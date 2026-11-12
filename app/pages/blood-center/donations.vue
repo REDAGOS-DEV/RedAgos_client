@@ -116,17 +116,31 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="row in rows" :key="row.id" class="don-row" :class="{ 'don-row--open': row.open }">
+              <tr
+                v-for="row in rows"
+                :key="row.id"
+                class="don-row"
+                :class="{ 'don-row--open': row.open }"
+                tabindex="0"
+                :aria-label="`Open donation ${row.code}`"
+                @click="openDetail(row)"
+                @keydown.enter.self="openDetail(row)"
+              >
                 <td class="c-id">
                   <span class="code">{{ row.code }}</span>
                   <span v-if="row.source === 'paper'" class="chip" :title="`Typed from paper sheet ${row.paper_sheet?.code}`">Paper</span>
                 </td>
                 <td class="c-donor">
-                  <template v-if="row.donor && !row.donor.blinded">
-                    <span class="donor__name">{{ row.donor.full_name }}</span>
-                    <span class="sub">{{ row.donor.donor_code }}</span>
-                  </template>
-                  <span v-else class="muted">Identity hidden</span>
+                  <div class="donor">
+                    <PersonAvatar :name="row.donor?.full_name" :hidden="!(row.donor && !row.donor.blinded)" />
+                    <div class="donor__text">
+                      <template v-if="row.donor && !row.donor.blinded">
+                        <span class="donor__name">{{ row.donor.full_name }}</span>
+                        <span class="sub">{{ row.donor.donor_code }}</span>
+                      </template>
+                      <span v-else class="muted">Identity hidden</span>
+                    </div>
+                  </div>
                 </td>
                 <td class="c-group">
                   <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
@@ -138,12 +152,13 @@
                 </td>
                 <td class="c-bag">
                   <span v-if="row.bag?.barcode" class="code code--bag">{{ row.bag.barcode }}</span>
-                  <span v-else class="muted">{{ row.open ? 'Not drawn' : '—' }}</span>
+                  <span v-else class="muted muted--soft">{{ row.open ? 'Not drawn' : '—' }}</span>
                   <span v-if="row.volume_ml" class="sub">{{ row.volume_ml }} mL</span>
                 </td>
                 <td class="c-appt">
-                  <span>{{ row.appointment?.code ?? 'Walk-in' }}</span>
-                  <span v-if="row.drive" class="sub">{{ row.drive }}</span>
+                  <span v-if="row.appointment?.code" class="code">{{ row.appointment.code }}</span>
+                  <span v-else class="tag">Walk-in</span>
+                  <span v-if="row.drive" class="sub sub--icon"><AssetIcon name="route" :size="12" />{{ row.drive }}</span>
                 </td>
                 <td class="c-status">
                   <span class="badge" :class="`badge--${donationTone(row.status, row.status_label)}`">
@@ -151,7 +166,7 @@
                     {{ row.status_label }}
                   </span>
                 </td>
-                <td class="c-actions">
+                <td class="c-actions" @click.stop>
                   <div class="row-actions">
                     <button type="button" class="icon-btn" :aria-label="`View ${row.code}`" title="View" @click="openDetail(row)">
                       <AssetIcon name="eye" :size="15" />
@@ -159,11 +174,12 @@
                     <NuxtLink
                       v-if="row.open && canStartVisit && row.donor?.uuid"
                       :to="continueLink(row.donor.uuid)"
-                      class="icon-btn"
+                      class="act-btn"
                       :aria-label="`Continue ${row.code} at the Donation Counter`"
                       title="Continue at the Donation Counter"
                     >
-                      <AssetIcon name="arrow-right" :size="15" />
+                      Continue
+                      <AssetIcon name="arrow-right" :size="14" />
                     </NuxtLink>
                     <button
                       v-if="row.open && canClose"
@@ -184,7 +200,9 @@
         </div>
 
         <footer class="pager">
-          <span class="pager__info">{{ pager.total }} record(s)</span>
+          <span class="pager__info">
+            <template v-if="pager.total">Showing {{ pageFrom }}–{{ pageTo }} of </template>{{ pager.total }} record(s)
+          </span>
           <div class="pager__btns">
             <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loading" @click="load(pager.page - 1)">
               <AssetIcon name="chevron-left" :size="14" />
@@ -201,123 +219,110 @@
     </div>
 
     <!-- ============ DETAIL ============ -->
-    <Transition name="modal">
-      <div v-if="detail" class="modal-overlay" @click.self="detail = null">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-          <div class="modal-card__header">
-            <h2 id="detail-title" class="modal-card__title">
-              <AssetIcon name="droplets" :size="17" />
-              Donation {{ detail.code }}
-            </h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="detail = null">
-              <AssetIcon name="x" :size="18" />
-            </button>
-          </div>
-          <div class="modal-card__body">
-            <div class="detail-head">
-              <div>
-                <p class="detail-name">{{ detail.donor && !detail.donor.blinded ? detail.donor.full_name : 'Identity hidden' }}</p>
-                <p class="sub">
-                  <template v-if="detail.donor && !detail.donor.blinded">{{ detail.donor.donor_code }} · </template>{{ detail.donor?.blood_type || 'Not typed' }}
-                </p>
-              </div>
-              <span class="badge" :class="`badge--${donationTone(detail.status, detail.status_label)}`">
-                <span class="badge__dot" aria-hidden="true" />
-                {{ detail.status_label }}
-              </span>
-            </div>
+    <CenterModal v-if="detail" :title="`Donation ${detail.code}`" eyebrow="Donation record" size="md" @close="detail = null">
+      <template #meta>
+        <span class="badge" :class="`badge--${donationTone(detail.status, detail.status_label)}`">
+          <span class="badge__dot" aria-hidden="true" />
+          {{ detail.status_label }}
+        </span>
+        <span v-if="detail.source === 'paper'" class="chip chip--flat">Typed from paper</span>
+      </template>
 
-            <dl class="facts">
-              <div class="fact"><dt>Opened</dt><dd>{{ formatShortDate(detail.date) }} · {{ detail.time }}</dd></div>
-              <div class="fact"><dt>Appointment</dt><dd>{{ detail.appointment?.code ?? 'Walk-in' }}<span v-if="detail.drive" class="fact__sub">{{ detail.drive }}</span></dd></div>
-              <div class="fact">
-                <dt>Screening</dt>
-                <dd>
-                  {{ detail.screening?.outcome_label ?? 'Not screened yet' }}
-                  <span v-if="detail.screening?.recorded_by" class="fact__sub">by {{ detail.screening.recorded_by }}</span>
-                  <!-- The code for everyone here; the reason, folded, only for the clinical record's holder. -->
-                  <span v-if="detail.screening?.deferral_code || detail.screening?.deferral_reason" class="fact__sub">
-                    <DeferralCodeTag :code="detail.screening.deferral_code" :reason="detail.screening.deferral_reason" />
-                  </span>
-                </dd>
-              </div>
-              <div class="fact">
-                <dt>Bag</dt>
-                <dd>
-                  {{ detail.bag?.barcode ?? 'Not drawn' }}
-                  <span v-if="detail.bag?.type" class="fact__sub">{{ detail.bag.type }}<template v-if="detail.volume_ml"> · {{ detail.volume_ml }} mL</template></span>
-                </dd>
-              </div>
-              <div class="fact">
-                <dt>Collected</dt>
-                <dd>
-                  {{ detail.collection?.collected_at ? formatDateTime(detail.collection.collected_at) : '—' }}
-                  <span v-if="detail.collection?.collected_by" class="fact__sub">by {{ detail.collection.collected_by }}</span>
-                </dd>
-              </div>
-              <div v-if="detail.rejection_reason" class="fact fact--full"><dt>Closed because</dt><dd>{{ detail.rejection_reason }}</dd></div>
-              <div v-if="detail.source === 'paper' && detail.paper_sheet" class="fact fact--full">
-                <dt>Source</dt>
-                <dd>
-                  Paper sheet {{ detail.paper_sheet.code }}
-                  <span class="fact__sub">
-                    Typed in<template v-if="detail.paper_sheet.entered_by"> by {{ detail.paper_sheet.entered_by }}</template>
-                    from the drive's paper record. The names above are as the paper gives them.
-                  </span>
-                </dd>
-              </div>
-            </dl>
+      <div class="dd">
+        <div class="dd-donor">
+          <PersonAvatar size="lg" :name="detail.donor?.full_name" :hidden="!(detail.donor && !detail.donor.blinded)" />
+          <div class="dd-donor__text">
+            <p class="detail-name">{{ detail.donor && !detail.donor.blinded ? detail.donor.full_name : 'Identity hidden' }}</p>
+            <p class="sub">
+              <template v-if="detail.donor && !detail.donor.blinded">{{ detail.donor.donor_code }}</template>
+              <template v-if="!detail.donor?.blood_type">{{ detail.donor && !detail.donor.blinded ? ' · ' : '' }}Blood group not typed</template>
+            </p>
           </div>
-          <div class="modal-card__footer">
-            <NuxtLink
-              v-if="detail.source === 'paper' && detail.paper_sheet && canRecordPaper"
-              :to="`/blood-center/paper-records/${detail.paper_sheet.id}`"
-              class="btn-outline"
-            >
-              Open the sheet
-              <AssetIcon name="arrow-right" :size="14" />
-            </NuxtLink>
-            <NuxtLink v-if="detail.open && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-outline">
-              Continue at the counter
-              <AssetIcon name="arrow-right" :size="14" />
-            </NuxtLink>
-            <button type="button" class="btn-outline" @click="detail = null">Close</button>
-          </div>
+          <span v-if="detail.donor?.blood_type" class="blood blood--lg" title="Blood group">{{ detail.donor.blood_type }}</span>
         </div>
+
+        <section class="dd-section" aria-labelledby="dd-visit">
+          <h3 id="dd-visit" class="dd-section__title">The visit</h3>
+          <ol class="timeline">
+            <li v-for="step in visitSteps(detail)" :key="step.key" class="tl" :class="`tl--${step.state}`">
+              <span class="tl__dot" aria-hidden="true">
+                <AssetIcon v-if="step.state === 'done'" name="check" :size="11" />
+                <AssetIcon v-else-if="step.state === 'warn'" name="user-x" :size="11" />
+                <AssetIcon v-else-if="step.state === 'stop'" name="x" :size="11" />
+              </span>
+              <div class="tl__body">
+                <p class="tl__label">{{ step.label }}</p>
+                <p v-if="step.detail" class="tl__detail">{{ step.detail }}</p>
+                <p v-if="step.by" class="tl__by">by {{ step.by }}</p>
+                <!-- The code for everyone here; the reason, folded, only for the clinical record's holder. -->
+                <span v-if="step.key === 'screening' && (detail.screening?.deferral_code || detail.screening?.deferral_reason)" class="tl__tag">
+                  <DeferralCodeTag :code="detail.screening.deferral_code" :reason="detail.screening.deferral_reason" />
+                </span>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        <dl class="facts">
+          <div class="fact">
+            <dt>Appointment</dt>
+            <dd>{{ detail.appointment?.code ?? 'Walk-in' }}<span v-if="detail.drive" class="fact__sub">{{ detail.drive }}</span></dd>
+          </div>
+          <div class="fact">
+            <dt>Bag</dt>
+            <dd>
+              <span :class="{ code: detail.bag?.barcode, 'code--bag': detail.bag?.barcode }">{{ detail.bag?.barcode ?? 'Not drawn' }}</span>
+              <span v-if="detail.bag?.type" class="fact__sub">{{ detail.bag.type }}<template v-if="detail.volume_ml"> · {{ detail.volume_ml }} mL</template></span>
+            </dd>
+          </div>
+          <div v-if="detail.source === 'paper' && detail.paper_sheet" class="fact fact--full">
+            <dt>Source</dt>
+            <dd>
+              Paper sheet {{ detail.paper_sheet.code }}
+              <span class="fact__sub">
+                Typed in<template v-if="detail.paper_sheet.entered_by"> by {{ detail.paper_sheet.entered_by }}</template>
+                from the drive's paper record. The names above are as the paper gives them.
+              </span>
+            </dd>
+          </div>
+        </dl>
       </div>
-    </Transition>
+
+      <template #actions>
+        <NuxtLink
+          v-if="detail.source === 'paper' && detail.paper_sheet && canRecordPaper"
+          :to="`/blood-center/paper-records/${detail.paper_sheet.id}`"
+          class="btn-outline"
+        >
+          Open the sheet
+          <AssetIcon name="arrow-right" :size="14" />
+        </NuxtLink>
+        <button type="button" class="btn-outline" @click="detail = null">Close</button>
+        <NuxtLink v-if="detail.open && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-primary">
+          Continue at the counter
+          <AssetIcon name="arrow-right" :size="14" />
+        </NuxtLink>
+      </template>
+    </CenterModal>
 
     <!-- ============ CLOSE VISIT ============ -->
-    <Transition name="modal">
-      <div v-if="closing.row" class="modal-overlay" @click.self="cancelClose">
-        <div class="modal-card modal-card--sm" role="alertdialog" aria-modal="true" aria-labelledby="close-title">
-          <div class="modal-card__header">
-            <h2 id="close-title" class="modal-card__title">
-              <AssetIcon name="triangle-alert" :size="17" />
-              Close this visit?
-            </h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="cancelClose">
-              <AssetIcon name="x" :size="18" />
-            </button>
-          </div>
-          <div class="modal-card__body">
-            <p class="modal-text">
-              {{ closing.row.code }}<template v-if="closing.row.donor && !closing.row.donor.blinded"> for {{ closing.row.donor.full_name }}</template>
-              was opened but no blood was drawn. Closing it frees the donor to start a new visit; nothing is collected.
-            </p>
-            <label class="form-label" for="close-reason">Reason <span class="form-optional">optional</span></label>
-            <textarea id="close-reason" v-model="closing.reason" class="form-input form-textarea" rows="2" maxlength="255" placeholder="e.g. Left before screening" />
-            <p v-if="closing.error" class="form-error" role="alert">{{ closing.error }}</p>
-          </div>
-          <div class="modal-card__footer">
-            <button type="button" class="btn-outline" @click="cancelClose">Back</button>
-            <button type="button" class="btn-primary btn-primary--danger" :disabled="closing.busy" @click="confirmClose">
-              {{ closing.busy ? 'Closing…' : 'Close visit' }}
-            </button>
-          </div>
-        </div>
+    <CenterModal v-if="closing.row" title="Close this visit?" size="sm" @close="cancelClose">
+      <div class="close-form">
+        <p class="modal-text">
+          {{ closing.row.code }}<template v-if="closing.row.donor && !closing.row.donor.blinded"> for {{ closing.row.donor.full_name }}</template>
+          was opened but no blood was drawn. Closing it frees the donor to start a new visit; nothing is collected.
+        </p>
+        <label class="form-label" for="close-reason">Reason <span class="form-optional">optional</span></label>
+        <textarea id="close-reason" v-model="closing.reason" class="form-input form-textarea" rows="2" maxlength="255" placeholder="e.g. Left before screening" />
+        <p v-if="closing.error" class="form-error" role="alert">{{ closing.error }}</p>
       </div>
-    </Transition>
+      <template #actions>
+        <button type="button" class="btn-outline" @click="cancelClose">Back</button>
+        <button type="button" class="btn-primary btn-primary--danger" :disabled="closing.busy" @click="confirmClose">
+          {{ closing.busy ? 'Closing…' : 'Close visit' }}
+        </button>
+      </template>
+    </CenterModal>
   </div>
 </template>
 
@@ -328,6 +333,8 @@ import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
 import DonorQrScanDialog from '~/components/BloodCenter/DonorQrScanDialog.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { DONATION_STATUS_FILTERS, donationTone } from '~/utils/donationRecords'
@@ -450,6 +457,31 @@ function clearFilters() {
   fromDate.value = ''
   toDate.value = ''
   load()
+}
+
+const pageFrom = computed(() => (pager.total ? (pager.page - 1) * PER_PAGE + 1 : 0))
+const pageTo = computed(() => Math.min(pager.page * PER_PAGE, pager.total))
+
+/**
+ * The visit, step by step, from what the record already holds: when it was
+ * opened, how the screening went, and whether blood was drawn.
+ */
+function visitSteps(d) {
+  const outcome = d.screening?.outcome_label ?? ''
+  const deferred = /defer/i.test(outcome)
+  const collected = Boolean(d.collection?.collected_at)
+
+  return [
+    { key: 'opened', label: 'Visit opened', detail: `${formatShortDate(d.date)} · ${d.time}`, state: 'done' },
+    d.screening
+      ? { key: 'screening', label: `Screening: ${outcome || 'recorded'}`, by: d.screening.recorded_by, state: deferred ? 'warn' : 'done' }
+      : { key: 'screening', label: 'Screening', detail: 'Not screened yet', state: d.open ? 'pending' : 'skipped' },
+    collected
+      ? { key: 'collection', label: 'Blood collected', detail: formatDateTime(d.collection.collected_at), by: d.collection.collected_by, state: 'done' }
+      : d.open
+        ? { key: 'collection', label: 'Collection', detail: 'Not drawn yet', state: 'pending' }
+        : { key: 'collection', label: 'No blood collected', detail: d.rejection_reason || 'The visit ended without a collection.', state: 'stop' },
+  ]
 }
 
 /* ---------- export ---------- */
@@ -806,10 +838,17 @@ onPageReturn(() => load(pager.page))
 
 .don-table tbody tr:last-child td { border-bottom: 0; }
 .don-row { transition: background 0.12s ease; }
-.don-row:hover { background: var(--rb-surface-hover); }
+.don-row:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
 
-/* An open visit carries a marker on its edge, never a filled row. */
-.don-row--open td:first-child { box-shadow: inset 3px 0 0 var(--rb-primary); }
+/* The whole row opens the record; the status says when a visit is still open. */
+.don-row { cursor: pointer; }
+.don-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.don-row--open { background: rgba(var(--rb-primary-rgb), 0.03); }
+.don-row--open:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
+
+/* Loading rows stand as tall as the rows they become. */
+.don-table tbody :deep(tr[aria-hidden="true"] td) { height: 65px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+.don-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 
 .c-id { width: 124px; }
 .c-group { width: 66px; }
@@ -817,7 +856,7 @@ onPageReturn(() => load(pager.page))
 .c-bag { width: 128px; }
 .c-appt { width: 150px; }
 .c-status { width: 150px; }
-.c-actions { width: 138px; }
+.c-actions { width: 204px; }
 
 /* Narrow panels keep who, when and where it stands. */
 @container (max-width: 980px) {
@@ -844,7 +883,18 @@ onPageReturn(() => load(pager.page))
   color: var(--rb-text-secondary);
   vertical-align: 1px;
 }
+.donor { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.donor__text { min-width: 0; }
 .donor__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+
+
+.tag {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border); font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary);
+}
+.sub--icon { display: flex; align-items: flex-start; gap: 4px; }
+.sub--icon :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
+.muted--soft { font-style: italic; }
 .sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
 .muted { color: var(--rb-text-secondary); }
 .nowrap { white-space: nowrap; }
@@ -886,9 +936,20 @@ onPageReturn(() => load(pager.page))
 .badge--crit { --tone: var(--rb-accent); }
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
-.row-actions { display: flex; gap: 6px; }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+
+/* The visit's next step, said in words: it is the row's main action. */
+.act-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap;
+  transition: background 0.12s ease;
+}
+.act-btn:hover { background: rgba(var(--rb-primary-rgb), 0.12); }
+.act-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 .icon-btn {
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 30px;
@@ -939,75 +1000,43 @@ onPageReturn(() => load(pager.page))
 .pager__btns { display: flex; align-items: center; gap: 8px; }
 .pager__page { font-variant-numeric: tabular-nums; }
 
-/* ---------- Modals ---------- */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--rb-overlay);
+/* ---------- Detail ---------- */
+.dd { display: flex; flex-direction: column; gap: 18px; }
+.dd-donor { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); }
+.dd-donor__text { flex: 1; min-width: 0; }
+.dd-donor__text .sub { margin-top: 2px; }
+.blood--lg { min-width: 44px; padding: 4px 10px; font-size: 13px; }
+.chip--flat { margin-left: 0; }
+
+.dd-section__title { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+
+/* The visit as a short line of steps. */
+.timeline { margin: 0; padding: 0; list-style: none; }
+.tl { position: relative; display: flex; gap: 12px; padding-bottom: 14px; }
+.tl:last-child { padding-bottom: 0; }
+.tl:not(:last-child)::before { content: ''; position: absolute; left: 10px; top: 24px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--rb-border); }
+.tl__dot {
+  position: relative; display: grid; flex-shrink: 0; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--rb-border-strong); background: var(--rb-surface); color: #fff;
 }
+.tl--done .tl__dot { border-color: var(--rb-success); background: var(--rb-success); }
+.tl--warn .tl__dot { border-color: var(--rb-warning); background: var(--rb-warning); }
+.tl--stop .tl__dot { border-color: var(--rb-accent); background: var(--rb-accent); }
+.tl--pending .tl__dot { border-style: dashed; }
+.tl--skipped { opacity: 0.6; }
+.tl__body { min-width: 0; padding-top: 1px; }
+.tl__label { margin: 0; font-size: 13.5px; font-weight: 700; }
+.tl--pending .tl__label, .tl--skipped .tl__label { color: var(--rb-text-secondary); }
+.tl__detail { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); overflow-wrap: anywhere; }
+.tl__by { margin: 1px 0 0; font-size: 12px; color: var(--rb-text-muted); }
+.tl__tag { display: block; margin-top: 6px; }
 
-.modal-card {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 600px;
-  max-height: calc(100vh - 40px);
-  background: var(--rb-surface);
-  border: 1px solid var(--rb-border);
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
-}
-
-.modal-card--sm { max-width: 440px; }
-
-.modal-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--rb-border);
-  flex-shrink: 0;
-}
-
-.modal-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; }
-.modal-card__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
-
-.modal-card__close {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: none;
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
-.modal-card__body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; overflow-y: auto; min-height: 0; }
-
-.modal-card__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--rb-border);
-  flex-shrink: 0;
-}
-
+.close-form { display: flex; flex-direction: column; gap: 10px; }
 .modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
 
-.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--rb-border); }
 .detail-name { margin: 0; font-size: 16px; font-weight: 700; text-transform: capitalize; }
 
-.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding-top: 16px; border-top: 1px solid var(--rb-border); }
 .fact { min-width: 0; }
 .fact--full { grid-column: 1 / -1; }
 
@@ -1037,8 +1066,8 @@ onPageReturn(() => load(pager.page))
   line-height: 1.45;
 }
 
-/* Anchored on the page root: other portals ship unscoped dark .form-input rules. */
-.donations-page .form-input {
+/* Anchored on the form: other portals ship unscoped dark .form-input rules, and the dialog is on the body. */
+.close-form .form-input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--rb-border-strong);
@@ -1049,14 +1078,8 @@ onPageReturn(() => load(pager.page))
   color: var(--rb-text-primary);
 }
 
-.donations-page .form-textarea { min-height: 64px; line-height: 1.5; resize: vertical; }
-.donations-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-
-.modal-enter-active,
-.modal-leave-active { transition: opacity 0.18s ease; }
-
-.modal-enter-from,
-.modal-leave-to { opacity: 0; }
+.close-form .form-textarea { min-height: 64px; line-height: 1.5; resize: vertical; }
+.close-form .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 @media (max-width: 760px) {
   .toolbar,
@@ -1066,7 +1089,6 @@ onPageReturn(() => load(pager.page))
   .search { max-width: none; flex: 1 1 100%; }
   .toolbar__actions { width: 100%; }
   .facts { grid-template-columns: minmax(0, 1fr); }
-  .modal-overlay { padding: 10px; align-items: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

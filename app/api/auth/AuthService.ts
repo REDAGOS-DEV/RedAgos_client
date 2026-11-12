@@ -47,6 +47,11 @@ class AuthService extends BaseService {
         return await this.request('/logout', 'POST');
     }
 
+    /** My activity: the signed-in user's own audit trail (GET /me/activity). */
+    async myActivity(params: object = {}): Promise<any> {
+        return await this.request('/me/activity', 'GET', params);
+    }
+
     async logoutFromAllDevices(): Promise<any> {
         return await this.request('/logout-all', 'POST');
     }

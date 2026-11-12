@@ -106,15 +106,7 @@
                 :options="reference.priorities.map((priority) => ({ value: priority.value, label: priority.label }))"
               />
             </label>
-            <label class="field">
-              <span class="field__label">Attending physician <span class="field__optional">(optional)</span></span>
-              <input v-model="form.attendingPhysician" class="field__input" maxlength="150" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Patient record no. <span class="field__optional">(optional)</span></span>
-              <input v-model="form.patientRecordNumber" class="field__input" maxlength="60" autocomplete="off">
-            </label>
-            <label class="field">
+            <label class="field field--span2">
               <span class="field__label">Reference on the watcher's paperwork <span class="field__optional">(optional)</span></span>
               <input v-model="form.presentedReference" class="field__input" maxlength="60" placeholder="e.g. RQ-4-0012" autocomplete="off">
             </label>
@@ -130,13 +122,13 @@
             </span>
           </div>
 
-          <div v-if="isContinuing" class="banner banner--info">
-            <AssetIcon name="route" :size="15" />
-            <span>
-              Adding this center's share to <strong class="mono">{{ form.transfusionReference }}</strong>. The patient,
-              blood type and components come from that request; only its unallocated units can be asked for here.
+          <div v-if="isContinuing" class="banner banner--info banner--continue">
+            <span class="banner__icon"><AssetIcon name="route" :size="16" /></span>
+            <span class="banner__text">
+              <strong class="banner__title">Adding this center's share to <span class="mono">{{ form.transfusionReference }}</span></strong>
+              The patient, blood type and components come from that request; only its unallocated units can be asked for here.
             </span>
-            <button type="button" class="link-btn" @click="undoContinuation">Record separately instead</button>
+            <button type="button" class="banner__action" @click="undoContinuation">Record separately instead</button>
           </div>
 
           <ul v-if="matches.length" class="matches">
@@ -147,15 +139,19 @@
                 <span class="chip chip--muted">{{ requestStatusLabel(match) }}</span>
               </div>
               <p class="match__meta">
-                {{ match.patient.full_name || '—' }} · {{ match.blood_type?.code || '—' }}
-                · {{ match.facilities?.length ? match.facilities.join(', ') : 'No facility yet' }} · {{ match.source_label }}
-                · {{ formatDate(match.request_date) }}
+                <span class="match__patient">{{ match.patient.full_name || '—' }}</span>
+                <span v-if="match.blood_type?.code" class="match__type">{{ match.blood_type.code }}</span>
+                <span class="match__fact"><AssetIcon name="hospital" :size="12" />{{ match.facilities?.length ? match.facilities.join(', ') : 'No facility yet' }}</span>
+                <span class="match__fact">{{ match.source_label }}</span>
+                <span class="match__fact"><AssetIcon name="calendar" :size="12" />{{ formatDate(match.request_date) }}</span>
               </p>
-              <p class="match__lines">
-                <span v-for="line in match.lines" :key="line.transfusion_request_item_id">
-                  {{ line.component.name }} {{ line.approved }}/{{ line.required }} approved<template v-if="line.unallocated"> ({{ line.unallocated }} unallocated)</template>
-                </span>
-              </p>
+              <ul class="match__lines">
+                <li v-for="line in match.lines" :key="line.transfusion_request_item_id" class="match__line">
+                  <span class="match__line-name">{{ line.component.name }}</span>
+                  <span>{{ line.approved }}/{{ line.required }} approved</span>
+                  <span v-if="line.unallocated" class="match__line-open">{{ line.unallocated }} unallocated</span>
+                </li>
+              </ul>
               <div class="match__actions">
                 <button
                   v-if="match.relation === 'here' && match.allocation"
@@ -173,7 +169,7 @@
                 >
                   Add this center's share — {{ match.unallocated_quantity }} unallocated unit{{ match.unallocated_quantity === 1 ? '' : 's' }}
                 </button>
-                <span v-if="form.transfusionRequestId === match.id" class="ok-text">
+                <span v-if="form.transfusionRequestId === match.id" class="match__chosen">
                   <AssetIcon name="check" :size="14" /> Adding to this request
                 </span>
               </div>
@@ -193,27 +189,13 @@
                   :options="reference.components.map((component) => ({ value: component.id, label: component.name }))"
                   placeholder="Select"
                   :disabled="isContinuing"
-                  @change="line.indicationCode = ''"
                 />
               </label>
               <label class="field field--narrow">
                 <span class="field__label">Units{{ line.maxQuantity !== null ? ` (max ${line.maxQuantity})` : '' }}</span>
                 <input v-model="line.quantity" type="number" min="1" :max="line.maxQuantity ?? 100" class="field__input">
               </label>
-              <template v-if="!isContinuing">
-                <label v-if="indicationsFor(line).length" class="field field--grow">
-                  <span class="field__label">Indication</span>
-                  <SelectField
-                    v-model="line.indicationCode"
-                    :options="indicationsFor(line).map((code) => ({ value: code.code, label: `${code.label} — ${code.description}` }))"
-                    placeholder="Select the clinical indication"
-                  />
-                </label>
-                <label v-if="needsExplanation(line)" class="field field--grow">
-                  <span class="field__label">Specify</span>
-                  <input v-model="line.indicationOther" class="field__input" maxlength="255">
-                </label>
-              </template>
+              <!-- No indication on a walk-in (project owner, 2026-11-11): the watcher's paperwork is the hospital's. -->
               <!-- A continuing watcher may carry only some of what is unallocated. -->
               <button
                 v-if="form.lines.length > 1"
@@ -498,14 +480,6 @@ function undoContinuation() {
   form.value = clearContinuation(form.value)
 }
 
-function indicationsFor(line) {
-  return reference.value?.components.find((component) => component.id === line.componentId)?.indication_codes ?? []
-}
-
-function needsExplanation(line) {
-  return indicationsFor(line).find((code) => code.code === line.indicationCode)?.requires_explanation ?? false
-}
-
 function componentName(id) {
   return reference.value?.components.find((component) => component.id === id)?.name ?? '—'
 }
@@ -729,6 +703,11 @@ function formatDate(value) {
   grid-column: 1 / -1;
 }
 
+/* Beside Priority, the paperwork reference keeps its label on one line. */
+.field--span2 {
+  grid-column: span 2;
+}
+
 .field--narrow {
   max-width: 120px;
 }
@@ -858,10 +837,12 @@ function formatDate(value) {
   line-height: 1.45;
 }
 
-.banner > span {
+/* The text takes the room, never the icon (also a span). */
+.banner > span:not(.asset-icon):not(.banner__icon) {
   flex: 1;
   min-width: 200px;
 }
+.banner > .asset-icon { flex-shrink: 0; margin-top: 2px; }
 
 .banner--info {
   background: rgba(var(--rb-success-rgb), 0.1);
@@ -1005,5 +986,39 @@ function formatDate(value) {
   .steps__item.is-current .steps__label {
     display: inline;
   }
+}
+
+/* ---------- Continuing a request, and the requests found (2026-11-11) ---------- */
+.banner--continue { align-items: center; flex-wrap: nowrap; gap: 12px; padding: 12px 14px; border: 1px solid rgba(var(--rb-success-rgb), 0.3); }
+.banner__icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+  background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text);
+}
+.banner__text { font-size: 12.5px; color: var(--rb-text-secondary); }
+.banner__title { display: block; margin-bottom: 2px; font-size: 13.5px; color: var(--rb-text-primary); }
+.banner__action {
+  flex-shrink: 0; height: 32px; padding: 0 12px; border: 1px solid var(--rb-border-strong); border-radius: 8px;
+  background: var(--rb-surface); color: var(--rb-primary-text); font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.banner__action:hover { background: rgba(var(--rb-primary-rgb), 0.06); border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.banner__action:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.match { gap: 10px; padding: 14px 16px; border-radius: 12px; }
+.match__ref { font-size: 15px; }
+.match__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12.5px; }
+.match__patient { font-weight: 700; color: var(--rb-text-primary); text-transform: capitalize; }
+.match__type { padding: 1px 8px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); font-size: 11.5px; font-weight: 700; }
+.match__fact { display: inline-flex; align-items: center; gap: 4px; }
+.match__fact :deep(svg) { color: var(--rb-text-muted); }
+.match__lines { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.match__line {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px;
+  border: 1px solid var(--rb-border); background: var(--rb-surface); font-size: 12.5px; color: var(--rb-text-secondary);
+}
+.match__line-name { font-weight: 600; color: var(--rb-text-primary); }
+.match__line-open { color: var(--rb-warning-text); font-weight: 600; }
+.match__chosen {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); font-size: 12.5px; font-weight: 700;
 }
 </style>

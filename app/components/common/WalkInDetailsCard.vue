@@ -28,11 +28,14 @@
         <h4 class="walk-in__heading">Presented by</h4>
         <dl>
           <div><dt>Name</dt><dd>{{ walkIn.representative.name }}</dd></div>
-          <div><dt>Relationship</dt><dd>{{ walkIn.representative.relationship }}</dd></div>
-          <div><dt>Contact</dt><dd>{{ formatPhoneNumber(walkIn.representative.contact) }}</dd></div>
+          <div><dt>Relationship</dt><dd class="cap">{{ walkIn.representative.relationship }}</dd></div>
+          <div><dt>Contact</dt><dd class="nowrap">{{ formatPhoneNumber(walkIn.representative.contact) }}</dd></div>
           <div v-if="walkIn.representative.id_type_label">
             <dt>ID presented</dt>
-            <dd>{{ walkIn.representative.id_type_label }} · {{ formatIdNumber(walkIn.representative.id_type, walkIn.representative.id_number) || '—' }}</dd>
+            <dd>
+              {{ walkIn.representative.id_type_label }}
+              <span class="dd-sub mono">{{ formatIdNumber(walkIn.representative.id_type, walkIn.representative.id_number) || '—' }}</span>
+            </dd>
           </div>
         </dl>
       </section>
@@ -126,14 +129,15 @@ function formatDateTime(value) {
   color: var(--rb-warning-text);
 }
 
+/* One block under another, each the full width, its facts side by side. */
 .walk-in__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }
 
 .walk-in__block {
-  padding: 0.7rem 0.8rem;
+  padding: 0.8rem 0.95rem;
   border: 1px solid var(--rb-border);
   border-radius: 10px;
 }
@@ -143,7 +147,7 @@ function formatDateTime(value) {
 }
 
 .walk-in__heading {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.6rem;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -155,8 +159,8 @@ function formatDateTime(value) {
 dl {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.45rem 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem 1.25rem;
 }
 
 dt {
@@ -169,6 +173,23 @@ dd {
   font-size: 13.5px;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.dd-sub {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.cap::first-letter {
+  text-transform: uppercase;
 }
 
 .mono {

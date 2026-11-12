@@ -42,31 +42,37 @@
       the dates, the status, then the list's own actions; a table with a row's
       actions on it; a pager. Built like the Donations list.
     -->
-    <section class="panel">
-      <!--
-        This tab's queue at a glance, each count a filter (2026-10-24). Ready
-        to issue is not a status: it opens Request Fulfillment, where Issue goes.
-      -->
-      <div v-if="tabSummary" class="quick" role="group" aria-label="Quick filters">
-        <button
-          v-for="chip in quickChips"
-          :key="chip.key"
-          type="button"
-          class="quick__chip"
-          :class="[`quick__chip--${chip.tone}`, { 'quick__chip--on': chip.active, 'quick__chip--zero': !chip.count }]"
-          :aria-pressed="chip.active"
-          @click="toggleQuick(chip)"
-        >
-          <AssetIcon v-if="chip.icon" :name="chip.icon" :size="13" />
-          <strong>{{ chip.count }}</strong> {{ chip.label }}
-        </button>
-        <NuxtLink v-if="canRelease" :to="isPatientTab ? '/blood-center/fulfillment' : '/blood-center/dispatch'" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
-          <AssetIcon name="send" :size="13" />
-          <strong>{{ tabSummary.awaiting_release }}</strong> ready to {{ isPatientTab ? 'issue' : 'dispatch' }}
-          <AssetIcon name="arrow-right" :size="12" />
-        </NuxtLink>
-      </div>
+    <!--
+      This tab's queue at a glance, each count a filter (2026-10-24). Ready
+      to issue is not a status: it opens Request Fulfillment, where Issue goes.
+    -->
+    <div v-if="tabSummary" class="quick" role="group" aria-label="Quick filters">
+      <button
+        v-for="chip in quickChips"
+        :key="chip.key"
+        type="button"
+        class="quick__chip"
+        :class="[`quick__chip--${chip.tone}`, { 'quick__chip--on': chip.active, 'quick__chip--zero': !chip.count }]"
+        :aria-pressed="chip.active"
+        @click="toggleQuick(chip)"
+      >
+        <span class="quick__icon"><AssetIcon :name="chip.icon" :size="15" /></span>
+        <span class="quick__text">
+          <strong class="quick__count">{{ chip.count }}</strong>
+          <span class="quick__label">{{ chip.label }}</span>
+        </span>
+      </button>
+      <NuxtLink v-if="canRelease" :to="isPatientTab ? '/blood-center/fulfillment' : '/blood-center/dispatch'" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
+        <span class="quick__icon"><AssetIcon name="send" :size="15" /></span>
+        <span class="quick__text">
+          <strong class="quick__count">{{ tabSummary.awaiting_release }}</strong>
+          <span class="quick__label">Ready to {{ isPatientTab ? 'issue' : 'dispatch' }}</span>
+        </span>
+        <AssetIcon name="arrow-right" :size="14" class="quick__go" />
+      </NuxtLink>
+    </div>
 
+    <section class="panel">
       <div class="toolbar">
         <div class="toolbar__filters">
           <label class="search">
@@ -86,10 +92,6 @@
         </div>
 
         <div class="toolbar__actions">
-          <span v-if="lastUpdatedAt" class="updated">
-            <AssetIcon name="clock" :size="13" />
-            Updated {{ lastUpdatedLabel }}
-          </span>
           <button type="button" class="btn btn-outline" :disabled="exporting || !meta.total" @click="handleExportAll">
             <AssetIcon name="download" :size="14" />
             {{ exporting ? 'Exporting…' : 'Export' }}
@@ -116,9 +118,9 @@
           <caption class="sr-only">Requests to this center: open ones first, emergencies at the top</caption>
           <thead>
             <tr>
-              <th scope="col" class="c-id">ID</th>
-              <th scope="col" class="c-date">Date</th>
-              <th scope="col" class="c-hospital">Hospital / Requester</th>
+              <th scope="col" class="c-id">Request</th>
+              <th scope="col" class="c-date">Received</th>
+              <th scope="col" class="c-hospital">Hospital</th>
               <th v-if="isPatientTab" scope="col" class="c-patient">Patient</th>
               <th v-else scope="col" class="c-patient">Blood Type</th>
               <th scope="col" class="c-component">Component</th>
@@ -134,9 +136,13 @@
               :key="r.id"
               class="req-row"
               :class="{ 'is-mutating': isMutating(r.id), 'req-row--emergency': r.emergency && r.isOpen, 'req-row--closed': !r.isOpen }"
+              tabindex="0"
+              :aria-label="`Review ${r.code}`"
+              @click="openReview(r)"
+              @keydown.enter.self="openReview(r)"
             >
               <td class="c-id">
-                <button type="button" class="code-link" :title="`Review ${r.code}`" @click="openReview(r)">{{ r.code }}</button>
+                <button type="button" class="code-link" :title="`Review ${r.code}`" @click.stop="openReview(r)">{{ r.code }}</button>
                 <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
                 <!-- Priority: only an emergency is marked; routine is the rule. -->
                 <span v-if="r.dueBy" class="chip" :title="`The hospital needs this by ${r.dueBy}`">
@@ -163,10 +169,16 @@
                 <span v-if="r.requestedBy" class="sub">{{ r.requestedBy }}</span>
               </td>
               <td v-if="isPatientTab" class="c-patient">
-                <span class="patient">
-                  <span class="patient__name" :class="{ muted: !r.patient }">{{ r.patient || r.patientFallback }}</span>
-                  <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
-                </span>
+                <div class="person">
+                  <PersonAvatar :name="r.patient" :hidden="!r.patient" />
+                  <div class="person__text">
+                    <span class="patient__name" :class="{ muted: !r.patient }" :title="r.patient || ''">{{ r.patient || r.patientFallback }}</span>
+                    <span class="person__meta">
+                      <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
+                      <span v-if="r.patientDetails" class="person__details">{{ r.patientDetails }}</span>
+                    </span>
+                  </div>
+                </div>
               </td>
               <!-- A restocking order names no patient; a weekly one can ask
                    for several blood types. -->
@@ -211,11 +223,8 @@
                   <AssetIcon name="clock" :size="11" /> {{ waitingLabel(r) }}
                 </span>
               </td>
-              <td class="c-actions">
+              <td class="c-actions" @click.stop>
                 <div class="row-actions">
-                  <button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">
-                    <AssetIcon name="eye" :size="15" />
-                  </button>
                   <!-- A replenishment order is confirmed before it goes: what
                        is supplied, and how and when (project owner, 2026-10-29). -->
                   <template v-if="r.needsPlan">
@@ -248,6 +257,28 @@
                       {{ r.statusValue === 'pending' ? 'Approve' : 'Tag' }}
                     </button>
                   </template>
+                  <!-- Issue is dispatch, on Request Fulfillment: open once units
+                       are tagged. A confirmed replenishment order goes straight
+                       to For Dispatch. "Not yet" shows only where the row offers
+                       no other step. -->
+                  <template v-if="r.isOpen && canRelease">
+                    <NuxtLink v-if="r.canDispatch" :to="`/blood-center/dispatch?request=${r.id}`" class="btn-issue" :aria-label="`Dispatch ${r.code}`">
+                      <AssetIcon name="send" :size="13" />
+                      Dispatch
+                    </NuxtLink>
+                    <NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
+                      <AssetIcon name="send" :size="13" />
+                      Issue
+                    </NuxtLink>
+                    <template v-else-if="!rowHasStep(r)">
+                      <span v-if="r.isReplenishment" class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Dispatch: confirm the order first" title="Dispatch: confirm the order first">
+                        <AssetIcon name="send" :size="13" />
+                      </span>
+                      <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and tag units first" title="Issue: approve and tag units first">
+                        <AssetIcon name="send" :size="13" />
+                      </span>
+                    </template>
+                  </template>
                   <!-- Only while nothing is held or sent: the server refuses
                        a rejection once a unit is claimed. -->
                   <template v-if="r.canReject">
@@ -263,28 +294,12 @@
                       <AssetIcon name="x" :size="15" />
                     </button>
                   </template>
+                  <button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">
+                    <AssetIcon name="eye" :size="15" />
+                  </button>
                   <button type="button" class="icon-btn" :aria-label="`Download the request form for ${r.code}`" title="Request form (PDF)" @click="handleExportPdf(r)">
                     <AssetIcon name="file-down" :size="15" />
                   </button>
-                  <!-- Issue is dispatch, on Request Fulfillment: open once units
-                       are tagged, and says why not before then. A confirmed
-                       replenishment order goes straight to For Dispatch. -->
-                  <template v-if="r.isOpen && canRelease">
-                    <NuxtLink v-if="r.canDispatch" :to="`/blood-center/dispatch?request=${r.id}`" class="btn-issue" :aria-label="`Dispatch ${r.code}`">
-                      <AssetIcon name="send" :size="13" />
-                      Dispatch
-                    </NuxtLink>
-                    <NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
-                      <AssetIcon name="send" :size="13" />
-                      Issue
-                    </NuxtLink>
-                    <span v-else-if="r.isReplenishment" class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Dispatch: confirm the order first" title="Dispatch: confirm the order first">
-                      <AssetIcon name="send" :size="13" />
-                    </span>
-                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and tag units first" title="Issue: approve and tag units first">
-                      <AssetIcon name="send" :size="13" />
-                    </span>
-                  </template>
                 </div>
               </td>
             </tr>
@@ -313,7 +328,13 @@
       </div>
 
       <footer class="pager">
-        <span class="pager__info">{{ meta.total }} record(s)</span>
+        <span class="pager__info">
+          {{ meta.total }} {{ meta.total === 1 ? 'request' : 'requests' }}
+          <span v-if="lastUpdatedAt" class="updated">
+            <AssetIcon name="clock" :size="12" />
+            Updated {{ lastUpdatedLabel }}
+          </span>
+        </span>
         <div class="pager__btns">
           <button type="button" class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1 || loading" @click="loadRequests(meta.current_page - 1)">
             <AssetIcon name="chevron-left" :size="14" />
@@ -563,11 +584,13 @@
                         <td>
                           <span class="inv-inline" :class="'inv-' + lineLevel(line)">
                             <AssetIcon :name="inventoryIcon(lineLevel(line))" :size="12" />
-                            {{ lineLevel(line) === 'ok'
-                              ? 'Can cover'
-                              : lineLevel(line) === 'low'
-                                ? `Part only (${line.can_cover_now})`
-                                : 'No stock' }}
+                            {{ lineLevel(line) === 'none'
+                              ? 'Nothing needed'
+                              : lineLevel(line) === 'ok'
+                                ? 'Can cover'
+                                : lineLevel(line) === 'low'
+                                  ? `Part only (${line.can_cover_now})`
+                                  : 'No stock' }}
                           </span>
                         </td>
                       </tr>
@@ -579,14 +602,16 @@
 
                 <p class="inventory-status-line" :class="'inv-' + availabilityLevel(activeRequest)">
                   <AssetIcon :name="inventoryIcon(availabilityLevel(activeRequest))" :size="14" />
-                  {{ availabilityLevel(activeRequest) === 'ok'
-                    ? 'Sufficient Inventory'
-                    : availabilityLevel(activeRequest) === 'low'
-                      ? `Partial Inventory — some units can be ${activeRequest.isReplenishment ? 'dispatched' : 'tagged'} now`
-                      : 'Insufficient Inventory' }}
+                  {{ availabilityLevel(activeRequest) === 'none'
+                    ? (activeRequest.isOpen ? 'Nothing outstanding' : `Nothing outstanding: this request is ${activeRequest.status.toLowerCase()}`)
+                    : availabilityLevel(activeRequest) === 'ok'
+                      ? 'Sufficient Inventory'
+                      : availabilityLevel(activeRequest) === 'low'
+                        ? `Partial Inventory — some units can be ${activeRequest.isReplenishment ? 'dispatched' : 'tagged'} now`
+                        : 'Insufficient Inventory' }}
                 </p>
 
-                <p class="inventory-advisory">
+                <p v-if="availabilityLevel(activeRequest) !== 'none'" class="inventory-advisory">
                   <template v-if="activeRequest.isReplenishment">
                     Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held for this order,
                     and every unit is checked again under a lock when it is dispatched.
@@ -656,7 +681,7 @@
               <template v-else-if="activeRequest.canTag">
                 <button
                   v-if="availabilityLevel(activeRequest) === 'insufficient'"
-                  class="btn btn-outline"
+                  class="btn btn-outline btn-outline--primary"
                   @click="handleReviewInventory(activeRequest)"
                 >
                   Review Inventory
@@ -771,6 +796,7 @@ import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
+import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vue'
 import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
 import SupplyPlanDialog from '~/components/BloodCenter/SupplyPlanDialog.vue'
@@ -1069,10 +1095,10 @@ const tabSummary = computed(() => summary.value?.by_purpose?.[purposeTab.value] 
 const quickChips = computed(() => {
   const totals = tabSummary.value?.totals ?? {}
   return [
-    { key: 'emergency', label: 'emergency', icon: 'circle-alert', tone: 'crit', count: tabSummary.value?.open_emergencies ?? 0, active: urgencyFilter.value === 'emergency' },
-    { key: 'pending', label: 'pending', tone: 'warn', count: totals.pending ?? 0, active: statusFilter.value === 'pending' && !urgencyFilter.value },
-    { key: 'processing', label: 'processing', tone: 'info', count: totals.processing ?? 0, active: statusFilter.value === 'processing' && !urgencyFilter.value },
-    { key: 'partial', label: 'partly filled', tone: 'info', count: totals.partial ?? 0, active: statusFilter.value === 'partial' && !urgencyFilter.value },
+    { key: 'emergency', label: 'Emergency', icon: 'circle-alert', tone: 'crit', count: tabSummary.value?.open_emergencies ?? 0, active: urgencyFilter.value === 'emergency' },
+    { key: 'pending', label: 'Pending', icon: 'clock', tone: 'warn', count: totals.pending ?? 0, active: statusFilter.value === 'pending' && !urgencyFilter.value },
+    { key: 'processing', label: 'Processing', icon: 'refresh-cw', tone: 'info', count: totals.processing ?? 0, active: statusFilter.value === 'processing' && !urgencyFilter.value },
+    { key: 'partial', label: 'Partly filled', icon: 'package', tone: 'info', count: totals.partial ?? 0, active: statusFilter.value === 'partial' && !urgencyFilter.value },
   ]
 })
 
@@ -1089,6 +1115,11 @@ function toggleQuick(chip) {
     statusFilter.value = chip.key
   }
   loadRequests()
+}
+
+/** Whether a row already offers its next step in words (Confirm, Approve or Tag). */
+function rowHasStep(r) {
+  return (r.needsPlan && canDecide.value) || (r.canTag && canAllocate.value)
 }
 
 const share = (part, whole) => (whole ? Math.min(100, (part / whole) * 100) : 0)
@@ -1576,7 +1607,8 @@ function availabilityLevel(request) {
   const available = request.available ?? 0
   const needed = request.outstanding ?? request.units ?? 0
 
-  if (needed <= 0) return 'ok'
+  // A closed request, or one with nothing left to find, needs no stock.
+  if (!request.isOpen || needed <= 0) return 'none'
   if (available >= needed) return 'ok'
   if (available > 0) return 'low'
   return 'insufficient'
@@ -1585,13 +1617,15 @@ function availabilityLevel(request) {
 /** Per-component availability, as the review endpoint reports it. */
 function lineLevel(line) {
   if (!line) return 'insufficient'
+  // Nothing outstanding on the line: "can cover" would read as stock there is not.
+  if ((line.outstanding ?? 0) <= 0) return 'none'
   if (line.can_fully_cover) return 'ok'
   if ((line.available ?? 0) > 0) return 'low'
   return 'insufficient'
 }
 
 function inventoryIcon(level) {
-  return { ok: 'check', low: 'triangle-alert', insufficient: 'x' }[level] || 'check'
+  return { ok: 'check', low: 'triangle-alert', insufficient: 'x', none: 'minus' }[level] || 'check'
 }
 
 /* INITIAL LOAD */
@@ -2166,10 +2200,9 @@ useLiveRefresh(async () => {
 .quick__chip--go strong { color: var(--rb-primary-text); }
 .quick__chip--go:hover { background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); }
 
-/* An open emergency is marked down its edge and on a soft tint. */
-.req-row--emergency td { background: rgba(var(--rb-accent-rgb), 0.045); }
-.req-row--emergency td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
-.req-row--emergency:hover td { background: rgba(var(--rb-accent-rgb), 0.08); }
+/* An open emergency sits on a soft tint, its chip saying why. */
+.req-row--emergency td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.req-row--emergency:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
 /* A finished request steps back. */
 .req-row--closed td { color: var(--rb-text-secondary); }
 .req-row--closed .patient__name, .req-row--closed .strong { font-weight: 500; }
@@ -2560,6 +2593,71 @@ useLiveRefresh(async () => {
 :global(.dark .scope-blood-center-bloodrequests .field-select),
 :global(.dark .scope-blood-center-bloodrequests .field-textarea) { background: #1c2536; }
 :global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+/* ===== Refresh (2026-11-11) ===== */
+/* The whole row opens the review. */
+.req-row { cursor: pointer; }
+.req-row:hover { background: rgba(var(--rb-primary-rgb), 0.05); }
+.req-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.req-table tbody td { padding-top: 13px; padding-bottom: 13px; }
+.req-table thead th { padding-top: 11px; padding-bottom: 11px; }
+
+/* The queue at a glance: one tile per count, each a filter. */
+/* Above the list, under the tabs: they count what the tab holds. */
+.quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.15fr); gap: 12px; padding: 0; }
+.quick__chip {
+  height: auto; min-height: 64px; padding: 12px 14px; gap: 12px; border-radius: 14px;
+  background: var(--rb-surface); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+  justify-content: flex-start; text-align: left; font-size: 12px;
+}
+.quick__icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+  background: color-mix(in srgb, var(--tone) 12%, var(--rb-surface)); color: var(--tone);
+}
+.quick__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.quick__count { font-size: 19px !important; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.quick__label { margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quick__chip--zero { opacity: 1; }
+.quick__chip--zero .quick__icon { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
+.quick__chip--zero .quick__count { color: var(--rb-text-muted); }
+.quick__chip--crit:not(.quick__chip--zero) { background: rgba(var(--rb-accent-rgb), 0.05); font-weight: 600; }
+.quick__chip--crit:not(.quick__chip--zero) .quick__count { color: var(--rb-accent-text); }
+.quick__chip--go { --tone: var(--rb-primary); margin-left: 0; }
+/* Nothing to issue: a plain tile like the rest. */
+.quick__chip--go.quick__chip--zero { border-color: var(--rb-border); }
+.quick__chip--go.quick__chip--zero .quick__go { color: var(--rb-text-muted); }
+.quick__chip--go:not(.quick__chip--zero) { background: rgba(var(--rb-primary-rgb), 0.05); }
+.quick__chip--go:not(.quick__chip--zero) .quick__count { color: var(--rb-primary-text); }
+.quick__go { margin-left: auto; color: var(--rb-primary-text); flex-shrink: 0; }
+
+
+/* Patient: who, then the blood type and age under the name. */
+.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.person__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.person .patient__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.person__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
+.person__details { font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
+.c-patient { min-width: 170px; }
+.c-hospital { min-width: 190px; }
+
+/* Actions keep their places: the next step leads, review and the form close the row. */
+.row-actions { justify-content: flex-end; }
+.req-table th.c-actions { text-align: right; }
+.btn-approve, .btn-issue:not(.btn-issue--off) { min-width: 84px; justify-content: center; }
+
+/* Under the list: how many, and when they were read. */
+.pager__info { display: inline-flex; align-items: center; gap: 12px; }
+.pager__info .updated { margin: 0; font-size: 11.5px; }
+
+/* Review footer: Reject in red, Review Inventory in the action blue. */
+.btn-outline--danger { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.4); }
+.btn-outline--danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.07); border-color: rgba(var(--rb-accent-rgb), 0.6); }
+.btn-outline--primary { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.btn-outline--primary:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.07); border-color: rgba(var(--rb-primary-rgb), 0.65); }
+
+/* Nothing outstanding: neither good news nor bad. */
+.inv-none { color: var(--rb-text-secondary); background: transparent; }
+.inventory-status-line.inv-none { background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-weight: 600; }
 </style>
 
 <style scoped>

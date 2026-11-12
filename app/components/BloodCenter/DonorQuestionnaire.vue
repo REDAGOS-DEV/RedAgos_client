@@ -375,31 +375,39 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Centred, as every record in the portal opens (project owner, 2026-11-11):
+   wide enough for each question and its answer on one line. */
 .dhq-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  display: flex;
-  justify-content: flex-end;
-  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .dhq {
+  position: relative;
   display: flex;
   flex-direction: column;
-  width: min(46rem, 100%);
-  height: 100%;
+  width: min(1040px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--rb-border);
+  border-radius: 18px;
   background: var(--rb-surface);
-  border-left: 1px solid var(--rb-border-strong);
+  box-shadow: 0 28px 70px -24px rgba(15, 23, 42, 0.55);
   font-family: var(--rb-font-sans);
 }
 
 .dhq__header {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.2rem;
+  padding: 20px 24px 16px;
   border-bottom: 1px solid var(--rb-border);
 }
 
@@ -425,8 +433,9 @@ onBeforeUnmount(() => {
 
 .dhq__title {
   margin: 0.3rem 0 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--rb-text-primary);
 }
 
@@ -438,7 +447,7 @@ onBeforeUnmount(() => {
   color: var(--rb-text-secondary);
 }
 
-.dhq__header-actions { display: flex; gap: 0.35rem; flex: none; }
+.dhq__header-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
 .dhq__btn {
   border: 1px solid var(--rb-border-strong);
@@ -453,7 +462,7 @@ onBeforeUnmount(() => {
 }
 
 .dhq__btn:hover { background: var(--rb-surface-hover); }
-.dhq__btn--icon { font-size: 18px; line-height: 1; padding: 0.3rem 0.55rem; }
+.dhq__btn--icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 10px; font-size: 20px; line-height: 1; color: var(--rb-text-secondary); }
 .dhq__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .dhq__btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 .dhq__btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
@@ -461,7 +470,7 @@ onBeforeUnmount(() => {
 .dhq__btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
 .dhq__banner {
-  margin: 0.75rem 1.2rem 0;
+  margin: 12px 24px 0;
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
   font-size: 13px;
@@ -476,8 +485,9 @@ onBeforeUnmount(() => {
 
 .dhq__tabs {
   display: flex;
+  flex-shrink: 0;
   gap: 0.25rem;
-  padding: 0.75rem 1.2rem 0;
+  padding: 12px 24px 0;
   border-bottom: 1px solid var(--rb-border);
 }
 
@@ -495,7 +505,7 @@ onBeforeUnmount(() => {
 
 .dhq__tab--active { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
 
-.dhq__body { flex: 1; overflow-y: auto; padding: 1rem 1.2rem 2rem; }
+.dhq__body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 24px 28px; }
 
 .dhq__grid {
   display: grid;
@@ -528,7 +538,12 @@ onBeforeUnmount(() => {
 .dhq__section { margin-bottom: 1.4rem; }
 
 .dhq__section-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   margin: 0 0 0.5rem;
+  padding: 14px 0 8px;
+  background: var(--rb-surface);
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -545,14 +560,14 @@ onBeforeUnmount(() => {
   align-items: baseline;
   padding: 0.5rem 0.6rem;
   border-bottom: 1px solid var(--rb-border);
-  border-left: 3px solid transparent;
   font-size: 13.5px;
   line-height: 1.45;
 }
 
+/* A tint and the Review chip mark it; no edge line. */
 .dhq__question--flagged {
-  border-left-color: var(--rb-warning);
-  background: rgba(var(--rb-warning-rgb), 0.06);
+  border-radius: 8px;
+  background: rgba(var(--rb-warning-rgb), 0.08);
 }
 
 .dhq__question--na { color: var(--rb-text-secondary); }
@@ -623,9 +638,10 @@ onBeforeUnmount(() => {
 
 .dhq__save {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.7rem 1.2rem;
+  padding: 14px 24px;
   border-top: 1px solid var(--rb-border);
   background: var(--rb-surface);
 }
@@ -665,7 +681,8 @@ onBeforeUnmount(() => {
 .dhq__statements li { font-size: 13.5px; line-height: 1.5; color: var(--rb-text-primary); }
 
 @media (max-width: 640px) {
-  .dhq { width: 100%; }
+  .dhq-overlay { padding: 12px; }
+  .dhq { width: 100%; max-height: calc(100dvh - 24px); }
   .dhq__question { grid-template-columns: 1.4rem minmax(0, 1fr); }
   .dhq__answer,
   .dhq__choice { grid-column: 2; justify-self: start; margin-top: 0.3rem; }
@@ -674,7 +691,8 @@ onBeforeUnmount(() => {
 /* Staff keep a paper copy, so the drawer prints as the document it is. */
 @media print {
   .dhq-overlay { position: static; background: none; }
-  .dhq { width: 100%; height: auto; border: none; }
+  .dhq { width: 100%; height: auto; max-height: none; overflow: visible; border: none; border-radius: 0; box-shadow: none; }
+  .dhq__section-title { position: static; }
   .dhq__header-actions,
   .dhq__tabs,
   .dhq__save { display: none; }

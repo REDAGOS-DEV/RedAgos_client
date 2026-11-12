@@ -16,10 +16,27 @@
       <span>{{ notice }}</span>
     </div>
 
-    <!-- ================= QUEUE + WORKBENCH ================= -->
-    <div class="workspace">
+    <!--
+      One thing at a time, as on Component Processing (project owner,
+      2026-11-11): the queue fills the page when it opens; picking or scanning
+      a donation opens its bags in the queue's place, with the way back at its
+      head. ?donation= holds it open, so a reload or Back keeps the place.
+    -->
+    <!-- The day at a glance, over the queue (2026-11-11). -->
+    <div v-if="!selected" class="glance" role="group" aria-label="Stock intake at a glance">
+      <div v-for="tile in glance" :key="tile.key" class="glance__tile" :class="[`glance__tile--${tile.tone}`, { 'glance__tile--zero': tile.count === 0 }]">
+        <span class="glance__icon"><AssetIcon :name="tile.icon" :size="16" /></span>
+        <span class="glance__text">
+          <strong class="glance__count">{{ tile.count }}</strong>
+          <span class="glance__label">{{ tile.label }}</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="workspace" :class="{ 'workspace--unit': selected }">
       <!-- QUEUE -->
-      <aside class="queue-panel" aria-label="Donations waiting to be booked in">
+      <aside v-show="!selected" class="queue-panel" aria-label="Donations waiting to be booked in">
+        <div class="queue-toolbar">
         <form class="scan" @submit.prevent="findByBarcode">
           <AssetIcon name="scan-line" :size="17" class="scan__icon" />
           <label class="sr-only" for="intake-scan">Donation barcode</label>
@@ -41,8 +58,9 @@
         </form>
 
         <div class="queue-panel__head">
-          <p class="queue-panel__title">
-            Waiting
+          <!-- How many wait is on the tile above; a barcode search says what it found. -->
+          <p v-if="activeBarcode" class="queue-panel__title">
+            Found
             <span class="queue-panel__count">{{ loadingQueue ? '…' : queue.length }}</span>
           </p>
           <button
@@ -55,6 +73,7 @@
           >
             <AssetIcon :name="activeBarcode ? 'x' : 'refresh-cw'" :size="14" :class="{ 'spin': loadingQueue }" />
           </button>
+        </div>
         </div>
 
         <p v-if="activeBarcode && !loadingQueue" class="queue-panel__filter">
@@ -72,44 +91,82 @@
           <EmptyState
             :icon="activeBarcode ? 'search-x' : 'circle-check-big'"
             :title="activeBarcode ? 'No donation waiting to be booked in has this barcode.' : 'All caught up'"
-            :description="activeBarcode ? undefined : 'Every processed donation is on the shelf.'"
-            compact
+            :description="activeBarcode
+              ? 'Check the sticker, or show every donation waiting.'
+              : 'Every processed donation is on the shelf. When bags arrive from Component Processing, scan a donation\'s barcode above to book them in.'"
           />
+          <ul v-if="!activeBarcode" class="intake-how" aria-label="Booking in">
+            <li><span class="intake-how__icon"><AssetIcon name="scan-line" :size="15" /></span>Scan the donation's barcode</li>
+            <li><span class="intake-how__icon"><AssetIcon name="calendar" :size="15" /></span>Check each bag's expiry</li>
+            <li><span class="intake-how__icon"><AssetIcon name="warehouse" :size="15" /></span>Choose where it is stored</li>
+            <li><span class="intake-how__icon"><AssetIcon name="circle-check-big" :size="15" /></span>Book into stock</li>
+          </ul>
         </div>
 
-        <ul v-else class="queue">
-          <li v-for="row in queue" :key="row.donation_id">
-            <button
-              type="button"
-              class="queue__item"
-              :class="{ 'queue__item--on': selected?.donation_id === row.donation_id, 'queue__item--held': !row.into_stock }"
-              :aria-current="selected?.donation_id === row.donation_id ? 'true' : undefined"
-              :disabled="busy"
-              @click="openDonation(row)"
-            >
-              <span class="queue__top">
-                <span class="queue__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</span>
-                <span class="type-pill" :class="{ 'type-pill--unknown': !row.donor?.blood_type }">
-                  {{ row.donor?.blood_type || '?' }}
-                </span>
-              </span>
-              <span class="queue__meta">#{{ row.donation_id }} · {{ formatDate(row.donation_date) }}</span>
-              <span class="queue__bottom">
-                <span class="bag-dots" aria-hidden="true">
-                  <span
-                    v-for="n in dotCount(row)"
-                    :key="n"
-                    class="bag-dot"
-                    :class="{ 'bag-dot--in': n <= (row.recorded_units || 0) }"
-                  />
-                </span>
-                <span v-if="!row.into_stock" class="queue__left queue__left--held"><AssetIcon name="clock" :size="12" /> Not ready</span>
-                <span v-else class="queue__left">{{ row.outstanding_units }} bag{{ row.outstanding_units === 1 ? '' : 's' }} left</span>
-              </span>
-            </button>
-          </li>
-        </ul>
+        <div v-else class="qtable-wrap">
+          <table class="qtable">
+            <caption class="sr-only">Donations waiting to be booked in</caption>
+            <thead>
+              <tr>
+                <th scope="col">Donation</th>
+                <th scope="col">Group</th>
+                <th scope="col">Date</th>
+                <th scope="col">Bags</th>
+                <th scope="col" class="end"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in queue"
+                :key="row.donation_id"
+                class="qrow"
+                :class="{ 'qrow--held': !row.into_stock }"
+                tabindex="0"
+                :aria-label="`Open ${donorTitle(row.donor, row.donation_barcode, row.donation_id)}`"
+                @click="!busy && openDonation(row)"
+                @keydown.enter.self="!busy && openDonation(row)"
+              >
+                <td>
+                  <span class="qrow__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</span>
+                  <span class="qrow__sub">#{{ row.donation_id }}</span>
+                </td>
+                <td>
+                  <span class="type-pill" :class="{ 'type-pill--unknown': !row.donor?.blood_type }">{{ row.donor?.blood_type || '?' }}</span>
+                </td>
+                <td class="nowrap">{{ formatDate(row.donation_date) }}</td>
+                <td>
+                  <span class="qrow__bags">
+                    <span class="bag-dots" aria-hidden="true">
+                      <span
+                        v-for="n in dotCount(row)"
+                        :key="n"
+                        class="bag-dot"
+                        :class="{ 'bag-dot--in': n <= (row.recorded_units || 0) }"
+                      />
+                    </span>
+                    <span v-if="!row.into_stock" class="queue__left queue__left--held"><AssetIcon name="clock" :size="12" /> Not ready</span>
+                    <span v-else class="queue__left">{{ row.outstanding_units }} bag{{ row.outstanding_units === 1 ? '' : 's' }} left</span>
+                  </span>
+                </td>
+                <td class="end">
+                  <span class="qrow__open">
+                    Open
+                    <AssetIcon name="arrow-right" :size="14" />
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </aside>
+
+      <!-- What went on the shelf lately: the last bags booked in, newest first. -->
+      <RecentlyBookedIn
+        v-if="!selected"
+        :items="recent"
+        :loading="loadingRecent"
+        :can-view-all="can('inventory.view')"
+      />
 
       <!--
         WORKBENCH. Always shown, as on Processing and Testing (project owner,
@@ -117,8 +174,12 @@
         pick one. Nothing opens until a donation is picked or its barcode
         scanned.
       -->
-      <section class="bench" :class="{ 'bench--locked': !selected }" aria-live="polite">
-        <!-- Identity: the open donation, or a dash -->
+      <section v-if="selected" class="bench" aria-live="polite">
+        <button type="button" class="bench__back" :disabled="busy" @click="backToQueue">
+          <AssetIcon name="chevron-left" :size="15" />
+          Back to queue
+        </button>
+        <!-- Identity: the open donation -->
         <div class="bench__head">
           <span class="bench__avatar">
             <!-- A bag, not a person, for the roles that work blind and before a donation is open. -->
@@ -152,9 +213,6 @@
               booked in
             </span>
           </div>
-          <button v-if="selected" type="button" class="icon-btn" :disabled="busy" aria-label="Close this donation" title="Close" @click="backToQueue">
-            <AssetIcon name="x" :size="16" />
-          </button>
         </div>
 
         <!-- What the laboratory declared -->
@@ -332,8 +390,11 @@ import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import RecentlyBookedIn from '~/components/BloodCenter/RecentlyBookedIn.vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
 import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
+
+const { can } = useUser()
 
 /**
  * Issuance books the bags Processing hands over into stock. Processing keeps
@@ -603,6 +664,40 @@ async function loadQueue(options = {}) {
  * Find the donation whose bags are on the counter. One match opens it straight
  * away — the sticker was scanned because those are the bags being booked in.
  */
+/* AT A GLANCE AND RECENTLY BOOKED IN (2026-11-11) */
+// The last bags booked in, from the stock movements; this page writes none of
+// them, it only reads the newest page.
+const recentAll = ref([])
+const loadingRecent = ref(false)
+const recentLoaded = ref(false)
+const recent = computed(() => recentAll.value.slice(0, 8))
+
+async function loadRecent() {
+  loadingRecent.value = true
+  try {
+    const res = await service.inventoryActivity({ page: 1, per_page: 50, kind: 'booked_in' })
+    recentAll.value = (res?.data ?? []).filter((item) => item.kind === 'booked_in')
+  } catch {
+    // Without it the queue still works; the panel says nothing is booked in.
+  } finally {
+    loadingRecent.value = false
+    recentLoaded.value = true
+  }
+}
+
+const isToday = (iso) => Boolean(iso) && new Date(iso).toDateString() === new Date().toDateString()
+
+const glance = computed(() => {
+  const ready = queue.value.filter((row) => row.into_stock)
+  const counting = loadingQueue.value && !queue.value.length
+  return [
+    { key: 'waiting', label: 'Donations waiting', icon: 'inbox', tone: 'info', count: counting ? '…' : queue.value.length },
+    { key: 'bags', label: 'Bags to book in', icon: 'package', tone: 'warn', count: counting ? '…' : ready.reduce((sum, row) => sum + (row.outstanding_units || 0), 0) },
+    { key: 'held', label: 'Not ready yet', icon: 'clock', tone: 'neutral', count: counting ? '…' : queue.value.length - ready.length },
+    { key: 'today', label: 'Booked in today', icon: 'circle-check-big', tone: 'ok', count: !recentLoaded.value ? '…' : recentAll.value.filter((item) => isToday(item.at)).length },
+  ]
+})
+
 async function findByBarcode() {
   error.value = null
   activeBarcode.value = normalizeBarcode(barcodeSearch.value)
@@ -632,6 +727,7 @@ async function loadReference() {
 
 function openDonation(row) {
   selected.value = row
+  showDonationInAddress(row.donation_id)
   notice.value = null
   error.value = null
   unitRows.value = []
@@ -664,8 +760,52 @@ function backToQueue() {
   selected.value = null
   unitRows.value = []
   error.value = null
+  clearDonationFromAddress()
   loadQueue()
 }
+
+// ── The open donation in the address: Back returns to the queue, a reload keeps it ──
+const route = useRoute()
+const router = useRouter()
+
+function linkedDonation() {
+  const wanted = Number(route.query.donation)
+  return Number.isInteger(wanted) && wanted > 0 ? wanted : 0
+}
+
+// From the queue it is a new entry; from one donation to another it replaces.
+function showDonationInAddress(id) {
+  if (linkedDonation() === Number(id)) return
+  const query = { ...route.query, donation: String(id) }
+  if (linkedDonation()) router.replace({ query })
+  else router.push({ query })
+}
+
+function clearDonationFromAddress() {
+  if (!linkedDonation()) return
+  const { donation: _open, ...rest } = route.query
+  router.push({ query: rest })
+}
+
+// A linked donation opens once the queue holds it.
+function openLinked() {
+  const linked = linkedDonation()
+  if (!linked || selected.value?.donation_id === linked) return
+  const row = queue.value.find((r) => r.donation_id === linked)
+  if (row) openDonation(row)
+}
+
+// The browser's Back and Forward move between the queue and a donation.
+watch(() => route.query.donation, () => {
+  if (route.path !== '/blood-center/inventory-intake') return
+  if (!linkedDonation() && selected.value) {
+    selected.value = null
+    unitRows.value = []
+    loadQueue({ quiet: true })
+  } else {
+    openLinked()
+  }
+})
 
 async function submit() {
   if (!canBook.value) return
@@ -693,17 +833,25 @@ async function submit() {
   // Re-read rather than adjusting the counts here: the server is what decides
   // how much is still outstanding, and it has just changed.
   await loadQueue()
+  loadRecent()
 
   const refreshed = queue.value.find((row) => row.donation_id === selected.value.donation_id)
 
   if (refreshed) openDonation(refreshed)
-  else selected.value = null
+  else {
+    // Every bag is on the shelf: back to the queue, the booking said above it.
+    const message = notice.value
+    backToQueue()
+    notice.value = message
+  }
 }
 
 onMounted(async () => {
   scanInput.value?.focus()
   await loadReference()
+  loadRecent()
   await loadQueue()
+  openLinked()
 })
 
 // Kept alive: back here, the queue reloads in place and the scanner field has
@@ -711,8 +859,10 @@ onMounted(async () => {
 // unless it left the queue meanwhile (booked in from another screen).
 onPageReturn(async () => {
   scanInput.value?.focus()
+  loadRecent()
   await loadQueue({ quiet: true })
-  if (selected.value && !queue.value.some((row) => row.donation_id === selected.value.donation_id)) selected.value = null
+  if (selected.value && !queue.value.some((row) => row.donation_id === selected.value.donation_id)) backToQueue()
+  else openLinked()
 })
 
 /*
@@ -1198,4 +1348,89 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 
 /* Panels in the shared SectionCard's shape (2026-10-15). */
 .queue-panel, .bench { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
+
+/* ---------- One thing at a time: the queue, or one donation's bags ---------- */
+.workspace { grid-template-columns: minmax(0, 1fr) !important; }
+.queue-panel { position: static !important; max-height: none !important; border-radius: 16px; }
+.queue-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 16px; border-bottom: 1px solid var(--rb-border); }
+.queue-toolbar .scan { flex: 0 1 420px; padding: 0; border-bottom: 0; }
+.queue-toolbar .scan__icon { left: 12px; }
+.queue-toolbar .queue-panel__head { flex: 1; padding: 0; justify-content: flex-end; gap: 10px; }
+.queue-empty { padding: 32px 16px 40px; }
+
+.qtable-wrap { overflow-x: auto; }
+.qtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.qtable thead th {
+  padding: 10px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); white-space: nowrap;
+}
+.qtable th:first-child, .qtable td:first-child { padding-left: 20px; }
+.qtable th:last-child, .qtable td:last-child { padding-right: 20px; }
+.qtable tbody td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); vertical-align: middle; }
+.qtable tbody tr:last-child td { border-bottom: 0; }
+.qtable .end { text-align: right; }
+.qtable .nowrap { white-space: nowrap; }
+.qrow { cursor: pointer; transition: background 0.12s ease; }
+.qrow:hover { background: rgba(var(--rb-primary-rgb), 0.05); }
+.qrow:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.qrow--held { color: var(--rb-text-secondary); }
+.qrow__name { display: block; font-weight: 700; color: var(--rb-text-primary); white-space: nowrap; }
+.qrow__sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
+.qrow__bags { display: inline-flex; align-items: center; gap: 10px; }
+.qrow__open {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.qrow:hover .qrow__open { background: rgba(var(--rb-primary-rgb), 0.12); }
+
+/* The way back, above the donation. */
+.bench__back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: 12px 0 0 14px; padding: 4px 8px 4px 4px;
+  border: 0; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); cursor: pointer;
+}
+.bench__back:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-primary-text); }
+.bench__back:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.bench { min-height: 0 !important; }
+
+/* ---------- At a glance and recently booked in (2026-11-11) ---------- */
+.glance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.glance__tile {
+  --tone: var(--rb-text-muted);
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px;
+  border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+}
+.glance__tile--info { --tone: var(--rb-primary); }
+.glance__tile--warn { --tone: var(--rb-warning); }
+.glance__tile--ok { --tone: var(--rb-success); }
+.glance__icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+  background: color-mix(in srgb, var(--tone) 12%, var(--rb-surface)); color: var(--tone);
+}
+.glance__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.glance__count { font-size: 20px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.glance__label { margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
+/* ---------- The queue beside what went on the shelf (2026-11-11) ---------- */
+.workspace:not(.workspace--unit) { grid-template-columns: minmax(0, 1fr) 360px !important; align-items: start; }
+.glance__tile--zero .glance__icon { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
+.glance__tile--zero .glance__count { color: var(--rb-text-muted); }
+.queue-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 36px 20px 30px; }
+.queue-empty :deep(.es) { padding: 8px 0 4px; }
+.queue-empty :deep(.es__desc) { max-width: 60ch; }
+.intake-how {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 760px;
+  margin: 12px 0 0; padding: 0; list-style: none;
+}
+.intake-how li {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 10px; text-align: center;
+  border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt);
+  font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); line-height: 1.35;
+}
+.intake-how__icon {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); color: var(--rb-primary-text);
+}
 </style>

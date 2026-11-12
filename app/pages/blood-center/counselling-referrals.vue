@@ -11,7 +11,7 @@
 
     <section class="card">
       <div class="confidential" role="note">
-        <AssetIcon name="shield-check" :size="16" />
+        <span class="confidential__icon" aria-hidden="true"><AssetIcon name="lock" :size="15" /></span>
         <p>
           Confidential. This list says which infection each unit was reactive for, by barcode: Testing never sees who
           the donor is. Per the donor's consent, no result is issued to them. Ask them to get in touch with the mail
@@ -34,26 +34,40 @@
       </div>
 
       <ul v-if="loadingReferrals" class="referrals" aria-busy="true">
-        <li v-for="n in 4" :key="n" class="referral referral--skeleton">
-          <span class="sk sk--line" style="width: 42%" />
-          <span class="sk sk--line" style="width: 68%" />
+        <li v-for="n in 3" :key="n" class="referral referral--skeleton">
+          <div class="referral__head">
+            <div class="sk-stack">
+              <span class="sk sk--line" style="width: 180px; height: 14px" />
+              <span class="sk sk--line" style="width: 240px" />
+            </div>
+            <span class="sk sk--line" style="width: 96px; height: 24px; border-radius: 999px" />
+          </div>
+          <div class="sk-row">
+            <span class="sk sk--line" style="width: 64px; height: 22px; border-radius: 7px" />
+            <span class="sk sk--line" style="width: 72px; height: 22px; border-radius: 7px" />
+          </div>
+          <span class="sk sk--line" style="width: 380px; max-width: 100%; height: 22px" />
         </li>
       </ul>
 
       <div v-else-if="!referrals.length" class="empty">
-        <AssetIcon name="life-buoy" :size="28" />
-        <p>{{ referralFilter === 'open' ? 'No donors are waiting to be followed up.' : 'No referrals match this filter.' }}</p>
+        <span class="empty__icon" aria-hidden="true"><AssetIcon :name="referralFilter === 'open' ? 'check-check' : 'life-buoy'" :size="22" /></span>
+        <p class="empty__title">{{ referralFilter === 'open' ? 'No one to follow up' : 'Nothing here' }}</p>
+        <p class="empty__text">{{ referralFilter === 'open' ? 'No donors are waiting to be followed up.' : 'No referrals match this filter.' }}</p>
       </div>
 
       <ul v-else class="referrals">
         <li v-for="referral in referrals" :key="referral.id" class="referral" :class="`referral--${referral.status}`">
           <div class="referral__head">
-            <div>
+            <div class="referral__who">
+              <span class="referral__icon" aria-hidden="true"><AssetIcon name="droplets" :size="17" /></span>
+              <div>
               <p class="referral__name">{{ referralTitle(referral) }}</p>
               <p class="referral__meta">
                 Donation #{{ referral.donation?.id }} · {{ formatDate(referral.donation?.donation_date) }}
                 <template v-if="referral.donor?.blood_type"> · {{ referral.donor.blood_type }}</template>
               </p>
+              </div>
             </div>
             <div class="referral__side">
               <span class="pill" :class="`pill--ref-${referral.status}`">{{ referral.status_label }}</span>
@@ -71,6 +85,18 @@
             </div>
           </div>
 
+          <!-- What it was reactive for: the reason the referral exists. -->
+          <div class="referral__markers">
+            <span class="referral__label">Reactive for</span>
+            <span v-for="marker in referral.reactive_markers" :key="marker.value" class="chip chip--alarm">
+              <AssetIcon name="circle-alert" :size="12" />
+              {{ marker.label }}
+            </span>
+          </div>
+
+
+
+          <div class="referral__track">
           <!-- Where the referral stands: forward only, from pending to closed. -->
           <ol class="steps" :aria-label="`Referral ${referral.status_label}`">
             <li
@@ -88,25 +114,19 @@
               {{ statusLabel(step) }}
             </li>
           </ol>
-
-          <div class="referral__facts">
-            <span v-for="marker in referral.reactive_markers" :key="marker.value" class="chip chip--alarm">
-              {{ marker.label }}
-            </span>
-            <span class="referral__meta">
-              Screened by {{ referral.screened_by || '—' }} · {{ formatDate(referral.screened_at) }}
-              <template v-if="referral.verified_by && referral.verified_by !== referral.screened_by">
-                · Verified by {{ referral.verified_by }}
-              </template>
-            </span>
-          </div>
-
-          <p class="referral__meta referral__contact" :class="{ 'referral__meta--todo': !referral.contact_requested_at && referral.is_open }">
+          <p class="referral__meta referral__contact" :class="{ 'referral__meta--todo': !referral.contact_requested_at && referral.is_open, 'referral__meta--done': referral.contact_requested_at }">
             <AssetIcon name="mail" :size="12" />
             <template v-if="referral.contact_requested_at">
               Contact request sent {{ formatDate(referral.contact_requested_at) }}<template v-if="referral.contact_requested_by"> by {{ referral.contact_requested_by }}</template><template v-else> (automatically)</template>
             </template>
             <template v-else>No contact request sent yet</template>
+          </p>
+          </div>
+          <p class="referral__meta referral__screened">
+            Screened by {{ referral.screened_by || '—' }} · {{ formatDate(referral.screened_at) }}
+            <template v-if="referral.verified_by && referral.verified_by !== referral.screened_by">
+              · Verified by {{ referral.verified_by }}
+            </template>
           </p>
 
           <p v-if="referral.note" class="referral__note">
@@ -157,53 +177,40 @@
     </section>
 
     <!-- The mail icon on a referral: ask the donor to get in touch, naming no result. -->
-    <div v-if="contact" class="dialog-backdrop" @click.self="closeContact">
-      <div
-        ref="contactRef"
-        class="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="contact-title"
-        tabindex="-1"
-        @keydown.esc="closeContact"
-      >
-        <h2 id="contact-title" class="dialog__title">
-          <AssetIcon name="mail" :size="18" />
-          Send contact request
-        </h2>
-        <div class="dialog__body">
+    <CenterModal v-if="contact" title="Send contact request" eyebrow="Counselling referral" size="sm" @close="closeContact">
+      <div class="dialog__body">
+        <p>
+          To the donor of <strong>{{ referralTitle(contact.referral) }}</strong>,
+          <template v-if="contact.referral.contact_by_email">by email and in the RedAgos portal.</template>
+          <template v-else>in the RedAgos portal only: there is no email address on record.</template>
+        </p>
+        <blockquote class="contact-preview">
+          <p class="contact-preview__subject">Please contact {{ facilityLabel || 'your blood centre' }}</p>
           <p>
-            To the donor of <strong>{{ referralTitle(contact.referral) }}</strong>,
-            <template v-if="contact.referral.contact_by_email">by email and in the RedAgos portal.</template>
-            <template v-else>in the RedAgos portal only: there is no email address on record.</template>
+            Thank you for donating blood at {{ facilityLabel || 'our centre' }}<template v-if="contact.referral.donation?.donation_date"> on {{ formatDay(contact.referral.donation.donation_date) }}</template>.
+            Our staff would like to speak with you about your donation. Please call us or reply to this email at
+            your earliest convenience.
           </p>
-          <blockquote class="contact-preview">
-            <p class="contact-preview__subject">Please contact {{ facilityLabel || 'your blood centre' }}</p>
-            <p>
-              Thank you for donating blood at {{ facilityLabel || 'our centre' }}<template v-if="contact.referral.donation?.donation_date"> on {{ formatDay(contact.referral.donation.donation_date) }}</template>.
-              Our staff would like to speak with you about your donation. Please call us or reply to this email at
-              your earliest convenience.
-            </p>
-          </blockquote>
-          <p v-if="contact.referral.contact_requested_at" class="dialog__hint">
-            Last sent {{ formatDate(contact.referral.contact_requested_at) }}<template v-if="contact.referral.contact_requested_by"> by {{ contact.referral.contact_requested_by }}</template>.
-          </p>
-          <p v-if="contact.error" class="alert alert--error" role="alert">{{ contact.error }}</p>
-        </div>
-        <div class="actions">
-          <button type="button" class="btn btn--primary" :disabled="contact.busy" @click="sendContact">
-            <AssetIcon name="send" :size="14" />
-            {{ contact.busy ? 'Sending…' : (contact.referral.contact_requested_at ? 'Send again' : 'Send') }}
-          </button>
-          <button type="button" class="btn" :disabled="contact.busy" @click="closeContact">Cancel</button>
-        </div>
+        </blockquote>
+        <p v-if="contact.referral.contact_requested_at" class="dialog__hint">
+          Last sent {{ formatDate(contact.referral.contact_requested_at) }}<template v-if="contact.referral.contact_requested_by"> by {{ contact.referral.contact_requested_by }}</template>.
+        </p>
+        <p v-if="contact.error" class="alert alert--error" role="alert">{{ contact.error }}</p>
       </div>
-    </div>
+      <template #actions>
+        <button type="button" class="btn" :disabled="contact.busy" @click="closeContact">Cancel</button>
+        <button type="button" class="btn btn--primary" :disabled="contact.busy" @click="sendContact">
+          <AssetIcon name="send" :size="14" />
+          {{ contact.busy ? 'Sending…' : (contact.referral.contact_requested_at ? 'Send again' : 'Send') }}
+        </button>
+      </template>
+    </CenterModal>
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorTitle } from '~/utils/donorLabel'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -323,11 +330,9 @@ async function submitReferral() {
 // --- contact requests (the mail icon) ----------------------------------------------
 
 const contact = ref(null)
-const contactRef = ref(null)
 
 function openContact(referral) {
   contact.value = { referral, busy: false, error: '' }
-  nextTick(() => contactRef.value?.focus())
 }
 
 function closeContact() {
@@ -697,11 +702,8 @@ onPageReturn(() => loadReferrals({ quiet: true }))
 .filter--on { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 
 /* A referral: its state down its edge. */
-.referral { position: relative; overflow: hidden; padding-left: 1.15rem; border-radius: 14px; }
-.referral::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--rb-text-muted); }
-.referral--pending::before { background: var(--rb-accent); }
-.referral--referred::before { background: var(--rb-primary); }
-.referral--closed::before { background: var(--rb-success); }
+/* Status is the pill and the steps; no edge line. */
+.referral { position: relative; border-radius: 14px; }
 
 /* The mail button names its job until a request has gone. */
 .icon-btn:has(.icon-btn__text) { display: inline-flex; align-items: center; width: auto; height: 32px; gap: 6px; padding: 0 12px; border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-primary-text); font-size: 12.5px; font-weight: 700; }
@@ -721,4 +723,40 @@ onPageReturn(() => loadReferrals({ quiet: true }))
 .btn--ghost { border-color: transparent; background: transparent; color: var(--rb-text-secondary); }
 .btn--ghost:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 .referral--skeleton { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- Calmer, clearer (2026-11-11) ---------- */
+.confidential {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px !important; border: 1px solid var(--rb-border) !important;
+  border-radius: 12px; background: var(--rb-surface-alt) !important; color: var(--rb-text-secondary) !important; font-size: 12.5px; line-height: 1.55;
+}
+.confidential__icon { display: grid; flex-shrink: 0; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+
+.referral { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px !important; transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+.referral:hover { border-color: var(--rb-border-hover); }
+.referral__who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.referral__icon { display: grid; flex-shrink: 0; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
+.referral--closed .referral__icon { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
+.referral__markers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.referral__label { margin-right: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-muted); }
+.referral__markers .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 7px; font-size: 12px; font-weight: 700; }
+.referral--closed .chip--alarm { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+/* The track: steps, then the contact and who screened, on one band. */
+.referral__track {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 12px;
+  border-radius: 10px; background: var(--rb-surface-alt);
+}
+.referral__track .steps { margin: 0; }
+.referral__track .referral__contact { margin: 0; }
+.referral__screened { margin: -4px 0 0 !important; font-size: 12px; color: var(--rb-text-muted); }
+.referral__meta--done { color: var(--rb-success-text); }
+
+.referral--skeleton { gap: 14px; }
+.sk-stack { display: flex; flex-direction: column; gap: 8px; }
+.sk-row { display: flex; gap: 6px; }
+
+.empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 40px 16px; text-align: center; }
+.empty__icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 4px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.empty__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.empty__text { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 </style>

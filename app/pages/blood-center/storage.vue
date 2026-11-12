@@ -1115,11 +1115,13 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 
 /* Neutral like the threshold banner: the state is the icon's colour alone. */
 .sweep-warning {
-  display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 14px; border-radius: 10px;
-  background: var(--rb-surface); border: 1px solid var(--rb-border); color: var(--rb-text-primary); font-size: 13px;
+  display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;
+  background: rgba(var(--rb-warning-rgb), 0.08); border: 1px solid rgba(var(--rb-warning-rgb), 0.35); color: var(--rb-text-primary); font-size: 13px;
 }
 .sweep-warning :deep(svg) { flex-shrink: 0; color: var(--iss-warn); }
-.sweep-warning span { flex: 1; }
+/* The text takes the room, never the icon (also a span). */
+.sweep-warning > span:not(.asset-icon) { flex: 1; line-height: 1.45; }
+.sweep-warning > .asset-icon { flex-shrink: 0; }
 
 .kpi__spark-area { fill: var(--kpi-mark); opacity: 0.14; stroke: none; }
 

@@ -15,11 +15,13 @@
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
     <!--
-      Workspace: the queue stays on the left while the open unit's serology
-      panel and typing are recorded on the right, the same layout as Processing.
+      One thing at a time, as on Component Processing (project owner,
+      2026-11-11): the queue fills the page when it opens; picking or scanning
+      a tube opens its results in the queue's place, with the way back at its
+      head. ?donation= holds the unit open, so a reload or Back keeps the place.
     -->
-    <div class="workspace">
-      <aside class="queue-panel" aria-label="Units awaiting testing">
+    <div class="workspace" :class="{ 'workspace--unit': selected }">
+      <aside v-show="!selected" class="queue-panel" aria-label="Units awaiting testing">
         <div class="queue-panel__head">
           <p class="queue-panel__title">
             {{ viewCopy.queueTitle }}
@@ -93,44 +95,68 @@
           <p v-else>No units are waiting. Donations appear here once the counter records a collection.</p>
         </div>
 
-        <ul v-else class="qlist">
-          <li v-for="row in visibleQueue" :key="row.id">
-            <button
-              type="button"
-              class="qitem"
-              :class="[`qitem--${rowTone(row)}`, { 'qitem--on': selected?.id === row.id }]"
-              :aria-current="selected?.id === row.id ? 'true' : undefined"
-              :disabled="busy"
-              @click="openDonation(row.id)"
-            >
-              <span class="qitem__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
-              <span class="qitem__meta">
-                #{{ row.id }}
-                <template v-if="row.collection?.donation_barcode && !row.donor?.blinded"> · <span class="mono">{{ row.collection.donation_barcode }}</span></template>
-                <template v-if="row.collection?.blood_bag_type_label"> · {{ row.collection.blood_bag_type_label }}</template>
-                · {{ formatDate(row.collection?.ended_at || row.donation_date) }}
-              </span>
-              <span class="qitem__state">
-                <span v-if="row.immunohematology?.clearance_hold" class="chip chip--alarm">Typing held</span>
-                <span v-else class="chip" :class="row.clearances?.immunohematology ? 'chip--done' : ''">
-                  <AssetIcon v-if="row.clearances?.immunohematology" name="check" :size="11" />
-                  Typing
-                </span>
-                <span v-if="row.serology?.awaiting_verification" class="chip chip--wait" title="Saved as reactive, waiting for the Laboratory Supervisor">
-                  <AssetIcon name="clock" :size="11" />
-                  Serology to verify
-                </span>
-                <span v-else class="chip" :class="row.clearances?.tti ? 'chip--done' : ''">
-                  <AssetIcon v-if="row.clearances?.tti" name="check" :size="11" />
-                  Serology
-                </span>
-              </span>
-            </button>
-          </li>
-        </ul>
+        <div v-else class="qtable-wrap">
+          <table class="qtable">
+            <caption class="sr-only">Units awaiting testing</caption>
+            <thead>
+              <tr>
+                <th scope="col">Unit</th>
+                <th scope="col">Bag</th>
+                <th scope="col">Collected</th>
+                <th scope="col">Typing</th>
+                <th scope="col">Serology</th>
+                <th scope="col" class="end"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in visibleQueue"
+                :key="row.id"
+                class="qrow"
+                :class="`qrow--${rowTone(row)}`"
+                tabindex="0"
+                :aria-label="`Open ${donorTitle(row.donor, row.collection?.donation_barcode, row.id)}`"
+                @click="!busy && openDonation(row.id)"
+                @keydown.enter.self="!busy && openDonation(row.id)"
+              >
+                <td>
+                  <span class="qrow__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
+                  <span class="qrow__sub">
+                    #{{ row.id }}<template v-if="row.collection?.donation_barcode && !row.donor?.blinded"> · <span class="mono">{{ row.collection.donation_barcode }}</span></template>
+                  </span>
+                </td>
+                <td class="nowrap">{{ row.collection?.blood_bag_type_label || '—' }}</td>
+                <td class="nowrap">{{ formatDate(row.collection?.ended_at || row.donation_date) }}</td>
+                <td>
+                  <span v-if="row.immunohematology?.clearance_hold" class="chip chip--alarm">Typing held</span>
+                  <span v-else class="chip" :class="row.clearances?.immunohematology ? 'chip--done' : ''">
+                    <AssetIcon :name="row.clearances?.immunohematology ? 'check' : 'clock'" :size="11" />
+                    {{ row.clearances?.immunohematology ? 'Cleared' : 'To do' }}
+                  </span>
+                </td>
+                <td>
+                  <span v-if="row.serology?.awaiting_verification" class="chip chip--wait" title="Saved as reactive, waiting for the Laboratory Supervisor">
+                    <AssetIcon name="clock" :size="11" />
+                    To verify
+                  </span>
+                  <span v-else class="chip" :class="row.clearances?.tti ? 'chip--done' : ''">
+                    <AssetIcon :name="row.clearances?.tti ? 'check' : 'clock'" :size="11" />
+                    {{ row.clearances?.tti ? 'Cleared' : 'To do' }}
+                  </span>
+                </td>
+                <td class="end">
+                  <span class="qrow__open">
+                    Open
+                    <AssetIcon name="arrow-right" :size="14" />
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </aside>
 
-      <section ref="benchRef" class="bench">
+      <section v-if="selected" ref="benchRef" class="bench">
         <!--
           ONE UNIT. With none open the results card still shows, locked, and its
           Save line says to pick one. A unit is never opened for the
@@ -138,6 +164,11 @@
         -->
         <template v-if="selected">
           <section class="unit-bar">
+            <button type="button" class="unit-bar__back" :disabled="busy" @click="backToQueue">
+              <AssetIcon name="chevron-left" :size="15" />
+              Back to queue
+            </button>
+            <span class="unit-bar__break" aria-hidden="true" />
             <div class="unit-bar__identity">
               <!-- A bag, not a person, for the roles that work blind. -->
               <span class="unit-bar__avatar">
@@ -153,7 +184,8 @@
               </div>
             </div>
 
-            <div class="fact">
+            <!-- A blind unit is already named by its barcode, in the title. -->
+            <div v-if="!selected.donor?.blinded" class="fact">
               <span class="fact__label">Barcode</span>
               <span class="fact__value mono">{{ selected.collection?.donation_barcode || 'None' }}</span>
             </div>
@@ -168,9 +200,6 @@
               <span class="pill" :class="`pill--${selected.status}`">{{ selected.status_label }}</span>
             </div>
 
-            <button type="button" class="icon-btn" :disabled="busy" aria-label="Close this unit" title="Close" @click="backToQueue">
-              <AssetIcon name="x" :size="16" />
-            </button>
           </section>
 
           <!-- Finished: nothing left for Testing to record -->
@@ -192,7 +221,7 @@
             </div>
 
             <div class="actions">
-              <button type="button" class="btn btn--primary" @click="backToQueue">Close this unit</button>
+              <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
               <NuxtLink v-if="isReactive && canSeeReferrals" to="/blood-center/counselling-referrals" class="btn">
                 Open Counselling Referrals
               </NuxtLink>
@@ -751,11 +780,17 @@ async function openDonation(id) {
 
   notice.value = null
   adopt(res.data ?? res)
+  showUnitInAddress(id)
+}
 
-  // Stacked on a narrow screen, the forms open below the list: bring them up.
-  if (window.matchMedia('(max-width: 860px)').matches) {
-    nextTick(() => benchRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-  }
+// The open unit in the address: Back returns to the queue, a reload keeps it.
+// From the queue it is a new entry; from one unit to another it replaces.
+function showUnitInAddress(id) {
+  appliedDonation = Number(id)
+  if (linkedDonation() === Number(id)) return
+  const query = { ...route.query, donation: String(id) }
+  if (linkedDonation()) router.replace({ query })
+  else router.push({ query })
 }
 
 function backToQueue() {
@@ -763,8 +798,27 @@ function backToQueue() {
   error.value = null
   notice.value = null
   confirmingReactive.value = false
+  appliedDonation = 0
+  if (linkedDonation()) {
+    const { donation: _open, ...rest } = route.query
+    router.push({ query: rest })
+  }
   loadQueue()
 }
+
+// The browser's Back and Forward move between the queue and a unit.
+watch(() => route.query.donation, () => {
+  if (route.path !== '/blood-center/testing') return
+  const linked = linkedDonation()
+  if (!linked && selected.value) {
+    adopt(null)
+    confirmingReactive.value = false
+    appliedDonation = 0
+    loadQueue({ quiet: true })
+  } else if (linked && linked !== selected.value?.id && !busy.value) {
+    openDonation(linked)
+  }
+})
 
 const confirmingReactive = ref(false)
 const dialogRef = ref(null)
@@ -1681,4 +1735,53 @@ fieldset:disabled .choice { cursor: not-allowed; opacity: 0.6; }
   margin: 0;
   padding: 0;
 }
+
+/* ---------- One thing at a time: the queue, or one unit's results ---------- */
+.workspace { grid-template-columns: minmax(0, 1fr) !important; gap: 18px; }
+.queue-panel { position: static !important; max-height: none !important; border-radius: 16px; }
+.queue-panel__tools { display: flex; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 0 18px 14px !important; }
+.queue-panel__tools .scan { flex: 0 1 420px; }
+.queue-panel__tools .view-switch { flex: 0 0 auto; }
+.queue-panel__tools .scan__active { flex-basis: 100%; }
+
+.qtable-wrap { overflow-x: auto; }
+.qtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.qtable thead th {
+  padding: 10px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); white-space: nowrap;
+}
+.qtable th:first-child, .qtable td:first-child { padding-left: 20px; }
+.qtable th:last-child, .qtable td:last-child { padding-right: 20px; }
+.qtable tbody td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); vertical-align: middle; }
+.qtable tbody tr:last-child td { border-bottom: 0; }
+.qtable .end { text-align: right; }
+.qtable .nowrap { white-space: nowrap; }
+.qrow { cursor: pointer; transition: background 0.12s ease; }
+.qrow:hover { background: rgba(var(--rb-primary-rgb), 0.05); }
+.qrow:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.qrow__name { display: block; font-weight: 700; color: var(--rb-text-primary); white-space: nowrap; }
+.qrow__sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
+.qrow__open {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.qrow:hover .qrow__open { background: rgba(var(--rb-primary-rgb), 0.12); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* The unit's head: the way back first. */
+.unit-bar { flex-wrap: wrap; padding: 14px 20px; border-color: var(--rb-border); border-radius: 16px; background: var(--rb-surface); row-gap: 10px; }
+.unit-bar__break { flex-basis: 100%; height: 0; }
+.unit-bar__identity { flex: 1 1 auto; }
+.unit-bar__back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; width: max-content; max-width: max-content;
+  padding: 4px 8px 4px 4px; margin: 0 0 2px -4px; border: 0; border-radius: 8px; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); cursor: pointer;
+}
+.unit-bar__back:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-primary-text); }
+.unit-bar__back:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* The one Save stays in view at the foot of the results. */
+.results__foot { position: sticky; bottom: 0; z-index: 2; background: var(--rb-surface); }
+
 </style>

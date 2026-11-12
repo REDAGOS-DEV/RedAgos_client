@@ -272,11 +272,14 @@ describe('the Processing page', () => {
     expect(page).toContain("if (row.test_result?.is_legacy) return 'Needs serology from Testing'")
   })
 
-  it('shows its cards before a unit is picked, locked, with the list as tall as the bench and counts on the chips (project owner, 2026-10-22)', () => {
+  it('shows the queue first and one unit\'s bench in its place, held in the address, with counts on the chips (project owner, 2026-11-11)', () => {
     expect(page).not.toContain('Pick a unit to start')
+    expect(page).toContain('<aside v-show="!selected" class="queue-panel" aria-label="Donation units">')
+    expect(page).toContain('<section v-if="selected" class="bench" aria-live="polite">')
+    expect(page).toContain('Back to queue')
+    expect(page).toContain("const query = { ...route.query, donation: String(id) }")
     expect(page).toContain('<fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">')
     expect(page).toContain("{{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}")
-    expect(page).toContain('align-items: stretch;')
     // Each chip's count is its list's paginated total, one row asked for.
     expect(page).toContain('per_page: 1')
   })

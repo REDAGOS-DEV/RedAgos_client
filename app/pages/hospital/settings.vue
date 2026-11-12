@@ -220,6 +220,9 @@
       </section>
 
       <!-- ACCOUNT: sessions and account information -->
+      <!-- ACTIVITY: the user's own audit trail, in any portal. -->
+      <MyActivityCard v-if="activeTab === 'activity'" />
+
       <template v-if="activeTab === 'account'">
         <section class="card">
           <header class="card__head">
@@ -334,6 +337,7 @@ import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import MyActivityCard from '~/components/common/MyActivityCard.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
 import { authService } from '~/api/auth/AuthService'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -351,6 +355,7 @@ const TABS = [
   { id: 'security', label: 'Security', icon: 'lock' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
   { id: 'account', label: 'Account', icon: 'monitor' },
+  { id: 'activity', label: 'Activity', icon: 'history' },
   { id: 'hospital', label: 'Hospital', icon: 'building-2' },
 ]
 
@@ -367,6 +372,21 @@ const activeTab = ref(tabFromLink() ?? 'profile')
 onPageReturn(() => {
   const tab = tabFromLink()
   if (tab) activeTab.value = tab
+})
+
+// The tab and the address follow each other, so a sidebar link to one tab
+// (My activity) opens it even from here, and the sidebar shows which is open.
+// Only on this page: kept alive, it must not answer another page's ?tab=.
+const router = useRouter()
+watch(() => route.query.tab, () => {
+  if (route.path !== '/hospital/settings') return
+  const tab = tabFromLink()
+  if (tab && tab !== activeTab.value) activeTab.value = tab
+})
+watch(activeTab, (tab) => {
+  if (route.path !== '/hospital/settings' || (route.query.tab ?? 'profile') === tab) return
+  const { tab: _old, ...rest } = route.query
+  router.replace({ query: tab === 'profile' ? rest : { ...rest, tab } })
 })
 
 const loading = ref(true)
