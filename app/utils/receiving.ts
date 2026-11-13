@@ -9,6 +9,7 @@
 
 import type { IsoWeekday } from '~/types/receiving'
 import { WEEKDAY_LABELS, WEEKDAYS } from '~/types/receiving'
+import { bagMatchesCode } from '~/utils/bagNumber'
 import { normalizeBarcode } from '~/utils/phlebotomy'
 
 /** What a typed bag number may hold: it becomes the bag's id, and every bag route matches [A-Za-z0-9-]. */
@@ -72,17 +73,21 @@ export type ScanResult =
  * A number that is on the delivery and not yet ticked is a match; one already
  * ticked is said so rather than counted twice; one not on the delivery is
  * unknown — a bag that arrived without being dispatched for this request.
+ * A donation's barcode sticker (digits only) is on every bag of that
+ * donation, so each scan of it ticks the next of them not yet ticked.
  */
 export function matchScannedBag(awaiting: AwaitingBag[], scanned: Set<number>, input: string): ScanResult {
   const unitId = normalizeUnitNumber(input)
 
   if (!unitId) return { kind: 'empty' }
 
-  const bag = awaiting.find((candidate) => normalizeUnitNumber(candidate.unit_id) === unitId)
+  const matches = awaiting.filter((candidate) => bagMatchesCode(unitId, candidate.unit_id))
 
-  if (!bag) return { kind: 'unknown', unit_id: unitId }
+  if (!matches.length) return { kind: 'unknown', unit_id: unitId }
 
-  return scanned.has(bag.allocation_id) ? { kind: 'already_scanned', bag } : { kind: 'matched', bag }
+  const next = matches.find((candidate) => !scanned.has(candidate.allocation_id))
+
+  return next ? { kind: 'matched', bag: next } : { kind: 'already_scanned', bag: matches[0]! }
 }
 
 /** The parts of a blood request, as a detail view sends it, that receiving reads. */

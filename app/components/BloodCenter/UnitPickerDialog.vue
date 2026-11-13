@@ -197,6 +197,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { isSticker, normalizeBagCode, parseBagNumber } from '~/utils/bagNumber'
 
 const props = defineProps({
   /** The list's row for the request: id, code, hospital, patient. */
@@ -283,7 +284,7 @@ function setScanRef(lineId, el) {
 }
 
 function searchTerm(line) {
-  return (query.value[line.request_item_id] ?? '').trim().toUpperCase()
+  return normalizeBagCode(query.value[line.request_item_id])
 }
 
 function note(line, tone, text) {
@@ -292,17 +293,20 @@ function note(line, tone, text) {
 
 /**
  * The units a typed or scanned number names in one line: the exact bag
- * number, or, for a bare donation sticker, that donation's bags of this
- * line's component (a second bag of the same component ends -2).
+ * number (SNBC-21627990-PRBC), or, for a bare donation sticker, that
+ * donation's bags of this line's component (a second bag of the same
+ * component ends -2).
  */
 function matchesIn(line, term) {
-  const exact = line.units.filter((unit) => unit.id.toUpperCase() === term)
+  const exact = line.units.filter((unit) => normalizeBagCode(unit.id) === term)
   if (exact.length) return exact
 
-  const asSticker = `${term}-${(line.component.code ?? '').toUpperCase()}`
+  if (!isSticker(term)) return []
+
+  const code = (line.component.code ?? '').toUpperCase()
   return line.units.filter((unit) => {
-    const id = unit.id.toUpperCase()
-    return id === asSticker || id.startsWith(`${asSticker}-`)
+    const bag = parseBagNumber(unit.id)
+    return bag?.sticker === term && (!code || bag.component === code)
   })
 }
 

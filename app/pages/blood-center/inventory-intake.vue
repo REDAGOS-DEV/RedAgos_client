@@ -49,8 +49,8 @@
             autocomplete="off"
             spellcheck="false"
             autocapitalize="characters"
-            maxlength="30"
-            placeholder="Scan or type a barcode"
+            maxlength="60"
+            placeholder="Scan a barcode or type a bag number"
           >
           <button type="submit" class="scan__go" :disabled="loadingQueue" aria-label="Find donation">
             <AssetIcon name="arrow-right" :size="16" />
@@ -343,12 +343,16 @@
           </div>
         </div>
 
-        <!-- Labelled, yet its bags carry no numbers: its barcode changed after the hand-over. -->
+        <!-- Labelled, yet its bags carry no numbers: no barcode, or the centre has no abbreviation yet. -->
         <div v-else-if="!barcoded" class="bench__stuck">
           <AssetIcon name="triangle-alert" :size="18" />
           <div>
             <p class="bench__stuck-title">Its bags have no numbers</p>
-            <p class="bench__note">
+            <p v-if="selected.numbers_missing === 'centre_abbreviation_missing'" class="bench__note">
+              Your blood center has no abbreviation yet, and every bag number starts with it. Ask the RedAgos
+              administrator to set one.
+            </p>
+            <p v-else class="bench__note">
               This donation has no barcode, so its bags carry no numbers to book them under. Ask Processing to check
               the donation's barcode.
             </p>
@@ -611,6 +615,10 @@ function messageFor(err) {
       return err?.data?.message || 'This batch records more bags than the laboratory declared.'
     case 'donor_blood_type_missing':
       return 'This donor has no blood type on file, so a unit cannot be labelled. The laboratory result records it.'
+    case 'barcode_missing':
+    case 'centre_abbreviation_missing':
+    case 'bag_number_missing':
+      return err?.data?.message || 'These bags have no numbers to book them under.'
     case 'donation_not_found':
       return 'That donation was not found at your facility.'
     case 'facility_missing':

@@ -869,6 +869,7 @@ function messageFor(err) {
     // The server's own words name the component or the fix.
     case 'shelf_life_missing':
     case 'barcode_missing':
+    case 'centre_abbreviation_missing':
     case 'bags_unnumbered':
     case 'donor_blood_type_missing':
       return err?.data?.message || 'These bags cannot be labelled yet.'
