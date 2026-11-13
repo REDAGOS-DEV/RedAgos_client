@@ -1,15 +1,16 @@
 <template>
   <!--
-    The first stop for a donor the blood center desk registered: they signed in
-    with the desk's temporary password (donor code or email), and choose their
-    own here. The server refuses every other endpoint until they do
-    (`password_change_required`), and portal.global sends them back here.
+    The first stop for an account on a temporary password: a donor the blood
+    center desk registered, or a staff member whose account was set up for
+    them (project owner, 2026-11-13: staff set their own password at first
+    sign-in). The server refuses every other endpoint until they choose their
+    own (`password_change_required`), and portal.global sends them back here.
   -->
-  <AuthShell :hero="hero" back-to="/auth/donor/login" back-label="Back to sign in">
+  <AuthShell :hero="hero" :back-to="signInPath" back-label="Back to sign in">
     <header class="au-header">
       <h1>Choose your own password</h1>
       <p>
-        You signed in with the temporary password from the blood center.
+        {{ isDonor ? 'You signed in with the temporary password from the blood center.' : 'You signed in with a temporary password.' }}
         Set your own to continue{{ firstName ? `, ${firstName}` : '' }}.
       </p>
     </header>
@@ -23,7 +24,7 @@
             id="temporary-password"
             v-model="temporary"
             :type="showTemporary ? 'text' : 'password'"
-            placeholder="The one the blood center gave you"
+            :placeholder="isDonor ? 'The one the blood center gave you' : 'The one you were given'"
             autocomplete="current-password"
             autocapitalize="none"
             spellcheck="false"
@@ -127,14 +128,20 @@ definePageMeta({
 
 useHead({ title: 'Choose Your Password · RedAgos' })
 
-const hero = {
+const { user, ensureUser, refreshUser, logout } = useUser()
+
+// A donor the desk registered, or a staff member on a set-up password.
+const isDonor = computed(() => user.value?.roles?.includes('donor') ?? false)
+const signInPath = computed(() => (isDonor.value ? '/auth/donor/login' : '/auth/login'))
+
+const hero = computed(() => ({
   lead: 'Welcome to RedAgos.',
   accent: 'One last step',
-  desc: 'Choose a password only you know. The one from the blood center works until you replace it here.',
+  desc: isDonor.value
+    ? 'Choose a password only you know. The one from the blood center works until you replace it here.'
+    : 'Choose a password only you know. The temporary one works until you replace it here.',
   ...authPhoto('screening'),
-}
-
-const { user, ensureUser, refreshUser, logout } = useUser()
+}))
 
 const firstName = computed(() => user.value?.first_name ?? '')
 
@@ -191,13 +198,15 @@ async function submit() {
       user.value = { ...user.value, temporary_sign_in: false }
     }
 
-    await navigateTo('/donor/dashboard', { replace: true })
+    await navigateTo(isDonor.value ? '/donor/dashboard' : portalHomeFor(user.value), { replace: true })
   } catch (error: any) {
     const errors = error?.errors ?? error?.data?.errors ?? {}
     const first = (field: string) => (Array.isArray(errors[field]) ? errors[field][0] : errors[field])
 
     if (errors.current_password) {
-      fieldErrors.current_password = 'That is not the temporary password the blood center gave you.'
+      fieldErrors.current_password = isDonor.value
+        ? 'That is not the temporary password the blood center gave you.'
+        : 'That is not the temporary password you were given.'
     } else if (errors.password) {
       fieldErrors.password = String(first('password'))
     } else {
@@ -211,7 +220,7 @@ async function submit() {
 }
 
 function signOut() {
-  return logout('/auth/donor/login')
+  return logout(signInPath.value)
 }
 </script>
 
