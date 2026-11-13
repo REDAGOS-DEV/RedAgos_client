@@ -12,7 +12,7 @@ import type { ActivityKindMeta, InventoryTag, InventoryTone } from '~/utils/inve
  * bag is shown.
  */
 
-const STATUS_TAGS: Record<HospitalUnitStatus, InventoryTag> = {
+const STATUS_TAGS: Record<HospitalUnitStatus, HospitalInventoryTag> = {
   received: { label: 'Awaiting Stock-in', tone: 'neutral' },
   available: { label: 'Available', tone: 'success' },
   tag_assigned: { label: 'Tag Assigned', tone: 'neutral' },
