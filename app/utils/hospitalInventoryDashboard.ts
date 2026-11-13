@@ -19,6 +19,8 @@ const STATUS_TAGS: Record<HospitalUnitStatus, InventoryTag> = {
   tag_crossmatched: { label: 'Tag Crossmatched', tone: 'neutral' },
   // Out of storage with no patient: someone has to confirm it back or discard it.
   pending_return: { label: 'Pending Return', tone: 'warning' },
+  // Set aside for the blood donor partner program: the Inventory Report's purple.
+  partner_reserved: { label: 'Reserved for Donor Partner', tone: 'partner' },
   transfused: { label: 'Transfused', tone: 'muted' },
   expired: { label: 'Expired', tone: 'danger' },
   discarded: { label: 'Discarded', tone: 'muted' },
@@ -36,14 +38,13 @@ export interface HospitalInventoryTag {
 /**
  * A bag's status as the list shows it.
  *
- * An untagged bag reserved for a blood donor partner reads as Reserved
- * (project owner, 2026-11-07); the Remaining Days cell still warns of its
- * date. Otherwise an available bag within a week of its date reads as
- * Expiring Soon, as at the centre: still free to tag, and the one to tag next.
+ * A bag reserved for the blood donor partner program reads as Reserved for
+ * Donor Partner, in purple (its own status since 2026-11-13); the Remaining
+ * Days cell still warns of its date. An available bag within a week of its
+ * date reads as Expiring Soon, as at the centre: still free to tag, and the
+ * one to tag next.
  */
-export function hospitalUnitStatusTag(status: HospitalUnitStatus, daysRemaining: number | null, reserved = false): HospitalInventoryTag {
-  if (status === 'available' && reserved) return { label: 'Reserved', tone: 'partner' }
-
+export function hospitalUnitStatusTag(status: HospitalUnitStatus, daysRemaining: number | null): HospitalInventoryTag {
   if (status === 'available' && daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7) {
     return { label: 'Expiring Soon', tone: 'warning' }
   }

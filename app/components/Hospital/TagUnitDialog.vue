@@ -40,11 +40,6 @@
         <span v-else-if="requirementsError" class="field__hint field__hint--error">{{ requirementsError }}</span>
       </label>
 
-      <!-- Tagging stays open; the reservation outlasts the tag (project owner, 2026-11-07). -->
-      <div v-if="unit.partner_reservation" class="banner banner--warning" role="status">
-        <AssetIcon name="lock" :size="15" />
-        <span>Reserved for blood donor partner {{ unit.partner_reservation.partner }}.</span>
-      </div>
 
       <div v-if="mismatch" class="banner banner--warning" role="status">
         <AssetIcon name="triangle-alert" :size="15" />

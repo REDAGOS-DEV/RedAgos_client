@@ -67,7 +67,7 @@
  * Releasing a tag and discarding a bag both require one — the API refuses
  * either without it — so the confirm button stays disabled until there is
  * text. The wording around it is the caller's, passed in the default slot.
- * Reserving a bag asks for its blood donor partner the same way, on one line.
+ * `single-line` asks for a short answer on one line instead.
  */
 
 import { nextTick, onMounted, ref } from 'vue'
