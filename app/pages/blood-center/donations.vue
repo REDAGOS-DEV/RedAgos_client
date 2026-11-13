@@ -80,7 +80,7 @@
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': loading && rows.length }">
           <table class="don-table">
-            <caption class="sr-only">Donations at this centre</caption>
+            <caption class="sr-only">Donations at every centre</caption>
             <thead>
               <tr>
                 <th scope="col" class="c-id">ID</th>
@@ -129,6 +129,7 @@
                 <td class="c-id">
                   <span class="code">{{ row.code }}</span>
                   <span v-if="row.source === 'paper'" class="chip" :title="`Typed from paper sheet ${row.paper_sheet?.code}`">Paper</span>
+                  <span v-if="!isOwn(row)" class="chip" :title="`Recorded at ${row.centre?.name ?? 'another centre'}`">{{ centreLabel(row) }}</span>
                 </td>
                 <td class="c-donor">
                   <div class="donor">
@@ -172,7 +173,7 @@
                       <AssetIcon name="eye" :size="15" />
                     </button>
                     <NuxtLink
-                      v-if="row.open && canStartVisit && row.donor?.uuid"
+                      v-if="row.open && isOwn(row) && canStartVisit && row.donor?.uuid"
                       :to="continueLink(row.donor.uuid)"
                       class="act-btn"
                       :aria-label="`Continue ${row.code} at the Donation Counter`"
@@ -182,7 +183,7 @@
                       <AssetIcon name="arrow-right" :size="14" />
                     </NuxtLink>
                     <button
-                      v-if="row.open && canClose"
+                      v-if="row.open && isOwn(row) && canClose"
                       type="button"
                       class="icon-btn icon-btn--danger"
                       :disabled="!row.can.close"
@@ -226,6 +227,7 @@
           {{ detail.status_label }}
         </span>
         <span v-if="detail.source === 'paper'" class="chip chip--flat">Typed from paper</span>
+        <span v-if="!isOwn(detail)" class="chip chip--flat">Recorded at {{ detail.centre?.name ?? 'another centre' }}</span>
       </template>
 
       <div class="dd">
@@ -290,7 +292,7 @@
 
       <template #actions>
         <NuxtLink
-          v-if="detail.source === 'paper' && detail.paper_sheet && canRecordPaper"
+          v-if="detail.source === 'paper' && detail.paper_sheet && isOwn(detail) && canRecordPaper"
           :to="`/blood-center/paper-records/${detail.paper_sheet.id}`"
           class="btn-outline"
         >
@@ -298,7 +300,7 @@
           <AssetIcon name="arrow-right" :size="14" />
         </NuxtLink>
         <button type="button" class="btn-outline" @click="detail = null">Close</button>
-        <NuxtLink v-if="detail.open && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-primary">
+        <NuxtLink v-if="detail.open && isOwn(detail) && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-primary">
           Continue at the counter
           <AssetIcon name="arrow-right" :size="14" />
         </NuxtLink>
@@ -366,14 +368,30 @@ const canClose = computed(() => can('donations.close'))
 const canRecordPaper = computed(() => can('donations.record_paper'))
 
 /**
+ * The list holds every centre's donations (project owner, 2026-11-13), as
+ * Donor Management holds every centre's donors. Another centre's visit is
+ * read only: no Continue, no Close, no paper sheet to open.
+ */
+function isOwn(row) {
+  return row?.scope !== 'cross_facility'
+}
+
+/** The recording centre on another centre's row: SPMC, else its name. */
+function centreLabel(row) {
+  return row.centre?.abbreviation || row.centre?.name || 'Other centre'
+}
+
+/**
  * API SHAPE
  * -------------------------------------------------------------------------
  *  GET   /donation-records?search=&status=&blood_type_id=&from=&to=&page=
- *        -> paginator; rows: { id, code, date, time, status, status_label,
- *           open, donor (blinded without donors.view_identity), appointment,
+ *        -> paginator of every centre's donations; rows: { id, code, date,
+ *           time, status, status_label, open, scope ('own_facility' |
+ *           'cross_facility'), centre { id, name, abbreviation },
+ *           donor (blinded without donors.view_identity), appointment,
  *           drive, source ('counter' | 'paper'), paper_sheet, bag, volume_ml,
  *           screening, collection, rejection_reason, can: { close } }
- *  GET   /donation-records/export?(same filters)            -> CSV
+ *  GET   /donation-records/export?(same filters)            -> CSV, this centre's only
  *  PATCH /donations/{id}/status { status: 'rejected', rejection_reason }
  *        closes a visit left open (the counter's Cancel visit)
  * -------------------------------------------------------------------------
@@ -870,7 +888,7 @@ onPageReturn(() => load(pager.page))
 .code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
 .code--bag { color: var(--rb-text-primary); }
 
-/* A donation typed from a drive's paper sheet. */
+/* A donation typed from a drive's paper sheet, or recorded at another centre. */
 .chip {
   display: inline-block;
   margin-left: 6px;
