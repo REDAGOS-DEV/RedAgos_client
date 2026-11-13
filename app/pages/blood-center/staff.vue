@@ -154,6 +154,16 @@
               <!-- flex on an inner div: a flex <td> stops being a table cell and
                    its bottom border falls short of the row's. -->
               <div class="actions">
+                <!-- Every row, a removed one too: the profile reads only. -->
+                <button
+                  type="button"
+                  class="icon-btn icon-btn--row"
+                  :aria-label="`View ${row.full_name}'s profile`"
+                  title="View profile"
+                  @click="openProfile(row)"
+                >
+                  <AssetIcon name="eye" :size="15" />
+                </button>
                 <button v-if="!row.deleted_at" type="button" class="ghost-btn" @click="openEdit(row)">
                   <AssetIcon name="pencil" :size="13" />
                   Edit
@@ -398,6 +408,83 @@
         </div>
       </div>
     </Transition>
+
+    <!--
+      Staff Profile: read-only, from the staff-detail endpoint. Laid out as the
+      Donor Profile; CenterModal brings the focus trap, Escape and the Close.
+      No password, token or verification code: the endpoint never sends one.
+    -->
+    <CenterModal :open="profileView.open" title="Staff Profile" @close="closeProfile">
+      <div ref="profileBody" class="sp" tabindex="-1" :aria-busy="profileView.loading ? 'true' : undefined">
+        <div v-if="profileView.loading" class="skeleton skeleton--hero" />
+        <div v-else-if="profileView.error" class="banner banner--error" role="alert">
+          <AssetIcon name="circle-alert" :size="16" />
+          <p class="banner__text">{{ profileView.error }}</p>
+          <button type="button" class="btn-link" @click="retryProfile">Retry</button>
+        </div>
+
+        <template v-else-if="profile">
+          <div class="sp-hero">
+            <span class="sp-avatar" aria-hidden="true">
+              <img v-if="profile.photo" :src="profile.photo" alt="">
+              <template v-else>{{ initials(profile.fullName) }}</template>
+            </span>
+            <div class="sp-hero__text">
+              <p class="sp-hero__name">{{ profile.fullName }}</p>
+              <p v-if="profile.metaLine" class="sp-hero__meta">{{ profile.metaLine }}</p>
+              <div class="sp-hero__badges">
+                <span class="pill" :class="statusClass(profile.raw)">{{ statusLabel(profile.raw) }}</span>
+                <span v-if="profile.managementLevel" class="pill" :class="`pill--${profile.managementLevel}`">
+                  {{ profile.managementLevel === 'admin' ? 'Admin' : 'Supervisor' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <dl class="facts">
+            <div class="fact"><dt>Email</dt><dd>{{ profile.email || '—' }}</dd></div>
+            <div class="fact"><dt>Username</dt><dd>{{ profile.username || '—' }}</dd></div>
+            <div class="fact"><dt>Employee ID</dt><dd>{{ profile.employeeId || '—' }}</dd></div>
+            <div class="fact"><dt>Phone</dt><dd>{{ profile.phone || '—' }}</dd></div>
+            <div v-if="profile.credentials" class="fact"><dt>Title</dt><dd>{{ profile.credentials }}</dd></div>
+          </dl>
+
+          <section class="sp-section">
+            <h3 class="sp-section__title">Role and access</h3>
+            <dl class="facts">
+              <div class="fact"><dt>Department</dt><dd>{{ profile.department || '—' }}</dd></div>
+              <div class="fact"><dt>Access level</dt><dd>{{ profile.level }}</dd></div>
+              <div class="fact"><dt>Main role</dt><dd>{{ profile.mainRole || '—' }}</dd></div>
+              <div class="fact">
+                <dt>Additional roles</dt>
+                <dd>{{ profile.additionalRoles.length ? profile.additionalRoles.join(', ') : '—' }}</dd>
+              </div>
+              <div class="fact"><dt>Custom role</dt><dd>{{ profile.customRole || '—' }}</dd></div>
+              <div class="fact"><dt>Privileges</dt><dd>{{ profile.privileges }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="sp-section">
+            <h3 class="sp-section__title">Account</h3>
+            <dl class="facts">
+              <div class="fact">
+                <dt>Account status</dt>
+                <dd>
+                  {{ profile.accountStatus }}
+                  <span v-if="profile.removedOn" class="fact__sub">Since {{ profile.removedOn }}</span>
+                </dd>
+              </div>
+              <div class="fact"><dt>Email verification</dt><dd>{{ profile.emailVerified ? 'Verified' : 'Not verified' }}</dd></div>
+              <div v-if="profile.activatedOn" class="fact"><dt>Activated</dt><dd>{{ profile.activatedOn }}</dd></div>
+            </dl>
+          </section>
+        </template>
+      </div>
+
+      <template #actions>
+        <button type="button" class="ui-btn" @click="closeProfile">Close</button>
+      </template>
+    </CenterModal>
   </div>
 </template>
 
@@ -406,8 +493,13 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { resolveApiAssetURL } from '~/api/BaseService'
 import { onPageReturn } from '~/composables/useKeptAlive'
+import { createLatest } from '~/composables/useLiveRefresh'
+import { formatShortDate } from '~/utils/donorRecords'
+import { formatPhoneNumber } from '~/utils/phone'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -754,6 +846,101 @@ function showBanner(message, kind) {
   banner.value = message
   bannerKind.value = kind
   setTimeout(() => { banner.value = '' }, 6000)
+}
+
+// --- Staff Profile (read-only) ---
+
+const profileView = reactive({ open: false, uuid: null, loading: false, error: '' })
+const profile = ref(null)
+const profileBody = ref(null)
+// A slow answer for one row never lands on the profile of the next.
+const profileLatest = createLatest()
+
+const ACCOUNT_STATUS_LABELS = {
+  active: 'Active',
+  pending_verification: 'Pending verification',
+  suspended: 'Suspended',
+  deactivated: 'Deactivated',
+}
+
+function privilegeLabel(key) {
+  return privileges.value.find((privilege) => privilege.key === key)?.label ?? `${key[0].toUpperCase()}${key.slice(1)}`
+}
+
+/** One staff account as the profile shows it, from the staff-detail endpoint. */
+function mapStaffProfile(data) {
+  // role_labels is every role, main first, then the custom one; the first
+  // staff_roles.length of them are the listed roles.
+  const roleKeys = data?.staff_roles ?? []
+  const roleLabels = (data?.role_labels ?? []).slice(0, roleKeys.length)
+  const level = data?.management_level || ''
+  // As on the roster: a level is not capped by privileges, a role is.
+  const levelOnly = Boolean(level) && !data?.role_labels?.length
+  const granted = PRIVILEGE_ORDER.filter((key) => data?.staff_privileges?.includes(key))
+
+  return {
+    raw: data,
+    fullName: data?.full_name || [data?.first_name, data?.last_name].filter(Boolean).join(' '),
+    photo: resolveApiAssetURL(data?.avatar_url) || '',
+    metaLine: [roleLabels[0] || data?.custom_role || (level ? 'Management' : ''), data?.department_label].filter(Boolean).join(' · '),
+    email: data?.email || '',
+    username: data?.username || '',
+    employeeId: data?.employee_id || '',
+    phone: formatPhoneNumber(data?.phone),
+    credentials: data?.credentials || '',
+    department: data?.department_label || '',
+    level: level
+      ? (data?.management_level_label || levelOptions.value.find((option) => option.key === level)?.label || level)
+      : 'Staff',
+    managementLevel: level,
+    mainRole: roleLabels[0] || '',
+    additionalRoles: roleLabels.slice(1),
+    customRole: data?.custom_role || '',
+    privileges: levelOnly
+      ? (level === 'admin' ? 'Admin access' : 'View only')
+      : (granted.map(privilegeLabel).join(', ') || 'None'),
+    accountStatus: data?.deleted_at ? 'Removed' : (ACCOUNT_STATUS_LABELS[data?.account_status] || data?.account_status || '—'),
+    removedOn: formatShortDate(data?.deleted_at),
+    emailVerified: Boolean(data?.email_verified),
+    activatedOn: formatShortDate(data?.activated_at),
+  }
+}
+
+function openProfile(row) {
+  Object.assign(profileView, { open: true, uuid: row.uuid })
+  profile.value = null
+  loadProfile(row.uuid)
+}
+
+async function loadProfile(uuid) {
+  const ticket = profileLatest.begin()
+  profileView.loading = true
+  profileView.error = ''
+
+  try {
+    const data = await bloodCenterService.showStaff(uuid)
+    if (!profileLatest.isCurrent(ticket)) return
+    profile.value = mapStaffProfile(data)
+  } catch (error) {
+    if (!profileLatest.isCurrent(ticket)) return
+    profile.value = null
+    profileView.error = error?.message || 'Could not load this staff member.'
+  } finally {
+    if (profileLatest.isCurrent(ticket)) profileView.loading = false
+  }
+}
+
+function retryProfile() {
+  // Retry goes as the load starts. Focus stays in the dialog, where its
+  // focus trap hears Escape, rather than falling to the page.
+  profileBody.value?.focus()
+  loadProfile(profileView.uuid)
+}
+
+function closeProfile() {
+  profileLatest.invalidate()
+  profileView.open = false
+  profileView.loading = false
 }
 
 // --- Roster grouping and counts ---
@@ -1487,6 +1674,110 @@ onPageReturn(() => load({ quiet: true }))
   .roles__list {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---------- Staff Profile, as Donor Management draws its profile ---------- */
+
+/* The row's eye: Donor Management's bordered icon button. */
+.icon-btn--row {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.icon-btn--row:hover {
+  color: var(--rb-primary-text);
+  border-color: rgba(var(--rb-primary-rgb), 0.45);
+  background: var(--rb-surface-hover);
+}
+
+.icon-btn--row:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.sp { display: flex; flex-direction: column; gap: 16px; }
+.sp:focus { outline: none; }
+.sp .banner { margin-bottom: 0; border: 1px solid rgba(var(--rb-accent-rgb), 0.35); }
+.banner__text { flex: 1; margin: 0; line-height: 1.45; color: var(--rb-text-primary); }
+
+.btn-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rb-primary-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-link:hover { text-decoration: underline; }
+.btn-link:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.skeleton--hero { height: 120px; border-radius: 14px; }
+
+.sp-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.sp-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.sp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sp-hero__text { min-width: 0; }
+.sp-hero__name { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--rb-text-primary); overflow-wrap: anywhere; }
+.sp-hero__meta { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.sp-hero__badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.sp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rb-border);
+}
+
+.sp-section__title { margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+}
+
+.fact { min-width: 0; }
+
+.fact dt {
+  margin: 0 0 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--rb-text-primary); overflow-wrap: anywhere; }
+.fact__sub { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+
+@media (max-width: 480px) {
+  .facts { grid-template-columns: 1fr; }
 }
 </style>
 

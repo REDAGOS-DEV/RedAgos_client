@@ -20,10 +20,15 @@ import type { Tone } from '~/utils/requestFulfilment'
  *
  * `received`: arrived (receipt confirmed, or booked from outside RedAgos) and
  * awaiting stock-in by inventory staff; not stock until then.
+ *
+ * `partner_reserved`: set aside for the blood donor partner program (project
+ * owner, 2026-11-13). In storage, but not for patients: it cannot be tagged
+ * and counts in no available figure until it is released.
  */
 export type HospitalUnitStatus =
   | 'received'
   | 'available'
+  | 'partner_reserved'
   | 'tag_assigned'
   | 'tag_crossmatched'
   | 'pending_return'
@@ -124,8 +129,8 @@ export interface HospitalUnit {
   stocked_by?: string | null
   storage_location?: string | null
   /**
-   * Held for a blood donor partner (project owner, 2026-11-07). The bag keeps
-   * its status, may still be tagged, and stays reserved after a tag ends.
+   * When and by whom the bag was reserved for the blood donor partner
+   * program; set only while its status is `partner_reserved`.
    */
   partner_reservation?: HospitalPartnerReservation | null
   /**
@@ -156,7 +161,6 @@ export interface HospitalUnit {
 }
 
 export interface HospitalPartnerReservation {
-  partner: string
   reserved_at: string | null
   reserved_by: string | null
 }
@@ -175,7 +179,7 @@ export interface HospitalInventorySummary {
 }
 
 export interface HospitalInventoryFilters {
-  /** A status, `tagged` for both tag stages at once, or `reserved` for untagged bags held for a donor partner. */
+  /** A status, or `tagged` for both tag stages at once. (`reserved` is the older name for `partner_reserved`.) */
   status?: HospitalUnitStatus | 'tagged' | 'reserved'
   blood_type_id?: number
   component_id?: number
@@ -310,6 +314,7 @@ export interface UnitActionResult {
 export const HOSPITAL_UNIT_STATUS_LABELS: Record<HospitalUnitStatus, string> = {
   received: 'Awaiting stock-in',
   available: 'Available',
+  partner_reserved: 'Reserved for Donor Partner',
   tag_assigned: 'Tag Assigned',
   tag_crossmatched: 'Tag Crossmatched',
   pending_return: 'Pending Return',
@@ -327,6 +332,8 @@ export const HOSPITAL_UNIT_STATUS_LABELS: Record<HospitalUnitStatus, string> = {
 export const HOSPITAL_UNIT_STATUS_TONES: Record<HospitalUnitStatus, Tone> = {
   received: 'warning',
   available: 'success',
+  // Set aside, not for patients: Blood Bank Inventory draws it purple.
+  partner_reserved: 'muted',
   tag_assigned: 'info',
   tag_crossmatched: 'progress',
   pending_return: 'warning',
@@ -374,7 +381,7 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
   unit_not_discardable: 'This bag cannot be discarded as it stands. Release its tag first.',
   transfusion_request_not_found: 'That blood request was not found.',
   transfusion_request_closed: 'That blood request was cancelled. Tag the bag to the patient directly instead.',
-  unit_already_reserved: 'That bag is already reserved for a blood donor partner. The list has been refreshed.',
+  unit_already_reserved: 'That bag is already reserved for the blood donor partner program. The list has been refreshed.',
   unit_not_reserved: 'That bag is no longer reserved. The list has been refreshed.',
 }
 
@@ -382,6 +389,7 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
 export const HOSPITAL_UNIT_STATUSES: HospitalUnitStatus[] = [
   'received',
   'available',
+  'partner_reserved',
   'tag_assigned',
   'tag_crossmatched',
   'pending_return',

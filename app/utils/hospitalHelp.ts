@@ -215,25 +215,29 @@ export const HOSPITAL_HELP_GUIDES: HospitalHelpGuide[] = [
   },
   {
     id: 'reserve-for-partner',
-    title: 'Reserve a bag for a blood donor partner',
+    title: 'Reserve a bag for the blood donor partner program',
     department: 'Stock and Supply',
     path: '/hospital/inventory',
     pageLabel: 'Blood Bank Inventory',
     requires: 'hospital.inventory.handle',
-    summary: 'Hold a bag on the shelf for a blood donor partner. It prints purple on the Inventory Report.',
+    summary: 'Set a bag aside for the blood donor partner program. It stays in storage but is no longer for patients, and prints purple on the Inventory Report.',
     steps: [
-      'On Blood Bank Inventory, open the bag or its row menu, then press Reserve for blood donor partner.',
-      'Type the partner\'s name and press Reserve bag. The bag shows as Reserved, with the partner under it.',
-      'When the partner no longer needs it, press Release reservation.',
+      'On Blood Bank Inventory, open the bag or its row menu, then press Reserve for donor partner.',
+      'Press Reserve bag. The bag shows as Reserved for Donor Partner.',
+      'To give it back to patients, press Release reservation. It is available again.',
     ],
     questions: [
       {
         q: 'Can a reserved bag be tagged to a patient?',
-        a: 'Yes. While tagged it prints pink, and if the tag ends the bag is reserved for the partner again.',
+        a: 'No. Release the reservation first. Until then it cannot be tagged.',
+      },
+      {
+        q: 'Does a reserved bag count as available stock?',
+        a: 'No. It is left out of the available counts, the stock levels and the minimum-stock alerts. If 10 Packed RBC are on the shelf and 3 are reserved, 7 are available for patients.',
       },
       {
         q: 'How do I list the reserved bags?',
-        a: 'Set Status to Reserved for partner.',
+        a: 'Set Status to Reserved for Donor Partner.',
       },
     ],
   },
@@ -297,7 +301,7 @@ export const HOSPITAL_HELP_GUIDES: HospitalHelpGuide[] = [
       },
       {
         q: 'What do the colours and marks mean on a sheet?',
-        a: 'Under Crossmatched, a blue bag is waiting for its transfusion, and a green bag, marked (TF), was transfused that day. Under Uncrossmatched, a black bag is on the shelf and not tagged, a pink bag, marked (T), is tagged to a patient and still waiting for its crossmatch, and a purple bag, marked (R), is reserved for a blood donor partner.',
+        a: 'Under Crossmatched, a blue bag is waiting for its transfusion, and a green bag, marked (TF), was transfused that day. Under Uncrossmatched, a black bag is on the shelf and not tagged, a pink bag, marked (T), is tagged to a patient and still waiting for its crossmatch, and a purple bag, marked (R), is reserved for the blood donor partner program.',
       },
     ],
   },

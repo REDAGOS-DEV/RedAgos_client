@@ -32,12 +32,10 @@ describe('a hospital bag\'s status tag', () => {
     expect(hospitalUnitStatusTag('discarded', 3).tone).toBe('muted')
   })
 
-  it('reads an untagged bag held for a blood donor partner as Reserved, in purple (project owner, 2026-11-07)', () => {
-    expect(hospitalUnitStatusTag('available', 30, true)).toEqual({ label: 'Reserved', tone: 'partner' })
-    // Its date still shows in Remaining Days; the badge names the reservation.
-    expect(hospitalUnitStatusTag('available', 2, true)).toEqual({ label: 'Reserved', tone: 'partner' })
-    // Once tagged, the tag stage is what the badge says.
-    expect(hospitalUnitStatusTag('tag_assigned', 30, true).label).toBe('Tag Assigned')
+  it('reads a bag reserved for the blood donor partner program by its status, in purple (project owner, 2026-11-13)', () => {
+    expect(hospitalUnitStatusTag('partner_reserved', 30)).toEqual({ label: 'Reserved for Donor Partner', tone: 'partner' })
+    // Its date still shows in Remaining Days; the badge names the reservation, not Expiring Soon.
+    expect(hospitalUnitStatusTag('partner_reserved', 2)).toEqual({ label: 'Reserved for Donor Partner', tone: 'partner' })
   })
 })
 

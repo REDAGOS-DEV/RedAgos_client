@@ -264,10 +264,6 @@
                     <span v-else-if="row.last_tag && row.status === 'pending_return'" class="patient cell-muted">
                       Was {{ row.last_tag.patient.full_name }}
                     </span>
-                    <!-- Held for a blood donor partner; on the shelf the badge already says Reserved. -->
-                    <span v-if="row.partner_reservation" class="partner-line">
-                      <template v-if="row.status !== 'available'">Reserved · </template>{{ row.partner_reservation.partner }}
-                    </span>
                   </td>
                   <td class="actions-col" @click.stop>
                     <div class="row-menu" @focusout="onRowMenuFocusOut">
@@ -499,12 +495,8 @@
               </section>
 
               <section v-if="drawerUnit.partner_reservation">
-                <p class="drawer-section-title">Reserved For</p>
+                <p class="drawer-section-title">Blood Donor Partner Program</p>
                 <dl class="drawer-info-grid">
-                  <div class="drawer-info-grid__wide">
-                    <dt>Blood Donor Partner</dt>
-                    <dd class="partner-line partner-line--strong">{{ drawerUnit.partner_reservation.partner }}</dd>
-                  </div>
                   <div class="drawer-info-grid__wide">
                     <dt>Reserved</dt>
                     <dd>
@@ -804,21 +796,6 @@
     </HospitalUnitReasonDialog>
 
     <HospitalUnitReasonDialog
-      v-if="dialog?.kind === 'reserve'"
-      :title="`Reserve ${bagLabel(dialog.unit)} for a blood donor partner`"
-      label="Blood donor partner"
-      confirm-label="Reserve bag"
-      icon="lock"
-      :danger="false"
-      single-line
-      :maxlength="150"
-      :busy="dialogBusy"
-      :error="dialogError"
-      @confirm="runReserve"
-      @close="closeDialog"
-    />
-
-    <HospitalUnitReasonDialog
       v-if="dialog?.kind === 'discard'"
       :title="`Discard ${bagLabel(dialog.unit)}?`"
       label="Why is the bag being discarded?"
@@ -927,24 +904,20 @@ const ACTIONS = {
   crossmatch: { label: 'Record crossmatch', icon: 'flask-conical' },
   transfuse: { label: 'Record transfusion', icon: 'blood-drop' },
   release: { label: 'Release tag', icon: 'user-x' },
-  reserve: { label: 'Reserve for blood donor partner', icon: 'lock' },
+  reserve: { label: 'Reserve for donor partner', icon: 'lock' },
   unreserve: { label: 'Release reservation', icon: 'unlock' },
   return: { label: 'Back in storage', icon: 'refresh-cw' },
   discard: { label: 'Discard', icon: 'trash-2' },
 }
 
 /**
- * The Status filter: each status in lifecycle order, with both tag stages
- * together after them, then the untagged bags reserved for a donor partner.
+ * The Status filter: each status in lifecycle order (Reserved for Donor
+ * Partner among them), with both tag stages together after them.
  */
 const STATUS_OPTIONS = [
   ...HOSPITAL_UNIT_STATUSES.map((value) => ({ value, label: HOSPITAL_UNIT_STATUS_LABELS[value] })),
   { value: 'tagged', label: 'Tagged (either stage)' },
-  { value: 'reserved', label: 'Reserved for partner' },
 ]
-
-/** Where a bag still is in the blood bank, so a partner reservation on it can be released. */
-const ON_HAND = ['available', 'tag_assigned', 'tag_crossmatched', 'pending_return']
 
 /** How long after a deadline passes to look again: the sweep runs every minute. */
 const SWEEP_GRACE_MS = 65_000
@@ -1218,7 +1191,7 @@ async function loadUnits(page = unitsMeta.page, { quiet = false } = {}) {
 const unitRows = computed(() =>
   units.value.map((unit) => ({
     ...unit,
-    tag: hospitalUnitStatusTag(unit.status, unit.days_remaining, Boolean(unit.partner_reservation)),
+    tag: hospitalUnitStatusTag(unit.status, unit.days_remaining),
     remaining: hospitalRemainingDaysTag(unit.status, unit.days_remaining),
   })),
 )
@@ -1304,18 +1277,17 @@ const anyOverdue = computed(() => [...units.value, drawerUnit.value].some((unit)
 /**
  * The tag steps this role may take on a bag; discard is offered apart.
  *
- * An untagged bag in date may be reserved for a blood donor partner (project
- * owner, 2026-11-07), and a reserved one released while it is still here.
+ * An untagged bag in date may be reserved for the blood donor partner
+ * program (project owner, 2026-11-07). Reserved, it is not for patients: no
+ * tag, only released back to the shelf (2026-11-13).
  */
 function handleActions(unit) {
   if (!canHandle.value) return []
 
-  const reserved = Boolean(unit.partner_reservation)
-
   return [
     ...actionsFor(unit.status, unit.bag_expired).filter((action) => action !== 'discard'),
-    ...(!reserved && unit.status === 'available' && !unit.bag_expired ? ['reserve'] : []),
-    ...(reserved && ON_HAND.includes(unit.status) ? ['unreserve'] : []),
+    ...(unit.status === 'available' && !unit.bag_expired ? ['reserve'] : []),
+    ...(unit.status === 'partner_reserved' ? ['unreserve'] : []),
   ]
 }
 
@@ -1351,7 +1323,7 @@ const drawerTagsLoading = ref(false)
 const drawerTagsError = ref('')
 
 const drawerTag = computed(() => (drawerUnit.value
-  ? hospitalUnitStatusTag(drawerUnit.value.status, drawerUnit.value.days_remaining, Boolean(drawerUnit.value.partner_reservation))
+  ? hospitalUnitStatusTag(drawerUnit.value.status, drawerUnit.value.days_remaining)
   : null))
 const drawerRemaining = computed(() => {
   const unit = drawerUnit.value
@@ -1530,10 +1502,16 @@ const confirmCopy = computed(() => {
         body: 'Confirm only once the bag is back in the blood bank\'s storage. It becomes available to tag again.',
         action: 'Confirm return',
       }
+    case 'reserve':
+      return {
+        title: `Reserve ${bagLabel(value.unit)} for the blood donor partner program?`,
+        body: 'It stays in storage but is no longer for patients: it cannot be tagged and leaves the available count until you release it.',
+        action: 'Reserve bag',
+      }
     case 'unreserve':
       return {
         title: `Release the reservation on ${bagLabel(value.unit)}?`,
-        body: `${value.unit.partner_reservation?.partner ?? 'The partner'} will no longer hold this bag.`,
+        body: 'The bag becomes available for patients again.',
         action: 'Release reservation',
       }
     default:
@@ -1565,15 +1543,12 @@ async function runDiscard(reason) {
   await perform((unit) => hospitalService.discardUnit(unit.unit_id, reason))
 }
 
-async function runReserve(partner) {
-  await perform((unit) => hospitalService.reserveUnit(unit.unit_id, partner))
-}
-
 async function runConfirm() {
   const calls = {
     crossmatch: (unit) => hospitalService.crossmatchUnit(unit.unit_id),
     transfuse: (unit) => hospitalService.transfuseUnit(unit.unit_id),
     return: (unit) => hospitalService.confirmUnitReturn(unit.unit_id),
+    reserve: (unit) => hospitalService.reserveUnit(unit.unit_id),
     unreserve: (unit) => hospitalService.unreserveUnit(unit.unit_id),
   }
 
@@ -2116,9 +2091,6 @@ onBeforeUnmount(() => {
   color: var(--tone); background: color-mix(in srgb, var(--tone-fill) 14%, transparent);
 }
 .countdown.tone--neutral { color: var(--inv-text); background: var(--inv-elevated); }
-/* The blood donor partner a bag is held for, in the report's purple. */
-.partner-line { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--inv-partner); white-space: normal; }
-.drawer-info-grid dd.partner-line--strong { margin-top: 0; font-weight: 600; color: var(--inv-partner); }
 
 .th-sort {
   display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none;

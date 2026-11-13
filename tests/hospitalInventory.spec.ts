@@ -109,27 +109,29 @@ describe('the hospital inventory page', () => {
     expect(source('app/components/Hospital/UnitReasonDialog.vue')).toContain(":disabled=\"busy || !reason.trim()\"")
   })
 
-  it('reserves a bag for a blood donor partner from its menu or drawer (project owner, 2026-11-07)', () => {
-    expect(page).toContain("reserve: { label: 'Reserve for blood donor partner', icon: 'lock' }")
+  it('reserves a bag for the blood donor partner program, a status of its own (project owner, 2026-11-13)', () => {
+    expect(page).toContain("reserve: { label: 'Reserve for donor partner', icon: 'lock' }")
     expect(page).toContain("unreserve: { label: 'Release reservation', icon: 'unlock' }")
-    // Offered on an untagged bag in date, and released while the bag is still here.
-    expect(page).toContain("...(!reserved && unit.status === 'available' && !unit.bag_expired ? ['reserve'] : [])")
-    expect(page).toContain("...(reserved && ON_HAND.includes(unit.status) ? ['unreserve'] : [])")
-    expect(page).toContain("dialog?.kind === 'reserve'")
-    expect(page).toContain('hospitalService.reserveUnit(unit.unit_id, partner)')
+    // Offered on an untagged bag in date; a reserved bag can only be released.
+    expect(page).toContain("...(unit.status === 'available' && !unit.bag_expired ? ['reserve'] : [])")
+    expect(page).toContain("...(unit.status === 'partner_reserved' ? ['unreserve'] : [])")
+    // A plain confirm: no partner is named.
+    expect(page).toContain("reserve: (unit) => hospitalService.reserveUnit(unit.unit_id),")
     expect(page).toContain('hospitalService.unreserveUnit(unit.unit_id)')
-    // Listed, badged and named in the report's purple.
-    expect(page).toContain("{ value: 'reserved', label: 'Reserved for partner' }")
-    expect(page).toContain('hospitalUnitStatusTag(unit.status, unit.days_remaining, Boolean(unit.partner_reservation))')
+    expect(page).not.toContain("dialog?.kind === 'reserve'")
+    expect(page).not.toContain('partner_reservation.partner')
+    expect(page).toContain('it cannot be tagged and leaves the available count until you release it.')
+    // Badged in the report's purple; listed by its status.
+    expect(page).toContain('hospitalUnitStatusTag(unit.status, unit.days_remaining)')
     expect(page).toContain('--inv-partner: #7B1FA2;')
-    expect(page).toContain('Reserved For')
 
     const service = source('app/api/hospital/HospitalService.ts')
-    expect(service).toContain('`/hospital/inventory/${encodeURIComponent(unit)}/reserve`, \'POST\', { partner }')
+    expect(service).toContain('`/hospital/inventory/${encodeURIComponent(unit)}/reserve`, \'POST\')')
     expect(service).toContain('`/hospital/inventory/${encodeURIComponent(unit)}/unreserve`, \'POST\'')
 
-    // Tagging is still open, with the partner named.
-    expect(source('app/components/Hospital/TagUnitDialog.vue')).toContain('Reserved for blood donor partner {{ unit.partner_reservation.partner }}.')
+    // Never tagged, so the tag dialog has nothing to warn about.
+    expect(source('app/components/Hospital/TagUnitDialog.vue')).not.toContain('partner_reservation')
+    expect(source('app/utils/tagDeadline.ts')).toMatch(/case 'partner_reserved':\r?\n\s*return \['discard'\]/)
   })
 })
 

@@ -5,6 +5,7 @@
  *
  * Pure, so the matching can be tested without mounting the page.
  */
+import { bagMatchesCode, normalizeBagCode } from '~/utils/bagNumber'
 
 /** The parts of an arrived bag a scan can match. */
 export interface ScannableBag {
@@ -23,16 +24,20 @@ export type StockInScanResult =
 /**
  * Which arrived bag a scanned or typed code is.
  *
- * A RedAgos bag carries its bag number; a bag from outside carries the
- * sender's number, which a batch shares, so each scan of that number takes
- * the next bag of the batch not yet scanned. Case and surrounding space are
- * ignored, as a scanner or a hand may add either.
+ * A RedAgos bag carries its bag number (SNBC-21627990-PRBC) and its
+ * donation's barcode sticker; a bag from outside carries the sender's number.
+ * A sticker and a sender's number are each shared by several bags (every bag
+ * of a donation, every bag of a batch), so each scan takes the next of them
+ * not yet scanned. Case and surrounding space are ignored, as a scanner or a
+ * hand may add either.
  */
 export function matchStockInScan(code: string, arrived: ScannableBag[], scanned: string[]): StockInScanResult {
-  const wanted = code.trim().toUpperCase()
-  const same = (value: string | null | undefined) => Boolean(value) && value!.trim().toUpperCase() === wanted
+  const wanted = normalizeBagCode(code)
+  const same = (value: string | null | undefined) => Boolean(value) && normalizeBagCode(value) === wanted
 
-  const matches = arrived.filter((bag) => same(bag.bag_number) || same(bag.unit_id) || same(bag.external_unit_number))
+  const matches = arrived.filter((bag) => bagMatchesCode(wanted, bag.bag_number)
+    || bagMatchesCode(wanted, bag.unit_id)
+    || same(bag.external_unit_number))
 
   if (!matches.length) return { kind: 'unknown', code: wanted }
 

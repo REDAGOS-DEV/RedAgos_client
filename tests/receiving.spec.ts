@@ -55,17 +55,24 @@ describe('request days', () => {
 
 describe('receiving a dispatched delivery by scan', () => {
   const awaiting = [
-    { allocation_id: 11, request_id: 1, unit_id: '1234567-PRBC' },
-    { allocation_id: 12, request_id: 1, unit_id: '1234568-PRBC' },
-    { allocation_id: 21, request_id: 2, unit_id: '7654321-FFP' },
+    { allocation_id: 11, request_id: 1, unit_id: 'SNBC-1234567-PRBC' },
+    { allocation_id: 12, request_id: 1, unit_id: 'SNBC-1234568-PRBC' },
+    { allocation_id: 21, request_id: 2, unit_id: 'SNBC-7654321-FFP' },
+    { allocation_id: 22, request_id: 2, unit_id: 'SNBC-7654321-FFP-2' },
   ]
 
   it('ticks a scanned bag that is on the delivery', () => {
-    expect(matchScannedBag(awaiting, new Set(), '1234567-prbc\r')).toEqual({ kind: 'matched', bag: awaiting[0] })
+    expect(matchScannedBag(awaiting, new Set(), 'snbc-1234567-prbc\r')).toEqual({ kind: 'matched', bag: awaiting[0] })
+  })
+
+  it('ticks the next bag of a donation on each scan of its barcode sticker', () => {
+    expect(matchScannedBag(awaiting, new Set(), '7654321')).toEqual({ kind: 'matched', bag: awaiting[2] })
+    expect(matchScannedBag(awaiting, new Set([21]), '7654321')).toEqual({ kind: 'matched', bag: awaiting[3] })
+    expect(matchScannedBag(awaiting, new Set([21, 22]), '7654321').kind).toBe('already_scanned')
   })
 
   it('says so when a bag is scanned twice rather than counting it again', () => {
-    expect(matchScannedBag(awaiting, new Set([11]), '1234567-PRBC').kind).toBe('already_scanned')
+    expect(matchScannedBag(awaiting, new Set([11]), 'SNBC-1234567-PRBC').kind).toBe('already_scanned')
   })
 
   it('treats a number that was not dispatched as unknown', () => {

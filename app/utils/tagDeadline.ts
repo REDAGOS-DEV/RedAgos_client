@@ -82,6 +82,9 @@ export function actionsFor(status: HospitalUnitStatus, bagExpired = false): Unit
       return bagExpired ? ['release'] : ['transfuse', 'release']
     case 'pending_return':
       return ['return', 'discard']
+    // Not for patients; released back to the shelf from the page, or discarded.
+    case 'partner_reserved':
+      return ['discard']
     case 'expired':
       return ['discard']
     default:

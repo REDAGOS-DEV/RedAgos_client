@@ -15,8 +15,8 @@
  * 2026-10-19), headed by the centre's name, with a marked box for the
  * donation's pre-printed barcode sticker and the bag or unit number under it
  * in large type (project owner, 2026-11-10). The label prints no code of its
- * own: the bag number is that sticker plus the component. Neither names the
- * donor.
+ * own: the bag number is the centre, that sticker and the component
+ * (SNBC-21627990-PRBC, 2026-11-13). Neither names the donor.
  */
 
 export type LabelVariant = 'base' | 'final'

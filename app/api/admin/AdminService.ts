@@ -26,6 +26,8 @@ export type PrimaryAccountPayload = {
 export type CreateFacilityPayload = {
   facility_type: FacilityTypeName
   name: string
+  /** Blood centers only: 2 to 6 letters that open every bag number (SNBC-21627990-PRBC). */
+  abbreviation?: string
   doh_license_number: string
   address: string
   email: string
@@ -72,6 +74,14 @@ class AdminService extends BaseService {
   /** Create a facility and its primary account in one request. */
   async create(payload: CreateFacilityPayload): Promise<any> {
     return this.request(this.resource, 'POST', payload)
+  }
+
+  /**
+   * Set or correct a blood center's abbreviation. Refused once the center
+   * has booked a bag, since every bag number starts with it.
+   */
+  async setAbbreviation(id: number | string, abbreviation: string): Promise<any> {
+    return this.request(`${this.resource}/${id}/abbreviation`, 'PATCH', { abbreviation })
   }
 
   // --- Legacy -------------------------------------------------------------

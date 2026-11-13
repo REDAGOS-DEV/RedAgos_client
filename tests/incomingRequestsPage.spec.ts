@@ -128,8 +128,9 @@ describe('tagging', () => {
 
   it('finds a bag by its typed or scanned number in each line, Enter ticking it (project owner, 2026-10-19)', () => {
     expect(picker).toContain('@keydown.enter.prevent="pickByNumber(line)"')
-    // A bare donation sticker finds that donation's bag of the line's component.
-    expect(picker).toContain("const asSticker = `${term}-${(line.component.code ?? '').toUpperCase()}`")
+    // A bare donation sticker finds that donation's bag of the line's component
+    // (bag numbers are SNBC-21627990-PRBC since 2026-11-13; see bagNumber.spec).
+    expect(picker).toContain('return bag?.sticker === term && (!code || bag.component === code)')
     // Typing narrows the list, past the first few.
     expect(picker).toContain('if (term) return line.units.filter((unit) => unit.id.toUpperCase().includes(term))')
     // A bag of another component on the request is ticked in its own line.

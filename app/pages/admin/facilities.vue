@@ -88,9 +88,14 @@
 
           <tr v-for="row in rows" v-else :key="row.id">
             <td>
-              <span class="facility-name">{{ row.name }}</span>
+              <span class="facility-name">
+                <span v-if="row.abbreviation" class="abbr">{{ row.abbreviation }}</span>{{ row.name }}
+              </span>
               <span class="muted">{{ row.address }}</span>
               <span class="muted">{{ row.email }} · {{ row.phone }}</span>
+              <span v-if="row.facility_type === 'blood_center' && !row.abbreviation" class="unverified">
+                No abbreviation yet: its bags cannot be booked
+              </span>
             </td>
 
             <td>
@@ -122,7 +127,7 @@
             <td class="actions-col">
               <div class="row-actions">
                 <button
-                  v-for="action in actionsFor(row.status)"
+                  v-for="action in actionsFor(row)"
                   :key="action.kind"
                   type="button"
                   class="action-btn"
@@ -133,7 +138,7 @@
                   {{ action.label }}
                 </button>
 
-                <span v-if="!actionsFor(row.status).length" class="muted">—</span>
+                <span v-if="!actionsFor(row).length" class="muted">—</span>
               </div>
             </td>
           </tr>
@@ -190,6 +195,56 @@
       </div>
     </Teleport>
 
+    <!-- A blood center's abbreviation: the start of every bag number it books.
+         Correctable until its first bag is booked; the server holds that. -->
+    <Teleport to="body" :disabled="pageHidden">
+      <div v-if="abbr.open" class="modal-overlay" @click.self="closeAbbreviation">
+        <form
+          class="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="abbr-title"
+          v-focus-trap
+          @dialog-escape="closeAbbreviation"
+          @submit.prevent="saveAbbreviation"
+        >
+          <h2 id="abbr-title">{{ abbr.row?.abbreviation ? 'Change abbreviation' : 'Set abbreviation' }}</h2>
+          <p class="muted abbr-subject">{{ abbr.row?.name }}</p>
+
+          <label for="abbr-input">Abbreviation</label>
+          <input
+            id="abbr-input"
+            v-model="abbr.value"
+            class="abbr-input"
+            type="text"
+            maxlength="6"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="characters"
+            placeholder="e.g. SNBC"
+            required
+            @input="abbr.value = abbreviationText(abbr.value)"
+          />
+          <p class="unverified">It cannot change once the center books a bag.</p>
+
+          <p v-if="abbr.error" class="state-error">{{ abbr.error }}</p>
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" :disabled="abbr.submitting" @click="closeAbbreviation">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="action-btn approve"
+              :disabled="abbr.submitting || abbr.value.length < 2"
+            >
+              {{ abbr.submitting ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
+
     <!-- Create Facility. The facility and its first account are one submission
          because the server creates them in one transaction. -->
     <Teleport to="body" :disabled="pageHidden">
@@ -224,6 +279,25 @@
               <label for="f-name">Facility name</label>
               <input id="f-name" v-model="form.name" type="text" maxlength="150" required />
               <p v-if="errorFor('name')" class="field-error">{{ errorFor('name') }}</p>
+            </div>
+
+            <!-- Every bag a blood center books starts with it: SNBC-21627990-PRBC. -->
+            <div v-if="acceptsBookings" class="field">
+              <label for="f-abbreviation">Abbreviation</label>
+              <input
+                id="f-abbreviation"
+                v-model="form.abbreviation"
+                class="abbr-input"
+                type="text"
+                maxlength="6"
+                autocomplete="off"
+                spellcheck="false"
+                autocapitalize="characters"
+                placeholder="e.g. SNBC"
+                required
+                @input="form.abbreviation = abbreviationText(form.abbreviation)"
+              />
+              <p v-if="errorFor('abbreviation')" class="field-error">{{ errorFor('abbreviation') }}</p>
             </div>
 
             <div class="field">
@@ -390,7 +464,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
@@ -516,6 +590,7 @@ function emptyForm() {
   return {
     facility_type: 'blood_center',
     name: '',
+    abbreviation: '',
     doh_license_number: '',
     address: '',
     email: '',
@@ -555,15 +630,65 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function actionsFor(status) {
-  if (status === 'pending_approval') {
+function actionsFor(row) {
+  if (row.status === 'pending_approval') {
     return [
       { kind: 'approve', label: 'Approve', needsReason: false },
       { kind: 'reject', label: 'Reject', needsReason: true },
     ]
   }
 
+  // Until a blood center books its first bag, its abbreviation can be set or corrected.
+  if (row.facility_type === 'blood_center' && row.abbreviation_locked === false) {
+    return [{ kind: 'abbreviation', label: row.abbreviation ? 'Change abbreviation' : 'Set abbreviation' }]
+  }
+
   return []
+}
+
+/** What an abbreviation may hold: letters, in capitals, at most 6. */
+function abbreviationText(value) {
+  return String(value ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6)
+}
+
+const abbr = reactive({
+  open: false,
+  row: null,
+  value: '',
+  error: '',
+  submitting: false,
+})
+
+function openAbbreviation(row) {
+  Object.assign(abbr, { open: true, row, value: row.abbreviation ?? '', error: '', submitting: false })
+  nextTick(() => document.getElementById('abbr-input')?.focus())
+}
+
+function closeAbbreviation() {
+  if (abbr.submitting) return
+  abbr.open = false
+  abbr.row = null
+}
+
+async function saveAbbreviation() {
+  if (abbr.submitting || abbr.value.length < 2) return
+
+  abbr.submitting = true
+  abbr.error = ''
+
+  try {
+    const response = await adminService.setAbbreviation(abbr.row.id, abbr.value)
+
+    abbr.open = false
+    abbr.row = null
+    showBanner(response?.message || 'Abbreviation saved.', 'success')
+    await load()
+  } catch (error) {
+    const messages = error?.errors?.abbreviation ?? error?.data?.errors?.abbreviation
+    abbr.error = (Array.isArray(messages) ? messages[0] : messages) || messageFor(error)
+  } finally {
+    abbr.submitting = false
+  }
 }
 
 const MODAL_COPY = {
@@ -575,6 +700,10 @@ const MODAL_COPY = {
 
 function startAction(row, action) {
   banner.value = ''
+
+  if (action.kind === 'abbreviation') {
+    return openAbbreviation(row)
+  }
 
   if (!action.needsReason) {
     return runAction(row, action.kind)
@@ -686,6 +815,8 @@ function buildPayload() {
   if (!acceptsBookings.value) {
     return payload
   }
+
+  payload.abbreviation = form.abbreviation
 
   if (form.operating_hours.trim()) payload.operating_hours = form.operating_hours.trim()
   if (form.slots_start_at) payload.slots_start_at = form.slots_start_at
@@ -1024,6 +1155,31 @@ onActivated(() => {
   font-size: 13px;
   white-space: nowrap;
   color: v-bind('TEXT_PRIMARY');
+}
+
+/* A blood center's abbreviation, ahead of its name: how its bag numbers start. */
+.abbr {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid v-bind('BORDER_COLOR');
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: v-bind('TEXT_SECONDARY');
+  vertical-align: 1px;
+}
+
+.abbr-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.abbr-subject {
+  margin: -6px 0 12px;
 }
 
 .pill,
