@@ -384,6 +384,8 @@ export function useBloodCenterNav() {
     { match: /^\/blood-center\/paper-records\/[^/]+$/, label: 'Sheet', parents: ['/blood-center/donations', '/blood-center/paper-records'] },
     // An invoice and a receipt: Invoices › RQ-5-0001, Payments › OR-000123 (2026-11-11).
     { match: /^\/blood-center\/invoice\/[^/]+$/, label: 'Invoice', parents: ['/blood-center/billing'] },
+    // A drive's roster: Donation Drives › UM Bolton Drive (2026-11-20).
+    { match: /^\/blood-center\/drive-registrations\/[^/]+$/, label: 'Drive', parents: ['/blood-center/drives'] },
     { match: /^\/blood-center\/receipt\/[^/]+$/, label: 'Receipt', parents: ['/blood-center/receipts'] },
   ]
 

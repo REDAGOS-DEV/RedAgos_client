@@ -26,7 +26,7 @@
         </span>
         <span v-if="item.description" class="nrow__desc">{{ item.description }}</span>
         <span class="nrow__meta">
-          {{ notificationTime(item.created_at) }}
+          <time v-if="item.created_at" :datetime="item.created_at" :title="exactTime(item.created_at)">{{ notificationTime(item.created_at, now) }}</time>
           <template v-if="item.meta"> · {{ item.meta }}</template>
           <template v-if="compact && item.action_label"> · {{ item.action_label }}</template>
         </span>
@@ -58,6 +58,10 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { notificationLook, notificationTime } from '~/utils/hospitalNotifications'
+import { exactTime, useNow } from '~/composables/useNow'
+
+// Keeps "5 min ago" current while the list is open.
+const now = useNow()
 
 const props = defineProps({
   /** A HospitalNotificationView; absent on a skeleton. */

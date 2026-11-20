@@ -1,11 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <NuxtLink to="/blood-center/drives" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Donation Drives
-      </NuxtLink>
-
+      <!-- The way back is the header's trail: Donation Drives › this drive (2026-11-20). -->
       <PageHeader :title="drive?.name || 'Drive roster'">
         <template #actions>
           <button
@@ -26,27 +22,41 @@
         <button type="button" class="btn-link" @click="refresh">Retry</button>
       </div>
 
-      <!-- The link people register through -->
-      <section v-if="drive" class="panel link-panel" aria-labelledby="link-title">
-        <div class="link-panel__head">
-          <h2 id="link-title" class="panel-title">Registration link</h2>
-          <span class="badge" :class="badgeClass(linkTone)">
-            <span class="badge__dot" aria-hidden="true" />
-            {{ linkLabel }}
+      <!-- The drive at a glance: when and where, and the link people register through. -->
+      <section v-if="drive" class="panel drive-card" aria-labelledby="link-title">
+        <div class="drive-card__when">
+          <span class="drive-card__date" aria-hidden="true">
+            <span class="drive-card__month">{{ monthShort(drive.event_date) }}</span>
+            <span class="drive-card__day">{{ dayOfMonth(drive.event_date) }}</span>
           </span>
+          <ul class="drive-card__facts">
+            <li><AssetIcon name="calendar" :size="14" />{{ longDay(drive.event_date) }}</li>
+            <li v-if="drive.start_time"><AssetIcon name="clock" :size="14" />{{ hoursOf(drive) }}</li>
+            <li v-if="drive.location"><AssetIcon name="map-pin" :size="14" />{{ drive.location }}</li>
+          </ul>
         </div>
-        <div v-if="linkUrl" class="link-row">
-          <input ref="linkInput" class="link-input" :value="linkUrl" readonly aria-label="Registration link" @focus="$event.target.select()">
-          <button type="button" class="btn-outline" @click="copyLink">
-            <AssetIcon :name="copied ? 'check' : 'link'" :size="14" />
-            {{ copied ? 'Copied' : 'Copy link' }}
-          </button>
-          <a :href="linkUrl" target="_blank" rel="noopener" class="btn-outline">
-            <AssetIcon name="arrow-up-right" :size="14" />
-            Open
-          </a>
+
+        <div class="drive-card__link">
+          <div class="link-panel__head">
+            <h2 id="link-title" class="panel-title">Registration link</h2>
+            <span class="badge" :class="badgeClass(linkTone)">
+              <span class="badge__dot" aria-hidden="true" />
+              {{ linkLabel }}
+            </span>
+          </div>
+          <div v-if="linkUrl" class="link-row">
+            <input ref="linkInput" class="link-input" :value="linkUrl" readonly aria-label="Registration link" @focus="$event.target.select()">
+            <button type="button" class="btn-outline" @click="copyLink">
+              <AssetIcon :name="copied ? 'check' : 'link'" :size="14" />
+              {{ copied ? 'Copied' : 'Copy link' }}
+            </button>
+            <a :href="linkUrl" target="_blank" rel="noopener" class="btn-outline">
+              <AssetIcon name="arrow-up-right" :size="14" />
+              Open
+            </a>
+          </div>
+          <p v-else class="link-blocked">Publish the drive on Donation Drives to share its link.</p>
         </div>
-        <p v-else class="link-blocked">Publish the drive on Donation Drives to share its link.</p>
       </section>
 
       <!-- Planning, kept apart from what happened on the day -->
@@ -339,7 +349,7 @@
  * self-check is a status from the donor's own portal questionnaire, never an
  * answer.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
@@ -384,6 +394,26 @@ const actionError = ref('')
 const busyKey = ref(null)
 
 const drive = ref(null)
+
+// The header's trail ends on the drive's name (Donation Drives › UM Bolton Drive).
+const crumbCurrent = useState('bc-crumb-current', () => '')
+watch(() => drive.value?.name, (name) => { crumbCurrent.value = name ?? '' }, { immediate: true })
+
+function driveDate(value) {
+  const d = new Date(`${String(value ?? '').slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+const monthShort = (value) => driveDate(value)?.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() ?? ''
+const dayOfMonth = (value) => driveDate(value)?.getDate() ?? ''
+const longDay = (value) => driveDate(value)?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) ?? ''
+
+function clockOf(value) {
+  const [h, m] = String(value ?? '').split(':').map(Number)
+  if (Number.isNaN(h)) return String(value ?? '')
+  const at = new Date(2000, 0, 1, h, m || 0)
+  return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+const hoursOf = (d) => (d.end_time ? `${clockOf(d.start_time)} to ${clockOf(d.end_time)}` : `From ${clockOf(d.start_time)}`)
 const summary = reactive({
   pre_registered_donors: 0, listed: 0, booked: 0, from_partners: 0, withdrawn: 0,
   walk_ins: 0, checked_in: 0, no_show: 0, deferred: 0, collected: 0, cancelled: 0,
@@ -705,4 +735,24 @@ a.icon-btn { text-decoration: none; }
   .link-input { flex-basis: 100%; }
   .walkin-find { grid-template-columns: 1fr; }
 }
+/* ---------- The drive at a glance (2026-11-20) ---------- */
+.drive-card {
+  display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 0;
+  padding: 0; overflow: hidden;
+}
+.drive-card__when { display: flex; align-items: center; gap: 16px; padding: 18px 20px; }
+.drive-card__date {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none;
+  width: 64px; height: 68px; border-radius: 14px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.drive-card__month { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.drive-card__day { font-size: 26px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.drive-card__facts { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.drive-card__facts li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--rb-text-primary); }
+.drive-card__facts li :deep(svg) { flex: none; color: var(--rb-text-muted); }
+.drive-card__link {
+  display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 18px 20px;
+  border-left: 1px solid var(--rb-border); background: var(--rb-surface-alt);
+}
+.drive-card__link .link-input { background: var(--rb-surface); }
 </style>
