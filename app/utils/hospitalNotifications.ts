@@ -1,3 +1,4 @@
+import { timeAgo } from '~/utils/staffNotifications'
 import type {
   HospitalNotification,
   HospitalNotificationList,
@@ -45,15 +46,9 @@ export function notificationLook(n: Partial<Pick<HospitalNotificationView, 'cate
 }
 
 /** "Just now", "5 min ago", "2 hours ago", then the date. */
+/** As every portal says it (staffNotifications.timeAgo): the hospital no longer differs past a day. */
 export function notificationTime(iso: string | null | undefined, now: number = Date.now()): string {
-  const at = iso ? new Date(iso).getTime() : NaN
-  if (Number.isNaN(at)) return ''
-  const minutes = Math.floor((now - at) / 60000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  return new Date(at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return timeAgo(iso, now)
 }
 
 export interface NotificationGroup {

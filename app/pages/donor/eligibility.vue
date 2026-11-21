@@ -372,11 +372,6 @@
 
                 <!-- Hugna 2: vitals, consent, review ug submit -->
                 <div v-show="stage === 'details'" ref="finishColumn" class="col-right">
-                    <button type="button" class="details-back" @click="backToQuestions">
-                        <AssetIcon name="chevron-left" :size="16" />
-                        Back to questions
-                    </button>
-
                     <div class="panel details-vitals" :class="{ 'details-vitals--full': !consentStatements.length }">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title" tabindex="-1">Vital Information</h2>
@@ -415,30 +410,29 @@
                         questionnaire can be submitted.
 
                         Taas ang mga statement, so 2 ka linya ra ang ipakita
-                        una ug naay "Show more". Ang "agree to all" sa ubos kay
-                        shortcut ra: ang matag statement kay naa gihapon iyang
-                        kaugalingong checkbox ug mao gihapon ang gi-check.
+                        una ug naay "Show more". One agreement at the foot
+                        accepts them all (project owner, 2026-11-20): each
+                        statement is numbered, and its number turns into a
+                        check once the donor agrees.
                     -->
                     <div v-if="consentStatements.length" class="panel details-consent">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Donor's informed consent</h2>
                         </div>
                         <div class="form-body">
-                            <div v-for="(statement, i) in consentStatements" :key="i" class="consent-item">
-                                <input
-                                    :id="`consent-${i}`"
-                                    v-model="consentTicked[i]"
-                                    type="checkbox"
-                                    class="consent-item__box"
-                                >
+                            <ol class="consent-list">
+                            <li v-for="(statement, i) in consentStatements" :key="i" class="consent-item" :class="{ 'consent-item--agreed': allConsentTicked }">
+                                <span class="consent-item__num" aria-hidden="true">
+                                    <AssetIcon v-if="allConsentTicked" name="check" :size="13" />
+                                    <template v-else>{{ i + 1 }}</template>
+                                </span>
                                 <div class="consent-item__content">
-                                    <label
+                                    <p
                                         :id="`consent-text-${i}`"
                                         :ref="el => setConsentTextEl(el, i)"
-                                        :for="`consent-${i}`"
                                         class="consent-item__text"
                                         :class="{ 'is-clamped': !consentExpanded[i] }"
-                                    >{{ statement }}</label>
+                                    >{{ statement }}</p>
                                     <button
                                         v-if="consentOverflows[i] || consentExpanded[i]"
                                         type="button"
@@ -450,9 +444,10 @@
                                         {{ consentExpanded[i] ? 'Show less' : 'Show more' }}
                                     </button>
                                 </div>
-                            </div>
+                            </li>
+                            </ol>
 
-                            <label class="consent-all">
+                            <label class="consent-all" :class="{ 'consent-all--on': allConsentTicked }">
                                 <input
                                     type="checkbox"
                                     class="consent-item__box"
@@ -506,11 +501,18 @@
                         </span>
                     </p>
 
-                    <button type="button" class="btn-primary btn-block btn-submit"
-                        :disabled="submitting || !canSubmit" @click="handleSubmit(answeringAgain)">
-                        <span>{{ submitting ? 'Submitting...' : 'Submit questionnaire' }}</span>
-                        <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
-                    </button>
+                    <!-- Back and forward at the foot of the step (project owner, 2026-11-20). -->
+                    <div class="details-actions">
+                        <button type="button" class="details-back" @click="backToQuestions">
+                            <AssetIcon name="chevron-left" :size="16" />
+                            Back to questions
+                        </button>
+                        <button type="button" class="btn-primary btn-block btn-submit"
+                            :disabled="submitting || !canSubmit" @click="handleSubmit(answeringAgain)">
+                            <span>{{ submitting ? 'Submitting...' : 'Submit questionnaire' }}</span>
+                            <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
+                        </button>
+                    </div>
 
                     <!--
                         "Already answered" (canForceResubmit) kay dili error pero
@@ -1773,29 +1775,27 @@ onActivated(() => {
         grid-column: 1 / -1;
     }
 
-    .main-grid > .col-right > .details-back {
-        justify-self: start;
-    }
-
     /* Ang submit kay sa tuo, dili mo-stretch sa tibuok 1400px */
-    .main-grid > .col-right > .btn-submit {
-        justify-self: end;
+    .main-grid > .col-right > .details-actions .btn-submit {
         width: auto;
         min-width: 300px;
     }
 }
 
+/* A plain outlined button, in line with the column (2026-11-20): it used to
+   sit 8px outside the edge and turn into a grey pill when pressed. */
 .details-back {
     display: inline-flex;
     align-self: flex-start;
     align-items: center;
-    gap: 4px;
-    margin: -4px 0 -6px -8px;
-    padding: 6px 12px 6px 8px;
-    border: none;
-    border-radius: 999px;
-    background: none;
-    color: var(--text-secondary, #6b7280);
+    gap: 6px;
+    height: 46px;
+    margin: 0;
+    padding: 0 16px 0 12px;
+    border: 1px solid var(--rb-border-strong, #E2E8F0);
+    border-radius: 10px;
+    background: var(--rb-surface, #fff);
+    color: var(--text-primary);
     font: inherit;
     font-size: var(--rb-fs-small);
     font-weight: 600;
@@ -1804,9 +1804,12 @@ onActivated(() => {
 }
 
 .details-back:hover {
-    background: rgba(var(--rb-primary-rgb), 0.06);
-    color: var(--text-primary);
+    border-color: rgba(var(--rb-primary-rgb), 0.45);
+    background: rgba(var(--rb-primary-rgb), 0.05);
+    color: var(--rb-primary);
 }
+
+.details-back:active { transform: translateY(1px); }
 
 .details-back:focus-visible {
     outline: 2px solid var(--primary);
@@ -2905,8 +2908,15 @@ onActivated(() => {
     border-top-color: rgba(245, 158, 11, 0.30);
     color: #FCD34D;
 }
+:global(.dark .eligibility-page .details-back) {
+    background: var(--ink-page, #0F172A);
+    border-color: var(--ink-border, #334155);
+    color: var(--ink-text, #E2E8F0);
+}
 :global(.dark .eligibility-page .details-back:hover) {
     background: rgba(255, 255, 255, 0.06);
+    border-color: var(--rb-primary-text);
+    color: var(--rb-primary-text);
 }
 :global(.dark .eligibility-page .wizard-nav),
 :global(.dark .eligibility-page .wizard-group__head--next) {
@@ -3398,4 +3408,29 @@ onActivated(() => {
 :global(.dark .eligibility-page .answer-btn) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .eligibility-page .answer-btn:hover:not(.answer-btn--active)) { background: var(--ink-hover, #263449); }
 :global(.dark .eligibility-page .answer-btn.answer-btn--active) { background: var(--rb-primary); color: #fff; }
+/* Consent (2026-11-20): numbered statements, one agreement at the foot. */
+.consent-list { margin: 0; padding: 0; list-style: none; }
+.consent-item { gap: 12px; padding: 12px 0; }
+.consent-item:last-child { border-bottom: none; }
+.consent-item__num {
+    display: grid; place-items: center; flex: none; width: 24px; height: 24px; margin-top: 1px;
+    border-radius: 50%; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary);
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.consent-item--agreed .consent-item__num { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text, #15803d); }
+.consent-item__text { margin: 0; cursor: text; }
+.consent-all { margin-top: 10px; padding: 14px 16px; border-width: 1.5px; transition: border-color 0.15s ease, background-color 0.15s ease; }
+.consent-all .consent-item__box { width: 18px; height: 18px; }
+.consent-all--on { border-color: rgba(var(--rb-success-rgb), 0.5); background: rgba(var(--rb-success-rgb), 0.07); }
+@media (prefers-reduced-motion: reduce) { .consent-item__num, .consent-all { transition: none; } }
+:global(.dark .eligibility-page .consent-all.consent-all--on) { border-color: rgba(var(--rb-success-rgb), 0.5); background: rgba(var(--rb-success-rgb), 0.1); }
+/* Back on the left, Submit on the right; on a phone, Submit on top and both full width. */
+.details-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.details-actions .details-back { align-self: auto; flex: none; }
+.details-actions .btn-submit { margin: 0; }
+@media (max-width: 640px) {
+    .details-actions { flex-direction: column-reverse; align-items: stretch; }
+    .details-actions .details-back { justify-content: center; width: 100%; }
+}
 </style>

@@ -8,6 +8,8 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Collection dashboard</h1>
+          <!-- The day, and where it stands (project owner, 2026-11-20). -->
+          <p class="page-subtitle">{{ todaySubtitle }}</p>
         </div>
         <div class="header-actions">
           <span v-if="updatedAt" class="updated">
@@ -498,6 +500,18 @@ function ringStyle(fraction, r) {
 }
 
 // The day's screening done: screened, of everyone who has come in.
+// "Friday, November 20 · 12 booked today, 3 screened so far"
+const todaySubtitle = computed(() => {
+  const day = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const a = data.value?.today.appointments ?? {}
+  const booked = (a.waiting ?? 0) + (a.in_progress ?? 0) + (a.collected ?? 0) + (a.no_show ?? 0)
+  const screened = screenedToday.value
+  if (!booked && !screened) return `${day} · no bookings or visits yet`
+  const bookedText = booked ? `${booked} booked today` : 'no bookings today'
+  const screenedText = screened ? `${screened} screened so far` : 'none screened yet'
+  return `${day} · ${bookedText}, ${screenedText}`
+})
+
 const queueTotal = computed(() => screenedToday.value + queueWaiting.value + (data.value?.today.donations.screening ?? 0))
 const queueDone = computed(() => (queueTotal.value ? screenedToday.value / queueTotal.value : 0))
 
@@ -745,6 +759,7 @@ onBeforeUnmount(() => {
 /* ---------- Header ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
+.page-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 
 .updated {

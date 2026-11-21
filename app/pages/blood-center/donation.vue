@@ -701,8 +701,8 @@ const {
 // The type of donation (Stage 2), a walk-in unless the counter picks otherwise.
 const DONATION_TYPES = [
   { value: 'walk_in', label: 'Walk-in', hint: 'Voluntary, for no patient in particular' },
-  { value: 'ts', label: 'TS', hint: 'Type-specific: for a patient of the same blood type' },
-  { value: 'nts', label: 'NTS', hint: 'Non-type-specific: for a patient of another blood type' },
+  { value: 'ts', label: 'Type Specific (TS)', hint: 'Type-specific: for a patient of the same blood type' },
+  { value: 'nts', label: 'Non-Type Specific (NTS)', hint: 'Non-type-specific: for a patient of another blood type' },
 ]
 const donationType = ref('walk_in')
 watch(() => donor.value?.uuid, () => { donationType.value = 'walk_in' })

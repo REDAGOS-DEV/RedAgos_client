@@ -23,7 +23,7 @@
       </span>
       <span v-if="item.desc" class="ni__desc">{{ item.desc }}</span>
       <span class="ni__foot">
-        <span class="ni__time">{{ timeAgo(item.created_at) }}<template v-if="item.meta"> · <span class="ni__meta">{{ item.meta }}</span></template></span>
+        <span class="ni__time"><time :datetime="item.created_at ?? undefined" :title="exactTime(item.created_at)">{{ timeAgo(item.created_at, now) }}</time><template v-if="item.meta"> · <span class="ni__meta">{{ item.meta }}</span></template></span>
         <button
           v-if="item.action_label && safeRoute(item.action_route)"
           type="button"
@@ -43,8 +43,12 @@
 <script setup lang="ts">
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { safeRoute, timeAgo, type StaffNotification } from '~/utils/staffNotifications'
+import { exactTime, useNow } from '~/composables/useNow'
 
 defineProps<{ item: StaffNotification, roomy?: boolean }>()
+
+// Keeps "5 min ago" current while the list is open.
+const now = useNow()
 defineEmits<{ open: [item: StaffNotification] }>()
 </script>
 
