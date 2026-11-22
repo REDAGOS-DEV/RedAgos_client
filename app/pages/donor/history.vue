@@ -75,8 +75,11 @@
           <li v-for="(step, i) in STEPS" :key="step" class="track__step"
             :class="{ 'is-done': i < stepIndex(v.status), 'is-current': i === stepIndex(v.status) }"
             :aria-current="i === stepIndex(v.status) ? 'step' : undefined">
-            <span class="track__dot" />
+            <span class="track__dot">
+              <AssetIcon v-if="i <= stepIndex(v.status)" name="check" :size="11" />
+            </span>
             <span class="track__label">{{ STEP_LABELS[step] }}</span>
+            <span v-if="i === stepIndex(v.status)" class="track__now">Now</span>
           </li>
         </ol>
       </section>
@@ -160,6 +163,7 @@
                   <div v-if="e.volumeMl"><dt>Collected</dt><dd>{{ e.volumeMl }} mL</dd></div>
                   <div><dt>Status</dt><dd>{{ STEP_LABELS[e.status] ?? e.status }}</dd></div>
                 </dl>
+                <p v-if="e.kind !== 'rejected'" class="detail__heading">Progress</p>
                 <ol v-if="e.kind !== 'rejected'" class="track track--small"
                   :class="{ 'track--ended': e.kind === 'ended' }"
                   :aria-label="e.kind === 'ended' ? `Stopped at ${STEP_LABELS[e.status]}` : `Progress: ${STEP_LABELS[e.status]}`">
@@ -171,9 +175,11 @@
                       'is-skipped': e.kind === 'ended' && i > stepIndex(e.status),
                     }">
                     <span class="track__dot">
-                      <AssetIcon v-if="e.kind === 'ended' && i === stepIndex(e.status)" name="x" :size="8" />
+                      <AssetIcon v-if="e.kind === 'ended' && i === stepIndex(e.status)" name="x" :size="10" />
+                      <AssetIcon v-else-if="e.kind !== 'ended' && i <= stepIndex(e.status)" name="check" :size="11" />
                     </span>
                     <span class="track__label">{{ STEP_LABELS[step] }}</span>
+                    <span v-if="e.kind === 'live' && i === stepIndex(e.status)" class="track__now">Now</span>
                   </li>
                 </ol>
                 <p v-if="e.kind === 'ended'" class="detail__note">
@@ -848,4 +854,22 @@ onActivated(() => {
   .entry__chev, .entry__row { transition: none; }
   .btn:active { transform: none; }
 }
+/* ── Step track, clearer (2026-11-20) ──
+   Larger dots: a check in every step reached, the one it is at ringed and
+   marked "Now", the ones ahead hollow. The expanded row puts the track under
+   its own heading so it is not read against the facts above it. */
+.track__step + .track__step::before { top: 10px; }
+.track__dot { width: 22px; height: 22px; color: #fff; }
+.track__step.is-current .track__dot { background: var(--rb-primary); box-shadow: 0 0 0 5px rgba(var(--rb-primary-rgb), 0.18); }
+.track__now {
+  margin-top: -2px; padding: 0 7px; border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+}
+.track__step.is-stopped .track__dot { width: 22px; height: 22px; margin-top: 0; background: var(--rb-surface); }
+.detail__heading {
+  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--rb-border);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-muted);
+}
+.detail__heading + .track--small { margin-top: 12px; }
 </style>

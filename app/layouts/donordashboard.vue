@@ -962,7 +962,8 @@ html.dark .donor-portal {
 
 .donor-portal .form-input.form-input:not(.form-input--locked),
 .donor-portal .sf:not(.sf--open) .sf-trigger.sf-trigger:not(.sf-trigger--invalid):not(:focus-visible),
-.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:not(.dp-trigger--invalid):not(:focus-visible) {
+.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:not(.dp-trigger--invalid):not(:focus-visible),
+.donor-portal .pf.pf:not(.pf--open):not(:focus-within) {
   border-color: var(--donor-field-border);
   background-color: var(--donor-field-bg);
   box-shadow: var(--donor-field-inset);

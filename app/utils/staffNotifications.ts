@@ -93,15 +93,20 @@ export function groupByDay(items: StaffNotification[], now = new Date()): { labe
   return groups
 }
 
-export function timeAgo(iso: string | null, now = Date.now()): string {
+/**
+ * "Just now", "5 min ago", "2 hours ago", "3 days ago", then the date: every
+ * portal's notifications say it this way (2026-11-20). Whole units, rounded
+ * down, so 59 seconds is still "Just now".
+ */
+export function timeAgo(iso: string | null | undefined, now = Date.now()): string {
   const at = iso ? new Date(iso).getTime() : Number.NaN
   if (Number.isNaN(at)) return ''
-  const minutes = Math.round((now - at) / 60000)
+  const minutes = Math.max(0, Math.floor((now - at) / 60000))
   if (minutes < 1) return 'Just now'
   if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.round(minutes / 60)
+  const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  const days = Math.round(hours / 24)
+  const days = Math.floor(hours / 24)
   if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
   return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }

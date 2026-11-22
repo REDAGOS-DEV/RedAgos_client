@@ -79,7 +79,8 @@
                 class="onsite__question"
                 :class="{ 'onsite__question--missing': attempted && answers[q.code] === undefined }"
               >
-                <p class="onsite__q-text"><span class="onsite__q-no">{{ q.number }}.</span> {{ q.text }}</p>
+                <span class="onsite__q-no" aria-hidden="true">{{ q.number }}</span>
+                <p class="onsite__q-text">{{ q.text }}</p>
 
                 <div class="onsite__answers" role="radiogroup" :aria-label="`Question ${q.number}`">
                   <button
@@ -693,5 +694,64 @@ onBeforeUnmount(() => {
   .onsite__body { padding: 0.9rem 1rem 0; }
   .onsite__footer { margin: 0 -1rem; padding: 0.75rem 1rem 0.9rem; }
   .onsite__answer { flex: 1 1 auto; }
+}
+/* ---------- Compact rows (2026-11-20) ----------
+   One line per question: the number, the question, then a segmented Yes / No
+   on the right. Every target stays at least 40px tall for a finger. On a phone
+   the answers drop under the question. */
+.onsite__body { gap: 14px; padding: 16px 20px 0; }
+.onsite__intro { font-size: 13.5px; }
+.onsite__group { padding: 14px 16px 6px; border-radius: 14px; }
+.onsite__legend { margin: 0 0 4px; padding: 0; font-size: 11.5px; }
+fieldset.onsite__group { padding-bottom: 14px; }
+fieldset.onsite__group > .onsite__legend { float: left; width: 100%; margin-bottom: 10px; }
+fieldset.onsite__group > .onsite__legend + * { clear: both; }
+
+.onsite__question {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 9px 0;
+  border-left: 0;
+  border-radius: 10px;
+}
+.onsite__question > .onsite__field--inline { grid-column: 2 / -1; margin-top: 8px; }
+
+.onsite__q-no {
+  display: grid; place-items: center; width: 26px; height: 26px; margin: 0;
+  border-radius: 50%; background: var(--rb-surface-alt); border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary); font-size: 12px; font-weight: 700;
+}
+.onsite__q-text { font-size: 14.5px; line-height: 1.45; }
+
+/* Not yet answered after a try: a soft tint and a red number, no edge line. */
+.onsite__question--missing {
+  padding-left: 8px;
+  padding-right: 8px;
+  margin: 2px -8px;
+  background: rgba(var(--rb-accent-rgb), 0.06);
+}
+.onsite__question--missing .onsite__q-no { border-color: rgba(var(--rb-accent-rgb), 0.45); background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
+
+/* Yes / No as one segmented control. */
+.onsite__answers {
+  display: inline-flex; flex-wrap: nowrap; gap: 2px; margin: 0; padding: 3px;
+  border: 1px solid var(--rb-border-strong); border-radius: 11px; background: var(--rb-surface-alt);
+}
+.onsite__answer {
+  min-width: 64px; min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--rb-text-secondary); font-size: 14px; white-space: nowrap;
+}
+.onsite__answer:hover { background: var(--rb-surface); color: var(--rb-text-primary); }
+.onsite__answer--on,
+.onsite__answer--on:hover { background: var(--rb-primary); color: #fff; box-shadow: 0 2px 6px -2px rgba(var(--rb-primary-rgb), 0.6); }
+
+.onsite__consent { padding: 8px 0; font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  .onsite__question { grid-template-columns: 26px minmax(0, 1fr); row-gap: 8px; }
+  .onsite__answers { grid-column: 2; justify-self: stretch; }
+  .onsite__answer { flex: 1 1 0; }
 }
 </style>
