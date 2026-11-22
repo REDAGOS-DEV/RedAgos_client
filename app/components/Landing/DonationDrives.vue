@@ -6,8 +6,9 @@
         <p class="lp-lead">Join a mobile blood donation drive near you and help save lives.</p>
       </header>
 
-      <!-- Nothing scheduled: point people at the one thing that helps. -->
-      <div v-if="drives.length === 0" class="empty-state">
+      <!-- Nothing scheduled: point people at the one thing that helps. Only
+           once the list is in, so it never flashes before the drives. -->
+      <div v-if="loaded && drives.length === 0" class="empty-state">
         <span class="empty-icon"><AssetIcon name="calendar" :size="24" /></span>
         <p class="empty-title">No drives scheduled yet</p>
         <p class="empty-desc">New drives are posted here as blood centers schedule them.</p>
@@ -20,7 +21,7 @@
         Registration counts and capacity are internal to the blood center and
         are not shown on the public page.
       -->
-      <div v-else class="drives-layout">
+      <div v-else-if="drives.length" class="drives-layout">
         <!-- ── The soonest drive, featured ── -->
         <article v-reveal class="featured">
           <div class="featured-date">
@@ -35,14 +36,19 @@
             <ul class="meta">
               <li><AssetIcon name="map-pin" :size="16" />{{ featured.location }}</li>
               <li><AssetIcon name="calendar" :size="16" />{{ featured.weekday }}</li>
-              <li><AssetIcon name="clock" :size="16" />{{ featured.time }}</li>
+              <li v-if="featured.time"><AssetIcon name="clock" :size="16" />{{ featured.time }}</li>
             </ul>
 
             <div class="actions">
               <NuxtLink to="/auth/login" class="lp-btn lp-btn--primary lp-btn--sm">
                 Register to join
               </NuxtLink>
-              <button type="button" class="lp-btn lp-btn--secondary lp-btn--sm" @click="addToCalendar(featured)">
+              <button
+                v-if="hasCalendar(featured)"
+                type="button"
+                class="lp-btn lp-btn--secondary lp-btn--sm"
+                @click="addToCalendar(featured)"
+              >
                 <AssetIcon name="calendar-check" :size="16" />
                 Add to calendar
               </button>
@@ -61,7 +67,7 @@
 
         <!-- ── The rest, compact ── -->
         <ol v-if="rest.length" class="rest">
-          <li v-for="(drive, i) in rest" :key="drive.title" v-reveal="i * 80" class="row">
+          <li v-for="(drive, i) in rest" :key="drive.id ?? drive.title" v-reveal="i * 80" class="row">
             <time class="row-date" :datetime="drive.date">
               <span class="row-month">{{ drive.month }}</span>
               <span class="row-day">{{ drive.day }}</span>
@@ -69,7 +75,7 @@
 
             <div class="row-main">
               <h3>{{ drive.title }}</h3>
-              <p class="row-meta">{{ drive.weekday }} · {{ drive.time }}</p>
+              <p class="row-meta">{{ drive.weekday }}<template v-if="drive.time"> · {{ drive.time }}</template></p>
               <p class="row-meta row-place">
                 <AssetIcon name="map-pin" :size="14" />{{ drive.location }}
               </p>
@@ -77,6 +83,7 @@
 
             <div class="row-actions">
               <button
+                v-if="hasCalendar(drive)"
                 type="button"
                 class="icon-action"
                 :aria-label="`Add ${drive.title} to your calendar`"
@@ -106,20 +113,22 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { driveIcs, driveMapsUrl, relativeDay, upcomingDrives } from '~/utils/donationDrives'
+import { driveIcs, driveMapsUrl, driveUtcRange, relativeDay } from '~/utils/donationDrives'
 
-// The list lives in utils/donationDrives.ts, shared with the hero's
-// "Next drive" card.
-const drives = computed(() => upcomingDrives())
+// The drives blood centers created and published, shared with the hero's
+// "Next drive" card (composables/usePublicDrives.ts). Fetched on the client.
+const { drives, loaded } = usePublicDrives()
 const featured = computed(() => drives.value[0])
 const rest = computed(() => drives.value.slice(1))
 
-// "In 3 weeks" depends on today's date, so it is filled in on the client to
-// keep the server render and hydration identical.
-const relative = ref({})
-onMounted(() => {
-  relative.value = Object.fromEntries(drives.value.map(d => [d.date, relativeDay(d.date)]))
-})
+// "In 3 weeks" depends on today's date. The drives only arrive on the client,
+// so the server render and hydration stay identical.
+const relative = computed(() => Object.fromEntries(drives.value.map(d => [d.date, relativeDay(d.date)])))
+
+// A drive with no times, or only one, has no calendar event to offer.
+function hasCalendar(drive) {
+  return driveUtcRange(drive) !== null
+}
 
 // Builds the .ics file in the browser and hands it over as a download. Phones
 // open it straight into the calendar app.

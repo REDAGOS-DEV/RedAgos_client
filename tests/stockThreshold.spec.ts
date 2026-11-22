@@ -403,12 +403,11 @@ describe('pages and navigation', () => {
     expect(nav).toMatch(/label: 'Stock Thresholds', path: '\/blood-center\/stock-thresholds'[^}]*requires: 'inventory\.view'/)
   })
 
-  it('links the hospital page from its sidebar, its search and its breadcrumb', () => {
+  it('links the hospital page from its sidebar and its search', () => {
     expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/stock-thresholds'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
     expect(layout).toContain("label: 'Stock Thresholds', path: '/hospital/stock-thresholds'")
-    expect(layout).toContain("'/hospital/stock-thresholds': 'Stock Thresholds'")
   })
 
   it('shows the banner on every screen that watches the shelf, linking to the right page', () => {

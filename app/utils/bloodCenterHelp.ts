@@ -93,7 +93,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       'Save. The drive is listed under Upcoming.',
     ],
     questions: [
-      { q: 'Can I edit a drive after saving it?', a: 'Not yet. Editing a drive is not available in this version.' },
+      { q: 'Can I edit a drive after saving it?', a: 'Yes. Choose the pencil beside the drive, change the details and save. Its bookings move with it and the donors are told. The date cannot move once a donor has checked in.' },
     ],
   },
 

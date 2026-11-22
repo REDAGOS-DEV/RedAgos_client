@@ -43,13 +43,7 @@
               <NuxtLink to="/admin/dashboard" class="brand-word__name" tabindex="-1" aria-hidden="true">
                 Red<span class="brand-word__accent">Agos</span>
               </NuxtLink>
-              <span class="brand-word__tag lg:hidden">Super Admin</span>
-              <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="`Super Admin / ${pageTitle}`">
-                <ol>
-                  <li>Super Admin</li>
-                  <li aria-current="page">{{ pageTitle }}</li>
-                </ol>
-              </nav>
+              <span class="brand-word__tag">Super Admin</span>
             </div>
           </div>
 
@@ -169,7 +163,6 @@
  * from them as part of adopting this layout.
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
 import AdminSidebar from '~/components/admin/sidebar.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
@@ -199,7 +192,6 @@ onUnmounted(() => document.documentElement.classList.remove('portal-bc'))
 
 const { user, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
-const route = useRoute()
 
 /*
  * Bound rather than written as a `:global(.dark) header` rule: this build's
@@ -212,15 +204,6 @@ const headerShadow = computed(() => (
     ? '0 1px 3px rgba(0,0,0,0.30), 0 1px 2px -1px rgba(0,0,0,0.30)'
     : '0 1px 2px rgba(15,23,42,0.05)'
 ))
-
-const PAGE_TITLES = {
-  '/admin/dashboard': 'Dashboard',
-  '/admin/facilities': 'Organizations',
-  '/admin/donor-identities': 'ID Verification',
-  '/admin/administrators': 'Administrators',
-}
-
-const pageTitle = computed(() => PAGE_TITLES[route.path] || 'Admin')
 
 // --- Account menu ---
 const menuOpen = ref(false)
@@ -290,7 +273,7 @@ const handleLogout = async () => {
   transition: background-color 150ms ease, border-color 150ms ease;
 }
 
-/* ── Brand: menu button, logo, wordmark and breadcrumb, as in the other portals ── */
+/* ── Brand: menu button, logo and wordmark, as in the other portals ── */
 .rail-toggle {
   display: inline-flex;
   flex-shrink: 0;
@@ -339,11 +322,6 @@ const handleLogout = async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.brand-crumb { margin-top: 2px; min-width: 0; }
-.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
-.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
-.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
-.brand-crumb li[aria-current] { color: var(--rb-text-primary); font-weight: 600; }
 
 main {
   background: var(--rb-page-bg);

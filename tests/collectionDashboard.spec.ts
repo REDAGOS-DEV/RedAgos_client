@@ -104,7 +104,7 @@ describe('the dashboard page and its link', () => {
     expect(nav).toMatch(/label: 'Donor',\s*items: \[\s*\{ label: 'Donor Management'[^\n]*\n\s*\{ label: 'Appointments'/)
     // The list of visits, then the drives. The counter is kept out of the
     // sidebar, reached from Donations and Donor Management (project owner,
-    // 2026-10-24), but still named for the breadcrumb.
+    // 2026-10-24).
     expect(nav).toMatch(/label: 'Collection',\s*items: \[[\s\S]*?\{ label: 'Donations', path: '\/blood-center\/donations'[\s\S]*?\{ label: 'Blood Donation Drive'/)
     expect(nav).toMatch(/\{ label: 'Donation Counter', path: '\/blood-center\/donation',[^}]*hidden: true \}/)
     expect(nav).toContain('.filter((item) => !item.hidden && can(item.requires))')

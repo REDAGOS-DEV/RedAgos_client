@@ -6,15 +6,6 @@
         <AssetIcon name="arrow-left" />
         <span>Back to Patient Request</span>
       </button>
-<!--
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-        <span>Hospital Portal</span>
-        <span class="crumb-sep">/</span>
-        <span>Blood Requests</span>
-        <span class="crumb-sep">/</span>
-        <span class="crumb-current">Request Details</span>
-      </nav> -->
-
       <PageHeader title="Blood Request Details" :subtitle="hospitalPageSubtitle('requestDetails', can)">
         <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
@@ -113,7 +104,7 @@
                 <span class="info-label">Submitted By</span>
                 <span class="info-value">
                   {{ request.requester_name
-                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : '—') }}
+                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : (request.recorder_name ? `Added by ${request.target_facility?.name || 'the blood center'}` : '—')) }}
                 </span>
               </div>
               <div class="info-item">
@@ -986,21 +977,6 @@ function scrollToTimeline() {
 }
 .back-link:hover {
   text-decoration: underline;
-}
-
-.breadcrumb {
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-  margin-bottom: 16px;
-  display: flex;
-  gap: 6px;
-}
-.crumb-sep {
-  color: var(--rb-text-muted);
-}
-.crumb-current {
-  color: var(--rb-text-primary);
-  font-weight: 600;
 }
 
 .page-header :deep(.ph) { margin-bottom: 24px; }

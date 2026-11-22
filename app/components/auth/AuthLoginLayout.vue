@@ -79,7 +79,30 @@
 
         <SessionExpiredNotice />
 
-        <LoginAlert :message="errorMessage" />
+        <!--
+          Google confirmed an address no account uses (2026-11-22): instead of
+          a warning, an offer to register a donor account with that address.
+        -->
+        <div v-if="googleSignUpEmail" class="gso" role="status">
+          <AssetIcon name="info" :size="16" class="gso__icon" />
+          <div class="gso__body">
+            <p class="gso__text">
+              No RedAgos account uses <strong>{{ googleSignUpEmail }}</strong>.
+              Register a donor account with this email?
+            </p>
+            <div class="gso__actions">
+              <NuxtLink
+                :to="{ path: '/auth/donor/register', query: { email: googleSignUpEmail } }"
+                class="gso__register"
+              >
+                Register with this email
+                <AssetIcon name="arrow-right" :size="15" />
+              </NuxtLink>
+              <button type="button" class="au-link gso__dismiss" @click="clearError">Not now</button>
+            </div>
+          </div>
+        </div>
+        <LoginAlert v-else :message="errorMessage" />
 
         <button type="submit" class="au-btn" :disabled="loading">
           <AssetIcon
@@ -136,9 +159,49 @@ const {
   typed,
   needsVerification,
   verificationEmail,
+  googleSignUpEmail,
   login,
   loginWithGoogle,
   goToForgotPassword,
   clearError,
 } = useAuthLogin('user')
 </script>
+
+<style scoped>
+/* The register offer, in LoginAlert's place: blue (an offer), not red. */
+.gso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(21, 101, 192, 0.28);
+  border-radius: 12px;
+  background: #EFF5FC;
+  color: var(--au-text);
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: left;
+}
+.gso__icon { flex: 0 0 auto; margin-top: 2px; color: var(--au-accent-text); }
+.gso__body { display: grid; gap: 10px; min-width: 0; }
+.gso__text { margin: 0; }
+.gso__text strong { font-weight: 600; overflow-wrap: anywhere; }
+.gso__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.gso__register {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--au-accent);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 150ms ease;
+}
+.gso__register:hover { background: var(--au-accent-hover); }
+.gso__register:focus-visible { outline: 2px solid var(--au-accent); outline-offset: 2px; }
+.auth-shell .gso__dismiss { margin-right: 0; }
+</style>

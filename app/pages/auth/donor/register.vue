@@ -374,6 +374,8 @@ definePageMeta({
   alias: ['/register/donor'],
 })
 
+const route = useRoute()
+
 // Brand panel copy for the shared AuthShell frame.
 const hero = {
   lead: 'Become a',
@@ -512,6 +514,15 @@ onMounted(() => {
 
   if (pending) {
     registeredEmail.value = pending.email
+    return
+  }
+
+  // From the sign-in screen's offer (2026-11-22): the Google address no
+  // account uses. Still editable; the password is next.
+  const offered = route.query.email
+  if (typeof offered === 'string' && offered.trim() && !form.email) {
+    form.email = offered.trim()
+    nextTick(() => document.getElementById('password')?.focus())
   }
 })
 </script>

@@ -51,22 +51,14 @@
             </NuxtLink>
 
             <!--
-              The wordmark, and beneath it where this page sits: the hospital,
-              its section and the page on desktop; the hospital alone below that.
+              The wordmark, and beneath it the hospital's name. No breadcrumb in
+              any portal (project owner, 2026-11-19).
             -->
             <div class="brand-word">
               <NuxtLink to="/hospital/dashboard" class="brand-word__name" tabindex="-1" aria-hidden="true">
                 Red<span class="brand-word__accent">Agos</span>
               </NuxtLink>
-              <span class="brand-word__tag lg:hidden">{{ facilityName || 'Hospital Portal' }}</span>
-              <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="breadcrumb">
-                <ol>
-                  <li v-for="(crumb, i) in crumbs" :key="i" :aria-current="i === crumbs.length - 1 ? 'page' : null">
-                    <NuxtLink v-if="crumb.to" :to="crumb.to" class="brand-crumb__link">{{ crumb.label }}</NuxtLink>
-                    <template v-else>{{ crumb.label }}</template>
-                  </li>
-                </ol>
-              </nav>
+              <span class="brand-word__tag" :title="facilityName || 'Hospital Portal'">{{ facilityName || 'Hospital Portal' }}</span>
             </div>
           </div>
 
@@ -280,7 +272,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
@@ -297,7 +289,6 @@ import logo from '~/assets/images/RedAgosLogo.png'
 import '~/assets/css/bc-ui.css'
 
 const router = useRouter()
-const route = useRoute()
 const { user, ensureUser, logout, can } = useUser()
 const { isDark, themeMode, setThemeMode } = useDarkMode()
 
@@ -370,67 +361,7 @@ onUnmounted(() => {
   themeColorMeta = null
 })
 
-// --- Breadcrumb ---
-const pageLabels = {
-  '/hospital/dashboard': 'Dashboard',
-  '/hospital/bloodrequests': 'Receiving / Patient Request',
-  '/hospital/bloodrequests/newrequest' : 'Receiving / Patient Request / New Request',
-  '/hospital/bloodrequests/newrequest/[id]' : 'Receiving / Patient Request / New Request / ',
-  '/hospital/bloodrequests/edit' : 'Receiving / Patient Request / Edit / ',
-  '/hospital/transfusion-requests': 'Receiving / Patient Request',
-  '/hospital/trackrequests': 'Track Requests',
-  '/hospital/bloodavailability': 'Receiving / Blood Availability',
-  '/hospital/inventory': 'Blood Bank Inventory',
-  '/hospital/stock-intake': 'Stock Intake',
-  '/hospital/stock-thresholds': 'Stock Thresholds',
-  '/hospital/inventory-report': 'Reports / Inventory Report',
-  '/hospital/receiving/weekly': 'Receiving / Weekly Request',
-  '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
-  '/hospital/request-days': 'Facility Settings / Request Days',
-  '/hospital/notifications': 'Notifications',
-  '/hospital/staff': 'Staff',
-  '/hospital/help': 'Help Center',
-  '/hospital/settings': 'Settings',
-}
-
-// A detail page (/receiving/weekly/12) falls back to the deepest section it sits under.
-const pageLabel = computed(() => {
-  const exact = pageLabels[route.path]
-  if (exact) return exact
-
-  const parent = Object.keys(pageLabels)
-    .filter((path) => route.path.startsWith(`${path}/`))
-    .sort((a, b) => b.length - a.length)[0]
-
-  return parent ? pageLabels[parent] : ''
-})
-
 const facilityName = computed(() => user.value?.facility?.facility_name || user.value?.facility?.name || '')
-
-// Desktop: "Hospital › Section › Page", as at the centre. When the bar runs
-// short the hospital's name gives way first, so the page always reads in full.
-//
-// Each crumb with a page of its own is a link (project owner, 2026-11-01), so a
-// detail page needs no "Back to…" of its own. A section ("Receiving") has no
-// page, so it stays text; the page open now is the last, and stays text too.
-const splitLabel = label => label.split(' / ').map((part) => part.trim()).filter(Boolean)
-const pathOfLabel = (parts) => {
-  const label = parts.join(' / ')
-  return Object.keys(pageLabels).find(path => splitLabel(pageLabels[path]).join(' / ') === label) ?? null
-}
-const crumbs = computed(() => {
-  const parts = splitLabel(pageLabel.value)
-  // A record under a list: the list is its parent, so it links back to it.
-  if (parts.length && !pageLabels[route.path] && !pageLabel.value.trim().endsWith('/')) parts.push('Details')
-  return [
-    { label: facilityName.value || 'Hospital Portal', to: parts.length ? '/hospital/dashboard' : null },
-    ...parts.map((label, i) => ({
-      label,
-      to: i < parts.length - 1 ? pathOfLabel(parts.slice(0, i + 1)) : null,
-    })),
-  ]
-})
-const breadcrumb = computed(() => crumbs.value.map(crumb => crumb.label).join(' / '))
 
 const nameParts = computed(() => {
   const parts = [user.value?.first_name, user.value?.last_name].map((v) => (v || '').trim()).filter(Boolean)
@@ -826,7 +757,7 @@ const handleLogout = async () => {
 
 main { background: transparent; }
 
-/* ── Brand: menu button, logo, wordmark and breadcrumb ── */
+/* ── Brand: menu button, logo and wordmark ── */
 .rail-toggle {
   display: inline-flex;
   flex-shrink: 0;
@@ -875,16 +806,6 @@ main { background: transparent; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Hospital › Section › Page; the page keeps its room, the rest give way. */
-.brand-crumb { margin-top: 2px; min-width: 0; }
-.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
-.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
-.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
-.brand-crumb li:first-child:not(:last-child) { flex-shrink: 1; }
-.brand-crumb li[aria-current] { flex-shrink: 0; max-width: 100%; color: var(--rb-text-primary); font-weight: 600; }
-.brand-crumb__link { color: inherit; text-decoration: none; border-radius: 3px; }
-.brand-crumb__link:hover { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 2px; }
-.brand-crumb__link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 
 .search-panel {
   max-height: 320px;

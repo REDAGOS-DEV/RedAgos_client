@@ -43,7 +43,7 @@
         <!--
           The bar spans the full width — it carries the background and the
           divider — but its contents sit in the same centred 1152px column the
-          donor pages use, with the same 16/32px gutters, so the breadcrumb
+          donor pages use, with the same 16/32px gutters, so the wordmark
           lines up with the page title directly beneath it instead of drifting
           as the rail reflows the column. The donor pages are 1400px wide, so
           the bar is too: at 1152px the greeting sat far in from the title.
@@ -80,25 +80,15 @@
           </NuxtLink>
 
           <!--
-            The wordmark beside the logo. Phones and tablets show the brand
-            ("Donor Portal" beneath RedAgos); each page carries its own title.
-            Desktop turns the second line into a breadcrumb to the page.
-            Hidden on phones while the search takes the bar.
+            The wordmark beside the logo, "Donor Portal" beneath RedAgos; each
+            page carries its own title. No breadcrumb in any portal (project
+            owner, 2026-11-19). Hidden on phones while the search takes the bar.
           -->
           <div class="brand-word" :class="{ 'max-sm:hidden': searchOpenMobile }">
             <NuxtLink to="/donor/dashboard" class="brand-word__name" aria-label="RedAgos, go to Home">
               Red<span class="brand-word__accent">Agos</span>
             </NuxtLink>
-            <span class="brand-word__tag lg:hidden">Donor Portal</span>
-            <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb">
-              <ol>
-                <li>
-                  <NuxtLink v-if="route.path !== '/donor/dashboard'" to="/donor/dashboard">Donor Portal</NuxtLink>
-                  <span v-else>Donor Portal</span>
-                </li>
-                <li aria-current="page">{{ pageLabels[route.path] || 'Dashboard' }}</li>
-              </ol>
-            </nav>
+            <span class="brand-word__tag">Donor Portal</span>
           </div>
         </div>
 
@@ -484,20 +474,6 @@ const vClickOutside = {
   }
 }
 
-// --- Page title (top bar and mobile header) ---
-const pageLabels = {
-  '/donor/dashboard': 'Dashboard',
-  '/donor/appointments': 'Book Appointment',
-  '/donor/history': 'Donation History',
-  '/donor/eligibility': 'Eligibility Screening',
-  '/donor/qrcode': 'My QR Code',
-  '/donor/notifications': 'Notifications',
-  '/donor/profile': 'My Profile',
-  '/donor/settings': 'Settings',
-  '/donor/help': 'Help',
-}
-
-
 // --- Notifications ---
 // Shared with the notifications page, which updates it as notices are read.
 const unreadCount = useState('donor-unread-count', () => 0)
@@ -781,8 +757,7 @@ html.dark .rail-toggle:hover { background: rgba(255, 255, 255, 0.08); }
   .mobile-logo { width: 48px; height: 48px; }
 }
 
-/* The wordmark beside the logo: the name, and beneath it "Donor Portal"
-   (phones, tablets) or the breadcrumb to the page (desktop). */
+/* The wordmark beside the logo: the name, and beneath it "Donor Portal". */
 .brand-word { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
 .brand-word__name { text-decoration: none; }
 .brand-word__name {
@@ -794,20 +769,7 @@ html.dark .rail-toggle:hover { background: rgba(255, 255, 255, 0.08); }
   color: var(--rb-text-primary);
 }
 .brand-word__accent { color: #D32F2F; }
-/* Desktop: Donor Portal › Page. Capped so a long page name ends in an
-   ellipsis short of the centred search (narrower below 1280px). */
-.brand-crumb { margin-top: 2px; max-width: 180px; }
-@media (min-width: 1280px) {
-  .brand-crumb { max-width: 280px; }
-}
-.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
-.brand-crumb li { flex-shrink: 0; color: var(--rb-text-secondary); font-weight: 500; }
-.brand-crumb li + li { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; color: var(--rb-text-secondary); opacity: 0.7; }
-.brand-crumb li[aria-current] { color: var(--rb-text-primary); font-weight: 600; }
-.brand-crumb a { color: inherit; text-decoration: none; border-radius: 4px; }
-.brand-crumb a:hover { color: var(--rb-primary-text, var(--rb-primary)); text-decoration: underline; }
-.brand-crumb a:focus-visible, .brand-word__name:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 4px; }
+.brand-word__name:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 4px; }
 .brand-word__tag {
   margin-top: 2px;
   font-size: 12px;
@@ -962,7 +924,8 @@ html.dark .donor-portal {
 
 .donor-portal .form-input.form-input:not(.form-input--locked),
 .donor-portal .sf:not(.sf--open) .sf-trigger.sf-trigger:not(.sf-trigger--invalid):not(:focus-visible),
-.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:not(.dp-trigger--invalid):not(:focus-visible) {
+.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:not(.dp-trigger--invalid):not(:focus-visible),
+.donor-portal .pf.pf:not(.pf--open):not(:focus-within) {
   border-color: var(--donor-field-border);
   background-color: var(--donor-field-bg);
   box-shadow: var(--donor-field-inset);

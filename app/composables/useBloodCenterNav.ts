@@ -25,8 +25,7 @@ export interface BloodCenterNavItem {
   /** Extra terms the ⌘F search should match on. */
   keywords?: string
   /**
-   * Left out of the sidebar and the page search, but still named in the
-   * breadcrumb: a page reached only from another page's links.
+   * Left out of the sidebar: a page reached only from another page's links.
    */
   hidden?: boolean
   /** Other pages that light this link up as the current one (tabs of one page). */
@@ -304,7 +303,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Your own audit trail, on the Settings page's Activity tab: not in the
       // sidebar (project owner, 2026-11-11), still found by search.
       { label: 'My activity', path: '/blood-center/settings?tab=activity', icon: 'history', hidden: true, keywords: 'my activity audit log history sign in login device ip who what when' },
-      // Reached from the bell's "View all"; named here for the breadcrumb and search (2026-10-31).
+      // Reached from the bell's "View all"; named here for the search (2026-10-31).
       { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', hidden: true, keywords: 'notifications alerts inbox unread emergency messages' },
       { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
     ],
@@ -378,66 +377,14 @@ export function useBloodCenterNav() {
       .filter((item): item is BloodCenterNavItem => Boolean(item))
   )
 
-  /** Pages off the sidebar, with the pages above them (top first). */
-  const SUB_PAGES: { match: RegExp, label: string, parents: string[] }[] = [
-    { match: /^\/blood-center\/paper-records\/?$/, label: 'Paper Records', parents: ['/blood-center/donations'] },
-    { match: /^\/blood-center\/paper-records\/[^/]+$/, label: 'Sheet', parents: ['/blood-center/donations', '/blood-center/paper-records'] },
-    // An invoice and a receipt: Invoices › RQ-5-0001, Payments › OR-000123 (2026-11-11).
-    { match: /^\/blood-center\/invoice\/[^/]+$/, label: 'Invoice', parents: ['/blood-center/billing'] },
-    { match: /^\/blood-center\/receipt\/[^/]+$/, label: 'Receipt', parents: ['/blood-center/receipts'] },
-  ]
-
   /**
-   * Look up a nav item's label, for the header breadcrumb.
-   */
-  function labelForPath(path: string): string {
-    const items = NAV_GROUPS.flatMap((group) => group.items)
-    const match = items.find((item) => item.path === path)
-
-    if (match) return match.label
-
-    // A page reached without the query its links carry (e.g. /blood-center/testing
-    // with no ?test=): one link to it gives that label, several give their group's.
-    const base = path.split('?')[0]
-    const sameBase = items.filter((item) => item.path.split('?')[0] === base)
-
-    if (sameBase.length === 1) return sameBase[0]!.label
-    if (sameBase.length > 1) {
-      return NAV_GROUPS.find((group) => group.items.includes(sameBase[0]!))?.label ?? ''
-    }
-
-    return ''
-  }
-
-  /**
-   * The department a page belongs to, for the breadcrumb. Read from the full
-   * list, so it still names the department when the sidebar shows no headings.
+   * The department a page belongs to. Read from the full list, so it still
+   * names the department when the sidebar shows no headings.
    */
   function sectionForPath(path: string): string {
     const base = path.split('?')[0]
     return NAV_GROUPS.find((group) => group.items.some((item) => item.path.split('?')[0] === base))?.label ?? ''
   }
 
-  /**
-   * The header breadcrumb as links: department, then each page above this one,
-   * then this page. Pages kept out of the sidebar (Paper Records and its
-   * sheets) name the nav page they sit under, so the trail still leads back.
-   * `current` replaces the last label (a sheet passes its own code).
-   */
-  function trailForPath(path: string, current = ''): { label: string, to?: string }[] {
-    const base = path.split('?')[0]!
-    const sub = SUB_PAGES.find((page) => page.match.test(base))
-    const parents = sub ? sub.parents : []
-    const anchor = parents[0] ?? path
-    const section = sectionForPath(anchor)
-    const own = current || (sub ? sub.label : labelForPath(path))
-
-    return [
-      ...(section ? [{ label: section }] : []),
-      ...parents.map((to) => ({ label: labelForPath(to) || SUB_PAGES.find((page) => page.match.test(to))?.label || '', to })),
-      ...(own ? [{ label: own }] : []),
-    ].filter((crumb) => crumb.label)
-  }
-
-  return { navGroups, searchablePages, userMenuItems, labelForPath, sectionForPath, trailForPath, can }
+  return { navGroups, searchablePages, userMenuItems, sectionForPath, can }
 }

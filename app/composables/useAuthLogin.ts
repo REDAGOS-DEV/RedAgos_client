@@ -143,6 +143,10 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   // by username, and the field may be edited afterwards.
   const verificationEmail = ref('')
 
+  // Google confirmed an address no account uses (2026-11-22): the screen
+  // offers to register a donor account with it instead of showing an error.
+  const googleSignUpEmail = ref('')
+
   function goToForgotPassword() {
     return navigateTo(config.value.forgotPasswordPath)
   }
@@ -151,6 +155,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   function clearError() {
     errorMessage.value = ''
     needsVerification.value = false
+    googleSignUpEmail.value = ''
   }
 
   /**
@@ -194,6 +199,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     loading.value = true
     errorMessage.value = ''
     needsVerification.value = false
+    googleSignUpEmail.value = ''
 
     try {
       const response = await request()
@@ -221,6 +227,12 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
       needsVerification.value = !google && error?.data?.code === 'email_not_verified'
       if (needsVerification.value) verificationEmail.value = error?.data?.email || email.value.trim()
 
+      // No account for this Google address: an offer to register, not an error.
+      if (google && error?.data?.code === 'google_account_not_found' && error?.data?.email) {
+        googleSignUpEmail.value = String(error.data.email)
+        return
+      }
+
       errorMessage.value = error instanceof Error
         ? error.message
         : 'Unable to sign in. Please check your credentials.'
@@ -238,6 +250,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     typed,
     needsVerification,
     verificationEmail,
+    googleSignUpEmail,
     login,
     loginWithGoogle,
     goToForgotPassword,

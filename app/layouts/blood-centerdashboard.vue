@@ -36,7 +36,7 @@
           The bar spans the full width — it carries the background and the
           divider — but its contents sit in the same centred --rb-content-max column the
           pages use, with the same 16/32px gutters. Left full-width, the
-          breadcrumb started ~46px inside of the page title directly beneath it
+          wordmark started ~46px inside of the page title directly beneath it
           and the avatar overhung the right edge of the content by about as
           much, so the chrome and the page it framed were on two different
           grids.
@@ -47,7 +47,7 @@
         <!--
           The search is absolutely centred on lg+, so this cluster does not
           know where it ends. Capping it at half the bar minus half the search
-          (plus a 1rem gap) makes a long breadcrumb truncate before it slides
+          (plus a 1rem gap) makes a long centre name truncate before it slides
           under the search box.
         -->
         <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0 lg:max-w-[calc(50%-13rem)] xl:max-w-[calc(50%-15rem)]">
@@ -73,22 +73,14 @@
           </NuxtLink>
 
           <!--
-            The wordmark, and beneath it where this page sits: the centre, its
-            department and the page on desktop; the centre alone below that.
+            The wordmark, and beneath it the centre's name. No breadcrumb in
+            any portal (project owner, 2026-11-19).
           -->
           <div class="brand-word">
             <NuxtLink :to="homePath" class="brand-word__name" tabindex="-1" aria-hidden="true">
               Red<span class="brand-word__accent">Agos</span>
             </NuxtLink>
-            <span class="brand-word__tag lg:hidden">{{ facilityName || 'Blood Center Portal' }}</span>
-            <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="breadcrumb">
-              <ol>
-                <li v-for="(crumb, i) in crumbs" :key="i" :aria-current="i === crumbs.length - 1 ? 'page' : null">
-                  <NuxtLink v-if="crumb.to && i < crumbs.length - 1" :to="crumb.to" class="brand-crumb__link">{{ crumb.label }}</NuxtLink>
-                  <template v-else>{{ crumb.label }}</template>
-                </li>
-              </ol>
-            </nav>
+            <span class="brand-word__tag" :title="facilityName || 'Blood Center Portal'">{{ facilityName || 'Blood Center Portal' }}</span>
           </div>
         </div>
 
@@ -333,7 +325,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useSidebar } from '~/composables/useSidebar.js'
@@ -349,12 +341,11 @@ import logo from '~/assets/images/RedAgosLogo.png'
 import '~/assets/css/bc-ui.css'
 
 const router = useRouter()
-const route = useRoute()
 const { user, ensureUser, logout, can } = useUser()
 // Ang nav kay usa ra ka source — parehas sa sidebar, sa ⌘F search ug sa
 // profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
 // ra sa server.
-const { searchablePages, userMenuItems, trailForPath } = useBloodCenterNav()
+const { searchablePages, userMenuItems } = useBloodCenterNav()
 const { isDark, themeMode, setThemeMode } = useDarkMode()
 
 const THEME_OPTIONS = [
@@ -428,33 +419,8 @@ onUnmounted(() => {
   themeColorMeta = null
 })
 
-// The path as the nav knows it, with the one query that picks a view.
-const navPath = computed(() => (route.query.test ? `${route.path}?test=${route.query.test}` : route.path))
-
 const facilityName = computed(() =>
   user.value?.facility?.facility_name || user.value?.facility?.name || ''
-)
-
-// The sidebar is grouped by department, so the breadcrumb says which one the
-// page belongs to: "Davao Blood Center / Issuance / Blood Inventory".
-// A page off the sidebar can name itself in the trail (a sheet gives its code).
-const crumbCurrent = useState('bc-crumb-current', () => '')
-watch(() => route.path, () => { crumbCurrent.value = '' })
-
-// Desktop: "Centre › Department › Page". When the bar runs short the
-// centre's name gives way first (an ellipsis, the full name in the tooltip),
-// so the department and the page always read in full.
-const trail = computed(() => trailForPath(navPath.value, crumbCurrent.value))
-// A page under another (Paper Records, a sheet) needs the room for its links,
-// and its first link already says the department, so the centre and the
-// department move to the tooltip there: "Donations › Paper Records › PS-000001".
-const crumbs = computed(() =>
-  trail.value.some((crumb) => crumb.to)
-    ? trail.value.slice(trail.value.findIndex((crumb) => crumb.to))
-    : [{ label: facilityName.value || 'Blood Center Portal' }, ...trail.value]
-)
-const breadcrumb = computed(() =>
-  [facilityName.value || 'Blood Center Portal', ...trail.value.map((crumb) => crumb.label)].join(' / ')
 )
 
 const nameParts = computed(() => {
@@ -884,7 +850,7 @@ main {
   background: transparent;
 }
 
-/* ── Brand: menu button, logo, wordmark and breadcrumb ── */
+/* ── Brand: menu button, logo and wordmark ── */
 .rail-toggle {
   display: inline-flex;
   flex-shrink: 0;
@@ -934,17 +900,6 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Centre › Department › Page; the page keeps its room, the rest give way. */
-.brand-crumb { margin-top: 2px; min-width: 0; }
-.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
-.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
-.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
-.brand-crumb li:first-child:not(:last-child) { flex-shrink: 1; }
-.brand-crumb__link { color: inherit; text-decoration: none; border-radius: 3px; transition: color 0.15s ease; }
-.brand-crumb__link:hover { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 2px; }
-.brand-crumb__link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
-.brand-crumb li:has(> .brand-crumb__link) { flex-shrink: 1; }
-.brand-crumb li[aria-current] { flex-shrink: 0; max-width: 100%; color: var(--rb-text-primary); font-weight: 600; }
 
 .search-panel {
   max-height: 320px;

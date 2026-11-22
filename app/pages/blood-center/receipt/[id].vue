@@ -1,8 +1,11 @@
 <template>
   <div class="rc-page">
     <div class="rc-inner">
+      <NuxtLink to="/blood-center/receipts" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Payments
+      </NuxtLink>
 
-      <!-- The trail is in the header: Payments › OR-000123. -->
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form'], ['table']]" />
       </div>
@@ -174,9 +177,6 @@ function when(iso) {
 }
 
 const receipt = ref(null)
-// The header breadcrumb ends on this receipt's number (Payments › OR-000123).
-const crumbCurrent = useState('bc-crumb-current', () => '')
-watch(() => receipt.value?.receipt_number, (number) => { crumbCurrent.value = number ?? '' }, { immediate: true })
 const paymentReference = ref(null)
 // A card payment's additional information (the cardholder's last name), like the reference, on screen only.
 const paymentInfo = ref(null)
@@ -276,6 +276,20 @@ onMounted(load)
 /* Tokens come from app/assets/css/main.css. */
 .rc-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .rc-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* The way back to the page above, as on the drive roster: no breadcrumb
+   in any portal (project owner, 2026-11-19). */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--rb-text-primary); }
 
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }

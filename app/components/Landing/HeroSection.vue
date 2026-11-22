@@ -155,7 +155,6 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { upcomingDrives } from '~/utils/donationDrives'
 
 // The donor portal, screen after screen: real screenshots with a sample
 // account; see public/images/photos/README.md.
@@ -181,7 +180,10 @@ onMounted(() => {
 })
 onBeforeUnmount(() => clearInterval(shotTimer))
 
-const nextDrive = computed(() => upcomingDrives()[0] ?? null)
+// The soonest drive a blood center created and published, from the same
+// request as the Donation Drives section. None created, or all over: no card.
+const { drives } = usePublicDrives()
+const nextDrive = computed(() => drives.value[0] ?? null)
 
 // Same behaviour as the navbar links: smooth scroll, and a #drives hash
 // (there is no /drives route).

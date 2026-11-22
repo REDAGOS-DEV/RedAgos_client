@@ -94,9 +94,10 @@ describe('where staff type a donor phone', () => {
     expect(quick).toContain('@click="submit(undefined, true)"')
   })
 
-  it('says a shared number is Shared on the list and the profile', () => {
+  // The list's Phone column is the number alone (project owner, 2026-11-19).
+  it('says a shared number is Shared on the profile', () => {
     expect(donors).toContain('phoneShared: Boolean(row.phone && row.phone_shared)')
-    expect(donors).toContain('<span v-if="donor.phone && donor.phoneShared" class="phone-shared">Shared</span>')
+    expect(donors).toContain('<td class="c-phone">{{ donor.phone || \'—\' }}</td>')
     expect(donors).toContain('<span v-if="profile.phone && profile.phoneShared" class="fact__sub">Shared</span>')
   })
 

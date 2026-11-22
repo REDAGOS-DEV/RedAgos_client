@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 
 import {
+  clockLabel,
   driveIcs,
   driveMapsUrl,
   driveUtcRange,
+  fromPublicDrive,
   relativeDay,
   upcomingDrives,
   type DonationDrive,
@@ -69,6 +71,44 @@ describe('donation drive actions', () => {
       { ...drive, date: '2026-11-01' },
     ], '2026-10-14')
     expect(list.map(d => d.date)).toEqual(['2026-11-01', '2026-12-01'])
+  })
+
+  it('lists nothing when no drive was created', () => {
+    expect(upcomingDrives([], '2026-10-14')).toEqual([])
+  })
+})
+
+describe('drives from the server (GET /public/drives)', () => {
+  const row = {
+    id: 7,
+    name: 'SM Lanang Blood Donation',
+    location: 'SM Lanang Premier, J.P. Laurel Ave.',
+    date: '2026-11-21',
+    start_time: '09:00',
+    end_time: '17:00',
+  }
+
+  it.each([
+    ['00:30', '12:30 AM'],
+    ['07:00', '7:00 AM'],
+    ['12:00', '12:00 PM'],
+    ['17:30', '5:30 PM'],
+    [null, ''],
+  ])('reads %s as %s', (hhmm, label) => {
+    expect(clockLabel(hhmm)).toBe(label)
+  })
+
+  it('becomes a drive the calendar file can be built from', () => {
+    const shown = fromPublicDrive(row)
+    expect(shown).toEqual({ id: 7, title: row.name, location: row.location, date: '2026-11-21', time: '9:00 AM to 5:00 PM' })
+    expect(driveUtcRange(shown)).toEqual({ start: '20261121T010000Z', end: '20261121T090000Z' })
+  })
+
+  it('shows whatever times the centre gave, and offers no calendar file without both', () => {
+    const startOnly = fromPublicDrive({ ...row, end_time: null })
+    expect(startOnly.time).toBe('From 9:00 AM')
+    expect(driveUtcRange(startOnly)).toBeNull()
+    expect(fromPublicDrive({ ...row, start_time: null, end_time: null }).time).toBe('')
   })
 })
 

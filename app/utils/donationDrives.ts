@@ -1,19 +1,21 @@
 /**
- * The public list of upcoming donation drives.
+ * The landing page's upcoming donation drives.
  *
  * Shared by the landing page's Donation Drives section and the "Next drive"
- * card in the hero, so the two can never disagree. Only public details live
- * here (title, place, date, time); registration counts are internal to the
- * blood center and never shown on the public page.
- *
- * Hard-coded until drives come from the API.
+ * card in the hero, so the two can never disagree. The drives are the ones
+ * blood centers create and publish, read from GET /public/drives
+ * (composables/usePublicDrives.ts); with none created, nothing is shown.
+ * Only public details live here (title, place, date, time); registration
+ * counts are internal to the blood center and never shown on the public page.
  */
 
 export interface DonationDrive {
+  id?: number
   title: string
   location: string
   /** 'YYYY-MM-DD', local date. */
   date: string
+  /** '9:00 AM to 5:00 PM', 'From 9:00 AM', or '' when the centre gave no times. */
   time: string
 }
 
@@ -23,26 +25,36 @@ export interface UpcomingDrive extends DonationDrive {
   weekday: string
 }
 
-export const DONATION_DRIVES: DonationDrive[] = [
-  {
-    title: 'Davao City Hall Community Drive',
-    location: 'Davao City Hall, San Pedro St.',
-    date: '2026-12-05',
-    time: '7:00 AM to 12:00 PM',
-  },
-  {
-    title: 'SM Lanang Blood Donation',
-    location: 'SM Lanang Premier, J.P. Laurel Ave.',
-    date: '2026-11-21',
-    time: '9:00 AM to 5:00 PM',
-  },
-  {
-    title: 'Ateneo de Davao Blood Drive',
-    location: 'Ateneo de Davao University, Jacinto St.',
-    date: '2026-11-07',
-    time: '8:00 AM to 3:00 PM',
-  },
-]
+/** One drive as GET /public/drives answers it. Times are 'HH:MM', Philippine time. */
+export interface PublicDriveRow {
+  id: number
+  name: string
+  location: string
+  date: string
+  start_time: string | null
+  end_time: string | null
+}
+
+/** '09:00' → '9:00 AM', '17:30' → '5:30 PM'. */
+export function clockLabel(hhmm: string | null | undefined): string {
+  const m = String(hhmm ?? '').match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return ''
+  const h = Number(m[1])
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+/** A /public/drives row in the shape the landing page shows. */
+export function fromPublicDrive(row: PublicDriveRow): DonationDrive {
+  const start = clockLabel(row.start_time)
+  const end = clockLabel(row.end_time)
+  return {
+    id: row.id,
+    title: row.name,
+    location: row.location,
+    date: row.date,
+    time: start && end ? `${start} to ${end}` : start ? `From ${start}` : end ? `Until ${end}` : '',
+  }
+}
 
 /**
  * Drives from today onward, soonest first. `today` is a local 'YYYY-MM-DD',
@@ -51,7 +63,7 @@ export const DONATION_DRIVES: DonationDrive[] = [
  * Greenwich.
  */
 export function upcomingDrives(
-  drives: DonationDrive[] = DONATION_DRIVES,
+  drives: DonationDrive[],
   today: string = new Date().toLocaleDateString('en-CA'),
 ): UpcomingDrive[] {
   return drives

@@ -85,7 +85,11 @@
                             <p class="notif-row__desc">{{ notif.desc }}</p>
                             <p class="notif-row__meta">
                                 <span class="notif-tag" :class="`notif-tag--${notif.category}`">{{ categoryLabel(notif.category) }}</span>
-                                <span>{{ notif.meta }}</span>
+                                <!-- When it came, as "5 min ago"; the exact time on hover (2026-11-20). -->
+                                <time v-if="notif.createdAt" class="notif-row__when" :datetime="notif.createdAt" :title="exactTime(notif.createdAt)">
+                                    {{ timeAgo(notif.createdAt, now) }}
+                                </time>
+                                <span v-if="notif.meta">{{ notif.meta }}</span>
                             </p>
                         </div>
 
@@ -136,6 +140,8 @@ definePageMeta({
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
+import { timeAgo } from '~/utils/staffNotifications'
+import { exactTime, useNow } from '~/composables/useNow'
 
 
 const loading = ref(true)
@@ -344,6 +350,9 @@ async function load({ silent = false } = {}) {
 }
 
 onMounted(() => load())
+
+// "5 min ago" keeps up while the page is open.
+const now = useNow()
 onActivated(() => {
     if (loadedOnce) load({ silent: true })
 })
@@ -536,6 +545,13 @@ onActivated(() => {
 }
 
 .notif-row__desc { margin: 4px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #475569; }
+
+.notif-row__when {
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
 
 .notif-row__meta {
     display: flex;

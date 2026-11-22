@@ -228,8 +228,3 @@ html.portal-bc .sk-card {
     animation: none !important;
   }
 }
-
-/* From 1024px the breadcrumb is the way back, so the page's own link stands down. */
-@media (min-width: 1024px) {
-  html.portal-bc .bc-shell .back-link--narrow { display: none; }
-}

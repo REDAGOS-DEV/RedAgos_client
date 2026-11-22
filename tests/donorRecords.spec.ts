@@ -197,10 +197,16 @@ describe('the donors page', () => {
     expect(page).toContain("const canManage = computed(() => can('donors.manage'))")
   })
 
-  it('offers the mock-up toolbar: search, group, status, export, remind, refresh, new donor', () => {
-    for (const text of ['All groups', 'All statuses', 'Export', 'Remind Eligible', 'Refresh', 'New Donor']) {
+  it('offers the mock-up toolbar: search, group, eligibility, export, remind, refresh, new donor', () => {
+    for (const text of ['All groups', 'All eligibility', 'Export', 'Remind Eligible', 'Refresh', 'New Donor']) {
       expect(page).toContain(text)
     }
+    // Filtered by eligibility, not Active/Inactive (project owner, 2026-11-19).
+    expect(page).toContain('if (eligibilityFilter.value) params.eligibility = eligibilityFilter.value')
+    for (const value of ['eligible', 'waiting', 'deferred', 'in_progress']) {
+      expect(page).toContain(`{ value: '${value}', label:`)
+    }
+    expect(page).not.toContain("{ value: 'inactive', label: 'Inactive' }")
     expect(page).toMatch(/placeholder="Search name \/ phone \/ email \/ ID"/)
   })
 
@@ -236,7 +242,7 @@ describe('the donors page', () => {
     expect(page).toContain('const unlisted = rows.length ? [] : await findUnlisted()')
     // Every match: a household's shared number is several donors' (2026-11-12).
     expect(page).toContain('bloodCenterService.lookupDonors(exact)')
-    expect(page).toMatch(/if \(bloodTypeId\.value \|\| statusFilter\.value \|\| !canViewProfile\.value \|\| !can\('appointments\.verify'\)\) return \[\]/)
+    expect(page).toMatch(/if \(bloodTypeId\.value \|\| eligibilityFilter\.value \|\| !canViewProfile\.value \|\| !can\('appointments\.verify'\)\) return \[\]/)
     expect(page).toContain('>Not checked in</span>')
   })
 

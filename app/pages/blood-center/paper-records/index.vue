@@ -1,6 +1,11 @@
 <template>
   <div class="paper-page">
     <div class="paper-inner">
+      <NuxtLink to="/blood-center/donations" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Donations
+      </NuxtLink>
+
       <header class="header-row">
         <h1 class="page-title">Paper Records</h1>
         <button type="button" class="btn-primary" @click="openNewSheet()">
@@ -505,6 +510,20 @@ onPageReturn(async () => {
 }
 
 .paper-inner { display: flex; flex-direction: column; gap: 16px; }
+
+/* The way back to the page above, as on the drive roster: no breadcrumb
+   in any portal (project owner, 2026-11-19). */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--rb-text-primary); }
 
 .sr-only {
   position: absolute;

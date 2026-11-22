@@ -40,9 +40,9 @@
             <SelectField v-if="!contactOnly" v-model="bloodTypeId" class="sel-filter" size="sm" aria-label="Filter by blood group"
               :options="[{ value: '', label: 'All groups' }, ...bloodTypeOptions.map(bt => ({ value: bt.id, label: bt.code }))]" @change="loadDonors()" />
 
-            <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
-              :options="[{ value: '', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]"
-              @change="loadDonors()" />
+            <!-- Eligibility, not Active/Inactive (project owner, 2026-11-19). -->
+            <SelectField v-model="eligibilityFilter" class="sel-filter" size="sm" aria-label="Filter by eligibility"
+              :options="ELIGIBILITY_FILTERS" @change="loadDonors()" />
           </div>
 
           <div class="toolbar__actions">
@@ -146,57 +146,25 @@
                 @click="canOpenRow(donor) && openProfile(donor)"
                 @keydown.enter.self="canOpenRow(donor) && openProfile(donor)"
               >
-                <td class="c-id"><span class="donor-code">{{ donor.donorCode }}</span></td>
-                <td class="c-donor">
-                  <div class="person">
-                    <PersonAvatar :name="donor.name" />
-                    <div class="donor-cell">
-                    <span class="donor-cell__name">{{ donor.name }}</span>
-                    <span v-if="donor.notCheckedIn" class="donor-cell__other" title="Not yet checked in at any blood centre">Not checked in</span>
-                    <span v-else-if="donor.otherCentre" class="donor-cell__other" title="Not yet checked in or registered at your centre">Other centre</span>
-                    <span v-if="donor.subline" class="donor-cell__sub">{{ donor.subline }}</span>
-                    <!-- Takes the Phone column's place when the panel is too narrow for it. -->
-                    <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}{{ donor.phoneShared ? ' · Shared' : '' }}</span>
-                    </div>
-                  </div>
-                </td>
-                <td v-if="!contactOnly" class="c-group">
-                  <span v-if="donor.bloodType" class="blood">{{ donor.bloodType }}</span>
-                  <span v-else class="muted" title="Not typed yet">—</span>
-                </td>
-                <td class="c-phone nowrap">
-                  {{ donor.phone || '—' }}
-                  <span v-if="donor.phone && donor.phoneShared" class="phone-shared">Shared</span>
-                </td>
+                <!-- One plain value per column, no chips, pills or dots (project
+                     owner, 2026-11-19): sex, age, tier, a shared phone and the
+                     like are on the profile. -->
+                <td class="c-id">{{ donor.donorCode }}</td>
+                <td class="c-donor"><span class="donor-name">{{ donor.name }}</span></td>
+                <td v-if="!contactOnly" class="c-group">{{ donor.bloodType || '—' }}</td>
+                <td class="c-phone">{{ donor.phone || '—' }}</td>
                 <td v-if="!contactOnly" class="c-address" :title="donor.address">{{ donor.address || '—' }}</td>
-                <td class="c-last nowrap">
-                  {{ donor.lastDonation || '—' }}
-                  <span v-if="donor.lastDonationDeclared" class="declared" title="As the donor declared it; not recorded in RedAgos">*</span>
-                </td>
-                <td class="c-total">
-                  <span class="total">
-                    <span class="total__count">{{ donor.totalDonations }}</span>
-                    <span v-if="donor.tier" class="tier" :class="`tier--${donor.tier.key}`">{{ donor.tier.label }}</span>
-                  </span>
-                </td>
-                <td class="c-elig">
-                  <span class="badge" :class="`badge--${donor.eligibility.tone}`" :title="donor.eligibility.hint">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ donor.eligibility.label }}
-                  </span>
-                </td>
+                <td class="c-last">{{ donor.lastDonation || '—' }}</td>
+                <td class="c-total">{{ donor.totalDonations }}</td>
+                <td class="c-elig" :title="donor.eligibility.hint">{{ donor.eligibility.label }}</td>
                 <td class="c-status">
                   <!-- From the last donation, never set by staff: 12 months or less is Active. -->
                   <span
                     v-if="donor.status"
-                    class="badge"
-                    :class="donor.status === 'active' ? 'badge--ok' : 'badge--neutral'"
                     :title="donor.status === 'active' ? 'Donated in the last 12 months' : 'No donation in the last 12 months'"
-                  >
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ donor.status === 'active' ? 'Active' : 'Inactive' }}
-                  </span>
-                  <span v-else class="muted" title="No donation yet">—</span>
+                  >{{ donor.status === 'active' ? 'Active' : 'Inactive' }}</span>
+                  <span v-else-if="donor.notCheckedIn" title="Not yet checked in at any blood centre">Not checked in</span>
+                  <template v-else>—</template>
                 </td>
                 <td class="c-actions" @click.stop>
                   <div class="row-actions">
@@ -870,13 +838,11 @@ import SelectField from '~/components/common/SelectField.vue'
 import { idNumberProblem } from '~/utils/validId'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
 import {
   GENDER_OPTIONS,
   blankDonorForm,
   donorFormFrom,
-  donorSubline,
   donorTier,
   editPayload,
   eligibilityBadge,
@@ -987,7 +953,15 @@ const donors = ref([])
 const loadingDonors = ref(true)
 const search = ref('')
 const bloodTypeId = ref('')
-const statusFilter = ref('')
+const eligibilityFilter = ref('')
+// The values DonorStanding::eligibility() gives; Not yet eligible is the list's "From <date>".
+const ELIGIBILITY_FILTERS = [
+  { value: '', label: 'All eligibility' },
+  { value: 'eligible', label: 'Eligible' },
+  { value: 'waiting', label: 'Not yet eligible' },
+  { value: 'deferred', label: 'Deferred' },
+  { value: 'in_progress', label: 'Visit in progress' },
+]
 const sort = ref('newest')
 const updatedAt = ref(null)
 const pager = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
@@ -1014,7 +988,7 @@ const actionsWidth = computed(() => {
 function canOpenRow(donor) {
   return canViewProfile.value && !donor.contactOnly
 }
-const hasFilters = computed(() => Boolean(search.value.trim() || bloodTypeId.value || statusFilter.value))
+const hasFilters = computed(() => Boolean(search.value.trim() || bloodTypeId.value || eligibilityFilter.value))
 
 const updatedAtLabel = computed(() => updatedAt.value
   ? updatedAt.value.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -1032,7 +1006,7 @@ function filterParams() {
   const params = { sort: sort.value }
   if (search.value.trim()) params.search = search.value.trim()
   if (bloodTypeId.value) params.blood_type_id = bloodTypeId.value
-  if (statusFilter.value) params.status = statusFilter.value
+  if (eligibilityFilter.value) params.eligibility = eligibilityFilter.value
   return params
 }
 
@@ -1041,7 +1015,6 @@ function mapDonor(row) {
     uuid: row.uuid,
     donorCode: row.donor_code || '—',
     name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unnamed donor',
-    subline: donorSubline(row.gender, row.birth_date),
     bloodType: row.blood_type || '',
     phone: formatPhone(row.phone),
     // The household's number, which other donors may hold too (2026-11-12).
@@ -1101,7 +1074,7 @@ async function loadDonors(page = 1) {
  * start their first visit instead of registering them twice.
  */
 async function findUnlisted() {
-  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return []
+  if (bloodTypeId.value || eligibilityFilter.value || !canViewProfile.value || !can('appointments.verify')) return []
   const exact = unlistedLookup(search.value)
   if (!exact) return []
 
@@ -1128,7 +1101,7 @@ function onSearchInput() {
 function clearFilters() {
   search.value = ''
   bloodTypeId.value = ''
-  statusFilter.value = ''
+  eligibilityFilter.value = ''
   loadDonors()
 }
 
@@ -2054,32 +2027,43 @@ onPageReturn(() => {
 /* Widths include the cell's padding. c-donor and c-address have none: they
    split the rest. The actions column is sized in the template, by how many
    buttons the viewer's role shows. */
-.c-id { width: 116px; }
+.c-id { width: 140px; }
 .c-group { width: 64px; }
 .c-phone { width: 120px; }
 .c-last { width: 110px; }
-.c-total { width: 112px; }
-.c-elig { width: 152px; }
-.c-status { width: 98px; }
+.c-total { width: 64px; }
+.c-elig { width: 140px; }
+.c-status { width: 110px; }
 
-.donor-cell__phone { display: none; }
-.phone-shared { display: block; font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
+/* Plain text, one line each; the donor's name may wrap. */
+.donor-table tbody td.c-id,
+.donor-table tbody td.c-group,
+.donor-table tbody td.c-phone,
+.donor-table tbody td.c-address,
+.donor-table tbody td.c-last,
+.donor-table tbody td.c-total,
+.donor-table tbody td.c-elig,
+.donor-table tbody td.c-status {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.donor-name { text-transform: capitalize; overflow-wrap: anywhere; }
 
 /* Too narrow for Address beside the donor's name: it stays on the profile. */
 @container (max-width: 1100px) {
   .c-address, .donor-table tbody :deep(td.c-address) { display: none; }
 }
 
-/* The eligibility badge already gives the next date; the profile has the last. */
+/* The eligibility column already gives the next date; the profile has the last. */
 @container (max-width: 1000px) {
   .c-last, .donor-table tbody :deep(td.c-last) { display: none; }
 }
 
-/* The phone moves under the donor's name, so the name keeps its room
-   beside the avatar on a laptop's panel. */
+/* Too narrow for Phone beside the donor's name: it stays on the profile and
+   the search still finds a donor by it. */
 @container (max-width: 1300px) {
   .c-phone, .donor-table tbody :deep(td.c-phone) { display: none; }
-  .donor-cell__phone { display: block; }
 }
 .donor-row { transition: background 0.12s ease; cursor: default; }
 .donor-row:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
@@ -2109,38 +2093,6 @@ onPageReturn(() => {
 .mono { font-family: var(--rb-font-mono); font-size: 12px; }
 .strong { font-weight: 700; }
 
-.donor-code {
-  font-family: var(--rb-font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  white-space: nowrap;
-}
-
-.donor-cell { display: flex; flex-direction: column; min-width: 0; }
-.donor-cell__name { font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
-.donor-cell__sub { font-size: 11.5px; color: var(--rb-text-secondary); }
-.donor-cell__other {
-  align-self: flex-start;
-  margin: 2px 0 1px;
-  padding: 0 6px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border);
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  white-space: nowrap;
-}
-
-/* The full address is in the cell's title and on the profile. */
-td.c-address {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--rb-text-secondary);
-}
-
-.declared { margin-left: 2px; color: var(--rb-text-secondary); cursor: help; }
-
 .blood {
   display: inline-flex;
   align-items: center;
@@ -2155,11 +2107,6 @@ td.c-address {
   font-weight: 700;
   white-space: nowrap;
 }
-
-/* The count and its tier on one line, read left to right like the
-   eligibility beside it, so the two columns never run together. */
-.total { display: inline-flex; align-items: center; gap: 8px; }
-.total__count { min-width: 14px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
 
 /* Recognition, not state: neutral, with the tier's name doing the work. */
 .tier {
@@ -2606,10 +2553,6 @@ td.c-address {
 /* ---------- Rows, as on Donations ---------- */
 .donor-row--open { cursor: pointer; }
 .donor-row--open:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
-.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.person__text { min-width: 0; }
-.person__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
-.person__hidden { color: var(--rb-text-secondary); }
 .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 /* The row's next step, said in words. */
@@ -2641,8 +2584,6 @@ td.c-address {
 .dd-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
 .dd-form { display: flex; flex-direction: column; gap: 10px; }
 
-.person .donor-cell { min-width: 0; }
-
 /* ---------- Dialog shell, as the system's CenterModal draws it ----------
    These dialogs stack (Email and Edit open over the profile), so they keep
    their own overlay; only the look follows CenterModal. */
@@ -2660,13 +2601,9 @@ td.c-address {
 .modal-card__body { padding: 20px 24px 24px; }
 .modal-card__footer { padding: 14px 24px; }
 
-/* Loading rows as tall as the real ones (measured at 1366px), so nothing jumps. */
-.donor-table tbody :deep(tr[aria-hidden="true"] td) { height: 63px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+/* Loading rows as tall as the real ones (the row's 30px buttons), so nothing jumps. */
+.donor-table tbody :deep(tr[aria-hidden="true"] td) { height: 53px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
 .donor-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
-/* Three lines (name, age, phone) once the phone moves under the name. */
-@container (max-width: 1300px) {
-  .donor-table tbody :deep(tr[aria-hidden="true"] td) { height: 81px; }
-}
 </style>
 
 <style scoped>

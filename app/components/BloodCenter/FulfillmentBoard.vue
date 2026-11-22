@@ -14,13 +14,39 @@
             <AssetIcon :name="forDispatch ? 'receipt' : 'truck'" :size="16" />
             {{ forDispatch ? 'Request Fulfillment' : 'For Dispatch' }}
           </NuxtLink>
-          <button class="ui-btn" :disabled="loading" @click="load">
-            <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
+          <button class="ui-btn" :disabled="!showingNetwork && loading" @click="refreshShown">
+            <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: !showingNetwork && loading }" />
             Refresh
           </button>
         </template>
       </PageHeader>
 
+      <!--
+        Request Fulfillment's two lists (project owner, 2026-11-19): its own
+        queue of invoices still owing, and every hospital's Blood Requests,
+        whoever holds the shares.
+      -->
+      <div v-if="!forDispatch" class="tabbar fade-in" style="--delay:40ms">
+        <div class="tabs" role="tablist" aria-label="Request Fulfillment">
+          <button
+            v-for="tab in FULFILMENT_TABS"
+            :key="tab.value"
+            type="button"
+            role="tab"
+            class="tab"
+            :class="{ 'tab--on': fulfilmentTab === tab.value }"
+            :aria-selected="fulfilmentTab === tab.value"
+            @click="selectFulfilmentTab(tab.value)"
+          >
+            {{ tab.label }}
+            <span v-if="fulfilmentTab === tab.value && tabCount(tab.value) !== null" class="tab__count">{{ tabCount(tab.value) }}</span>
+          </button>
+        </div>
+      </div>
+
+      <NetworkBloodRequests v-if="showingNetwork" ref="networkList" @loaded="networkTotal = $event" />
+
+      <template v-else>
       <div v-if="error" class="banner banner--error">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ error }}</span>
@@ -372,6 +398,7 @@
       </div>
         </section>
       </div>
+      </template>
     </div>
 
     <!-- DISPATCH CONFIRM -->
@@ -572,6 +599,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
+import NetworkBloodRequests from '~/components/BloodCenter/NetworkBloodRequests.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bloodTypeCodes, handoverWhen, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import { pesos } from '~/utils/billing'
@@ -631,6 +659,39 @@ const focusId = computed(() => {
 })
 
 watch(activeTab, () => load())
+
+/*
+ * Request Fulfillment's tabs (project owner, 2026-11-19): the queue of
+ * invoices still owing, and every hospital's Blood Requests. The second is
+ * kept in the address (?tab=all) so a link or a reload lands on it.
+ */
+const FULFILMENT_TABS = [
+  { value: 'owing', label: 'Awaiting Payment' },
+  { value: 'all', label: 'All Blood Requests' },
+]
+const router = useRouter()
+const fulfilmentTab = ref(route.query.tab === 'all' ? 'all' : 'owing')
+const showingNetwork = computed(() => !forDispatch.value && fulfilmentTab.value === 'all')
+const networkList = ref(null)
+const networkTotal = ref(null)
+
+function selectFulfilmentTab(value) {
+  if (fulfilmentTab.value === value) return
+  fulfilmentTab.value = value
+  router.replace({ query: { ...route.query, tab: value === 'all' ? 'all' : undefined } })
+  // Back on the queue, it reloads: it was left alone while the other tab showed.
+  if (value === 'owing') load({ quiet: true })
+}
+
+function tabCount(value) {
+  if (value === 'all') return networkTotal.value
+  return loading.value ? null : requests.value.length
+}
+
+function refreshShown() {
+  if (showingNetwork.value) networkList.value?.refresh()
+  else load()
+}
 
 /** What each list asks the server for: the invoice decides the page. */
 function queueFilters() {
@@ -1353,8 +1414,13 @@ async function confirmReturn() {
 onMounted(load)
 
 // Kept alive (fulfillment.vue, dispatch.vue): back here, the queue reloads
-// quietly, and an Issue button's ?request= is marked again.
-onPageReturn(() => load({ quiet: true }))
+// quietly, and an Issue button's ?request= is marked again. A link naming a
+// tab (?tab=all) opens that one; the Blood Requests list reloads itself.
+onPageReturn(() => {
+  if (!forDispatch.value) fulfilmentTab.value = route.query.tab === 'all' ? 'all' : 'owing'
+  if (showingNetwork.value) return
+  return load({ quiet: true })
+})
 const pageHidden = usePageHidden()
 
 /*
@@ -1367,6 +1433,7 @@ const pageHidden = usePageHidden()
 useLiveRefresh(refreshQuietly, {
   intervalMs: 30_000,
   pauseWhen: () => busyId.value !== null
+    || showingNetwork.value
     || dispatchFor.value !== null
     || orderFor.value !== null
     || deferFor.value !== null
