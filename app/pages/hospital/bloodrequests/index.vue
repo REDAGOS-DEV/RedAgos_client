@@ -583,7 +583,7 @@ function normalizeTransfusion(r) {
     status: r.status,
     request_date: r.request_date ? new Date(r.request_date) : null,
     requested_by: r.requester_name
-      ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : ''),
+      ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : (r.recorder_name ? `Added by ${r.target_facility?.name ?? 'the blood center'}` : '')),
     reason: r.cancellation_reason ?? '',
   }
 }

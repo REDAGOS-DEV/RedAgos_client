@@ -5,6 +5,11 @@
     </div>
 
     <div v-else class="sheet-inner">
+      <NuxtLink to="/blood-center/paper-records" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Paper Records
+      </NuxtLink>
+
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
         <p class="banner__text">{{ loadError }}</p>
@@ -209,8 +214,6 @@ const loadError = ref('')
 const notice = ref(null)
 useNoticeToast(notice)
 const sheet = ref(null)
-// The header breadcrumb ends on this sheet's code (Donations › Paper Records › PS-000001).
-const crumbCurrent = useState('bc-crumb-current', () => '')
 const rows = ref([])
 const justSavedId = ref(null)
 
@@ -244,7 +247,6 @@ async function load() {
     const res = await bloodCenterService.paperSheet(route.params.id)
     const { rows: list = [], ...rest } = res?.data ?? {}
     sheet.value = rest
-    crumbCurrent.value = rest.code ?? ''
     rows.value = list
   } catch (err) {
     loadError.value = err?.status === 404
@@ -333,6 +335,20 @@ onBeforeUnmount(() => {
 }
 
 .sheet-inner { display: flex; flex-direction: column; gap: 16px; }
+
+/* The way back to the page above, as on the drive roster: no breadcrumb
+   in any portal (project owner, 2026-11-19). */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--rb-text-primary); }
 
 .sr-only {
   position: absolute;

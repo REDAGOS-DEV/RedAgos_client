@@ -200,7 +200,7 @@ describe('the receiving routes and pages', () => {
     expect(service).not.toContain("'/hospital/blood-requests',\n      'POST'")
   })
 
-  it('puts Patient Request and Weekly Request under Receiving in the sidebar, the breadcrumb and the search', () => {
+  it('puts Patient Request and Weekly Request under Receiving in the sidebar and the search', () => {
     const sidebar = source('app/components/Hospital/Sidebar.vue')
     expect(sidebar).toContain("label: 'Receiving'")
     expect(sidebar).toContain("{ label: 'Patient Request', path: '/hospital/bloodrequests'")
@@ -208,9 +208,7 @@ describe('the receiving routes and pages', () => {
     expect(sidebar).not.toContain('Replenishment')
 
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/bloodrequests': 'Receiving / Patient Request'")
     expect(layout).toContain("{ label: 'Patient Request', path: '/hospital/bloodrequests'")
-    expect(layout).toContain("'/hospital/receiving/weekly': 'Receiving / Weekly Request'")
   })
 
   it('has no Direct Distribution page, link or search entry (project owner, 2026-10-30)', () => {
@@ -224,13 +222,12 @@ describe('the receiving routes and pages', () => {
     }
   })
 
-  it('puts Request Days under Facility Settings in the sidebar, the breadcrumb and the search', () => {
+  it('puts Request Days under Facility Settings in the sidebar and the search', () => {
     const sidebar = source('app/components/Hospital/Sidebar.vue')
     expect(sidebar).toMatch(/label: 'Facility Settings',\s*items: \[\s*\{ label: 'Request Days', path: '\/hospital\/request-days'/)
     expect(sidebar).toContain("'Facility Settings': 'building-2'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/request-days': 'Facility Settings / Request Days'")
     expect(layout).toContain("{ label: 'Request Days', path: '/hospital/request-days'")
   })
 

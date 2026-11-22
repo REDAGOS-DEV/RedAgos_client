@@ -961,9 +961,12 @@ function mapRequest(r) {
     // 2026-10-19): nobody there is notified.
     registered: r.requesting_facility?.is_registered !== false,
     // The hospital user who submitted it, or — for a walk-in, which nobody at
-    // the hospital submitted — who recorded it here.
+    // the hospital submitted — who recorded it here; or who added this
+    // center's share from All Blood Requests (2026-11-19).
     requestedBy: r.requester_name
-      ?? (r.is_walk_in ? `Walk-in · recorded by ${r.recorder_name ?? 'this center'}` : ''),
+      ?? (r.is_walk_in
+        ? `Walk-in · recorded by ${r.recorder_name ?? 'this center'}`
+        : (r.recorder_name ? `Added by ${r.recorder_name} at this center` : '')),
     isWalkIn: Boolean(r.is_walk_in),
     ptrReference: r.transfusion_request?.reference_number ?? null,
     weeklyReference: r.weekly_request?.reference_number ?? null,
@@ -1628,11 +1631,25 @@ function inventoryIcon(level) {
   return { ok: 'check', low: 'triangle-alert', insufficient: 'x', none: 'minus' }[level] || 'check'
 }
 
+/**
+ * A link naming one of this center's requests (?request=ID, from Request
+ * Fulfillment's All Blood Requests, 2026-11-19) opens its review. The id
+ * leaves the address once it is opened, so a return here does not reopen it.
+ */
+function openLinkedRequest() {
+  const id = Number(route.query.request)
+  if (!Number.isInteger(id) || id < 1) return
+
+  const { request: _linked, ...rest } = route.query
+  router.replace({ query: rest })
+  onOpenExisting(id)
+}
+
 /* INITIAL LOAD */
 onMounted(() => {
   hydrated.value = true
   window.addEventListener('keydown', onKeydown)
-  handleRefresh()
+  handleRefresh().finally(openLinkedRequest)
 })
 
 onBeforeUnmount(() => {
@@ -1651,9 +1668,9 @@ onPageReturn(() => {
   const linked = PURPOSE_TABS.find((tab) => tab.query === route.query.type)?.value
   if (linked && linked !== purposeTab.value) {
     purposeTab.value = linked
-    return Promise.all([loadRequests(), fetchSummary()])
+    return Promise.all([loadRequests(), fetchSummary()]).finally(openLinkedRequest)
   }
-  return handleRefresh()
+  return handleRefresh().finally(openLinkedRequest)
 })
 
 /*

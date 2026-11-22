@@ -916,6 +916,19 @@ class BloodCenterService extends BaseService {
     return this.request('/blood-center/blood-requests', 'GET', params)
   }
 
+  /**
+   * Every hospital's Blood Requests, whoever holds the shares (2026-11-19):
+   * open ones first; `scope` open|all, `search`, `page`, `per_page`.
+   */
+  async networkBloodRequests(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/transfusion-requests', 'GET', params)
+  }
+
+  /** Add this center's share of a Blood Request's unallocated units. */
+  async addBloodRequestShare(id: number | string, lines: Array<{ transfusion_request_item_id: number, quantity: number }>): Promise<any> {
+    return this.request(`/blood-center/transfusion-requests/${id}/share`, 'POST', { lines })
+  }
+
   /** The queue as CSV, with the list's filters (search, status/open, from, to). */
   async exportIncomingRequests(params: Record<string, any> = {}): Promise<Blob> {
     const query = new URLSearchParams(

@@ -1,8 +1,11 @@
 <template>
   <div class="st-page">
     <div class="st-inner">
+      <NuxtLink to="/blood-center/billing" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Invoices
+      </NuxtLink>
 
-      <!-- The trail is in the header: Invoices › RQ-5-0001. -->
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form', 'list'], ['table']]" />
       </div>
@@ -525,9 +528,6 @@ function day(value) {
 
 /* THE STATEMENT */
 const statement = ref(null)
-// The header breadcrumb ends on this request's reference (Invoices › RQ-5-0001).
-const crumbCurrent = useState('bc-crumb-current', () => '')
-watch(() => statement.value?.request?.reference_number, (reference) => { crumbCurrent.value = reference ?? '' }, { immediate: true })
 const loading = ref(true)
 const loadError = ref('')
 const view = ref('details')
@@ -1011,6 +1011,20 @@ onMounted(loadAll)
 /* Tokens come from app/assets/css/main.css. */
 .st-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .st-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* The way back to the page above, as on the drive roster: no breadcrumb
+   in any portal (project owner, 2026-11-19). */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--rb-text-primary); }
 
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }

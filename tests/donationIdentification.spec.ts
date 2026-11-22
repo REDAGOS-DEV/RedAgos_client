@@ -155,9 +155,12 @@ describe('Start donation from Donor Management', () => {
 describe('Donor Management across the blood centres', () => {
   const donors = source('app/pages/blood-center/donors.vue')
 
-  it('lists every donor and marks those another centre knows', () => {
+  // The name column is the name alone (project owner, 2026-11-19): no
+  // "Other centre" chip; the greyed-out mail button says why.
+  it('lists every donor and knows those another centre holds', () => {
     expect(donors).toContain("otherCentre: row.scope === 'cross_facility',")
-    expect(donors).toContain('<span v-else-if="donor.otherCentre" class="donor-cell__other"')
+    expect(donors).toContain("if (donor.otherCentre) return 'Emails go only to donors checked in or registered at your centre'")
+    expect(donors).not.toContain('donor-cell__other')
   })
 
   it("keeps email, export and reminders to this centre's own donors", () => {

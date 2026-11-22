@@ -254,23 +254,21 @@ describe('the hospital Inventory Report', () => {
     expect(source('app/types/hospitalInventory.ts')).toContain("kind: 'form' | 'other'")
   })
 
-  it('is listed under Reports in the sidebar, the breadcrumb and the search', () => {
+  it('is listed under Reports in the sidebar and the search', () => {
     const sidebar = source('app/components/Hospital/Sidebar.vue')
     const group = sidebar.slice(sidebar.indexOf("label: 'Reports'"), sidebar.indexOf("label: 'System'"))
     expect(group).toContain("path: '/hospital/inventory-report'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/inventory-report': 'Reports / Inventory Report'")
     expect(layout).toContain("path: '/hospital/inventory-report', icon: 'clipboard-list'")
   })
 })
 
 describe('the hospital navigation', () => {
-  it('lists the inventory in the sidebar, the breadcrumb and the search', () => {
+  it('lists the inventory in the sidebar and the search', () => {
     expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/inventory'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/inventory': 'Blood Bank Inventory'")
     expect(layout).toContain("path: '/hospital/inventory', icon: 'package'")
   })
 
@@ -280,7 +278,6 @@ describe('the hospital navigation', () => {
     expect(group).toContain("{ label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', requires: 'hospital.inventory.stock_in' }")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/stock-intake': 'Stock Intake'")
     expect(layout).toContain("path: '/hospital/stock-intake', icon: 'package-check'")
   })
 })

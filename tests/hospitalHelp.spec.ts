@@ -80,10 +80,9 @@ describe('the hospital help guides', () => {
 })
 
 describe('the hospital Help Center page', () => {
-  it('is in the sidebar, the breadcrumb and the search', () => {
+  it('is in the sidebar and the search', () => {
     expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/help'")
     const layout = source('app/layouts/hospitaldashboard.vue')
-    expect(layout).toContain("'/hospital/help': 'Help Center'")
     expect(layout).toContain('searchHospitalGuides(q, hospitalGuidesFor(can))')
   })
 })
