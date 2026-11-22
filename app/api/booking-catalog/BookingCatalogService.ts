@@ -21,6 +21,11 @@ class BookingCatalogService extends BaseService {
     async bloodDrives(): Promise<any> {
         return await this.request('/blood-drives', 'GET');
     }
+
+    /** The landing page's upcoming drives. No sign-in. [{ id, name, location, date, start_time, end_time }] */
+    async publicDrives(): Promise<any> {
+        return await this.request('/public/drives', 'GET');
+    }
 }
 
 export const bookingCatalogService = BookingCatalogService.getInstance();
