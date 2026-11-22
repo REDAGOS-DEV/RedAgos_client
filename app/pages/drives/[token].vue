@@ -31,6 +31,11 @@
       <template v-else-if="drive">
         <!-- The drive -->
         <section class="card drive" aria-labelledby="drive-title">
+          <span class="drive__date" aria-hidden="true">
+            <span class="drive__month">{{ monthShort(drive.event_date) }}</span>
+            <span class="drive__day">{{ dayOfMonth(drive.event_date) }}</span>
+          </span>
+          <div class="drive__body">
           <p class="drive__centre">{{ drive.centre_name }}</p>
           <h1 id="drive-title" class="drive__name">{{ drive.name }}</h1>
           <ul class="drive__facts">
@@ -39,6 +44,7 @@
             <li><AssetIcon name="map-pin" :size="15" />{{ drive.location }}</li>
           </ul>
           <p v-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
+          </div>
         </section>
 
         <!-- Not taking registrations -->
@@ -400,6 +406,16 @@ function clock(value) {
   return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 
+function monthShort(value) {
+  const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+}
+
+function dayOfMonth(value) {
+  const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? '' : d.getDate()
+}
+
 function hours(d) {
   return d.end_time ? `${clock(d.start_time)} to ${clock(d.end_time)}` : `From ${clock(d.start_time)}`
 }
@@ -654,5 +670,37 @@ onMounted(load)
 
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; }
+}
+/* ---------- The drive and its fields, as the portal draws them (2026-11-20) ---------- */
+.card.drive { display: flex; align-items: flex-start; gap: 18px; }
+.drive__body { min-width: 0; flex: 1; }
+.drive__date {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none;
+  width: 68px; height: 72px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.drive__month { font-size: 11.5px; font-weight: 800; letter-spacing: 0.08em; }
+.drive__day { font-size: 28px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+
+/* A field a visitor can tell is a field: a clear edge, a slight inset, a darker hover. */
+.link-page {
+  --link-field-border: #A3B0C2;
+  --link-field-border-hover: #64748B;
+  --link-field-inset: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+html.dark .link-page {
+  --link-field-border: #556070;
+  --link-field-border-hover: #8A94A3;
+  --link-field-inset: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.link-page .input:not(.input--invalid):not(:focus) { border-color: var(--link-field-border); box-shadow: var(--link-field-inset); }
+.link-page .input:not(.input--invalid):not(:focus):hover { border-color: var(--link-field-border-hover); }
+.link-page :deep(.sf:not(.sf--open) .sf-trigger:not(:focus-visible)),
+.link-page :deep(.dp:not(.dp--open) .dp-trigger:not(:focus-visible)),
+.link-page :deep(.pf:not(.pf--open):not(:focus-within)) { border-color: var(--link-field-border); box-shadow: var(--link-field-inset); }
+
+@media (max-width: 520px) {
+  .card.drive { gap: 14px; }
+  .drive__date { width: 58px; height: 62px; }
+  .drive__day { font-size: 24px; }
 }
 </style>
