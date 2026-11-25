@@ -7,7 +7,7 @@
             </NuxtLink>
 
             <h1 class="legal-title">Terms of Service</h1>
-            <p class="legal-updated">Last updated: July 2026</p>
+            <p class="legal-updated">Last updated: November 2026</p>
 
             <div class="legal-body">
                 <section class="legal-section">
@@ -48,7 +48,26 @@
                 </section>
 
                 <section class="legal-section">
-                    <h2>5. Limitation of Liability</h2>
+                    <h2>5. Notices by Email and SMS</h2>
+                    <p>
+                        By creating an account, you agree that RedAgos may send you notices in the
+                        portal, by email, and by text message (SMS) to the mobile number on your
+                        account. Texts are about your own appointments and donations only:
+                        appointment confirmations, cancellations or date changes of a blood drive
+                        you booked, a notice when your donation is recorded, a notice when blood you
+                        donated has been given to a patient (never saying who or where), and
+                        deferral notices, which show a code only and never medical details. RedAgos does not send
+                        promotional or marketing texts.
+                    </p>
+                    <p>
+                        You can turn email and SMS notices off at any time under Settings,
+                        Notifications. Some notices in the portal, and account and security
+                        emails, cannot be turned off.
+                    </p>
+                </section>
+
+                <section class="legal-section">
+                    <h2>6. Limitation of Liability</h2>
                     <p>
                         RedAgos serves as a scheduling and information platform between donors and
                         partner blood centers. We are not a medical provider and are not liable for
@@ -58,7 +77,7 @@
                 </section>
 
                 <section class="legal-section">
-                    <h2>6. Changes to These Terms</h2>
+                    <h2>7. Changes to These Terms</h2>
                     <p>
                         We may update these Terms from time to time. Continued use of RedAgos
                         after changes are posted constitutes acceptance of the revised terms.
@@ -66,7 +85,7 @@
                 </section>
 
                 <section class="legal-section">
-                    <h2>7. Contact Us</h2>
+                    <h2>8. Contact Us</h2>
                     <p>
                         Questions about these Terms? Reach us at
                         <a href="mailto:support@bloodcenter.example">support@bloodcenter.example</a>.

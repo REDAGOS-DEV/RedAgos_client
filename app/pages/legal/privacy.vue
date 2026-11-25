@@ -7,7 +7,7 @@
             </NuxtLink>
 
             <h1 class="legal-title">Privacy Policy</h1>
-            <p class="legal-updated">Last updated: July 2026</p>
+            <p class="legal-updated">Last updated: November 2026</p>
 
             <div class="legal-body">
                 <section class="legal-section">
@@ -23,8 +23,10 @@
                     <h2>2. How We Use Your Information</h2>
                     <p>
                         Your information is used to determine donation eligibility, schedule
-                        appointments, generate your QR code, maintain your donation history, and
-                        communicate important updates about your account.
+                        appointments, generate your QR code, maintain your donation history,
+                        communicate important updates about your account, and send you notices about
+                        your appointments and donations by email and by text message (SMS) to your
+                        mobile number.
                     </p>
                 </section>
 

@@ -98,7 +98,7 @@
                             </span>
                             <span role="columnheader" class="notif-grid__channel">
                                 <AssetIcon name="mail" :size="14" />
-                                Email
+                                Email &amp; SMS
                             </span>
                         </div>
                         <div v-for="topic in NOTIFICATION_TOPICS" :key="topic.key" class="notif-row" role="row">
@@ -114,12 +114,12 @@
                                 <span
                                     v-if="topic[channel] === 'always'"
                                     class="notif-always"
-                                    :title="`${topic.label}: always on ${channel === 'email' ? 'by email' : 'in the portal'}`"
+                                    :title="`${topic.label}: always on ${channelWords(topic, channel)}`"
                                 >
                                     <AssetIcon name="lock" :size="12" />
                                     Always
                                 </span>
-                                <span v-else-if="!topic[channel]" class="notif-none" :title="`Not sent ${channel === 'email' ? 'by email' : 'in the portal'}`">
+                                <span v-else-if="!topic[channel]" class="notif-none" :title="`Not sent ${channelWords(topic, channel)}`">
                                     <span aria-hidden="true">&ndash;</span>
                                     <span class="sr-only">Not sent</span>
                                 </span>
@@ -130,8 +130,8 @@
                                     :class="{ 'toggle-switch--on': prefs[topic[channel]] }"
                                     role="switch"
                                     :aria-checked="prefs[topic[channel]]"
-                                    :aria-label="`${topic.label}, ${channel === 'email' ? 'email' : 'portal'}`"
-                                    :disabled="channel === 'email' && !profile.email"
+                                    :aria-label="`${topic.label}, ${channel === 'email' ? (topic.sms ? 'email and SMS' : 'email') : 'portal'}`"
+                                    :disabled="channel === 'email' && !profile.email && !(topic.sms && hasMobile)"
                                     @click="prefs[topic[channel]] = !prefs[topic[channel]]"
                                 >
                                     <span class="toggle-switch__knob" />
@@ -145,7 +145,14 @@
                         <template v-if="profile.email">
                             Emails go to <strong>{{ profile.email }}</strong><template v-if="emailUnverified">, which isn't verified yet</template>.
                         </template>
-                        <template v-else>No email on file, so these come to you in the portal only.</template>
+                        <template v-else>No email on file.</template>
+                    </p>
+                    <p class="notif-email">
+                        <AssetIcon name="smartphone" :size="13" />
+                        <template v-if="hasMobile">
+                            {{ textedTopics }} are also texted to <strong>{{ formatPhoneNumber(profile.phone) }}</strong>.
+                        </template>
+                        <template v-else>No mobile number on file, so nothing is texted.</template>
                     </p>
                     <div class="panel-footer">
                         <p class="status-note" :class="{ 'status-note--error': notifsError, 'status-note--ok': notifsSaved && !notifsError }" aria-live="polite">
@@ -320,6 +327,7 @@ import { useUser } from '~/composables/useUser'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { DEFAULT_ACCENT } from '~/utils/accentThemes'
+import { formatPhoneNumber, nationalDigits } from '~/utils/phone'
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
 import { usePageHidden } from '~/composables/useKeptAlive'
 
@@ -369,10 +377,15 @@ const security = reactive({
  * What the server sends a donor, by topic and channel. A string names the
  * switch it keeps (app/Support/DonorNotificationPreferences.php on the
  * server); 'always' can't be turned off; null isn't sent on that channel.
+ *
+ * `sms` marks a topic the server also texts to a mobile number, under the
+ * same switch as its email (alwaysInAppChannels(..., sms: true)), so the
+ * column reads "Email & SMS" and one switch turns both off.
  */
 const NOTIFICATION_TOPICS = [
-    { key: 'appointments', label: 'Appointments', inApp: 'always', email: 'appointments_email' },
-    { key: 'results', label: 'Donation results', inApp: 'always', email: 'results_email' },
+    { key: 'appointments', label: 'Appointments', inApp: 'always', email: 'appointments_email', sms: true },
+    { key: 'results', label: 'Donation results', inApp: 'always', email: 'results_email', sms: true },
+    { key: 'transfusions', label: 'Blood given to a patient', inApp: 'always', email: 'transfusion_email', sms: true },
     { key: 'eligibility', label: 'Eligibility reminders', inApp: null, email: 'eligibility_renewal' },
     { key: 'drives', label: 'Blood drives', inApp: 'drives_in_app', email: 'drives_email' },
     { key: 'account', label: 'Account and security', inApp: 'always', email: 'always' },
@@ -385,7 +398,23 @@ const prefs = reactive({
     eligibility_renewal: true,
     drives_in_app: true,
     drives_email: false,
+    transfusion_email: true,
 })
+
+// A Philippine mobile, the only number the server texts (SemaphoreSms::recipient).
+const hasMobile = computed(() => /^9\d{9}$/.test(nationalDigits(profile.phone)))
+
+// "Appointments, donation results and blood given to a patient", from the topics the server texts.
+const textedTopics = (() => {
+    const labels = NOTIFICATION_TOPICS.filter((topic) => topic.sms).map((topic) => topic.label)
+    const listed = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}` : labels[0] ?? ''
+    return listed.charAt(0).toUpperCase() + listed.slice(1).toLowerCase()
+})()
+
+function channelWords(topic, channel) {
+    if (channel !== 'email') return 'in the portal'
+    return topic.sms ? 'by email and SMS' : 'by email'
+}
 
 const { user } = useUser()
 const emailUnverified = computed(() => user.value != null && !user.value.email_verified)
