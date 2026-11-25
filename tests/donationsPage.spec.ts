@@ -50,7 +50,7 @@ describe('donation helpers', () => {
 })
 
 describe('the donations service', () => {
-  it('reads the list and carries its filters into the export', async () => {
+  it('reads the centre-scoped list and carries its filters into the export', async () => {
     const { bloodCenterService } = await import('~/api/bloodcenter/BloodCenterService')
     const request = vi.fn(async () => ({}))
     const requestBlob = vi.fn(async () => new Blob())
@@ -82,16 +82,16 @@ describe('the donations page', () => {
 
   it('closes a visit left open through the counter\'s own route', () => {
     expect(page).toContain("bloodCenterService.updateDonationStatus(closing.row.id, {\n      status: 'rejected',")
-    expect(page).toContain('v-if="row.open && isOwn(row) && canClose"')
+    expect(page).toContain('v-if="row.open && canClose"')
     expect(page).toContain(':disabled="!row.can.close"')
   })
 
-  it("lists every centre's donations, another centre's read only", () => {
-    expect(page).toContain("return row?.scope !== 'cross_facility'")
-    expect(page).toContain('v-if="!isOwn(row)" class="chip"')
-    expect(page).toContain('v-if="row.open && isOwn(row) && canStartVisit && row.donor?.uuid"')
-    expect(page).toContain('v-if="detail.open && isOwn(detail) && canStartVisit && detail.donor?.uuid"')
-    expect(page).toContain('detail.paper_sheet && isOwn(detail) && canRecordPaper')
+  it('lists one plain value per column, as Donor Management does (project owner, 2026-11-26)', () => {
+    const rowsMarkup = page.slice(page.indexOf('v-for="row in rows"'), page.indexOf('<footer class="pager">'))
+    expect(rowsMarkup).toContain('<span v-if="row.donor && !row.donor.blinded" class="donor-name">{{ row.donor.full_name }}</span>')
+    for (const gone of ['PersonAvatar', 'donor_code', 'class="badge', 'class="blood', 'class="chip', 'class="tag']) {
+      expect(rowsMarkup).not.toContain(gone)
+    }
   })
 
   it('never shows a name the viewer may not see', () => {
