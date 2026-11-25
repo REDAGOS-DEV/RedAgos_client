@@ -80,7 +80,7 @@
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': loading && rows.length }">
           <table class="don-table">
-            <caption class="sr-only">Donations at every centre</caption>
+            <caption class="sr-only">Donations at this centre</caption>
             <thead>
               <tr>
                 <th scope="col" class="c-id">ID</th>
@@ -90,12 +90,12 @@
                 <th scope="col" class="c-bag">Bag</th>
                 <th scope="col" class="c-appt">Appointment</th>
                 <th scope="col" class="c-status">Status</th>
-                <th scope="col" class="c-actions">Actions</th>
+                <th scope="col" class="c-actions" :style="{ width: `${actionsWidth}px` }">Actions</th>
               </tr>
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <SkeletonRows :columns="8" :rows="6" />
+              <SkeletonRows :columns="8" :rows="6" :cell-classes="COLUMN_CLASSES" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -120,60 +120,28 @@
                 v-for="row in rows"
                 :key="row.id"
                 class="don-row"
-                :class="{ 'don-row--open': row.open }"
                 tabindex="0"
                 :aria-label="`Open donation ${row.code}`"
                 @click="openDetail(row)"
                 @keydown.enter.self="openDetail(row)"
               >
-                <td class="c-id">
-                  <span class="code">{{ row.code }}</span>
-                  <span v-if="row.source === 'paper'" class="chip" :title="`Typed from paper sheet ${row.paper_sheet?.code}`">Paper</span>
-                  <span v-if="!isOwn(row)" class="chip" :title="`Recorded at ${row.centre?.name ?? 'another centre'}`">{{ centreLabel(row) }}</span>
-                </td>
+                <!-- One plain value per column, as on Donor Management (project
+                     owner, 2026-11-26): no avatar, donor ID, chips, pills or
+                     dots. Volume, drive and paper sheet are in the record. -->
+                <td class="c-id" :title="row.source === 'paper' ? `Typed from paper sheet ${row.paper_sheet?.code}` : undefined">{{ row.code }}</td>
                 <td class="c-donor">
-                  <div class="donor">
-                    <PersonAvatar :name="row.donor?.full_name" :hidden="!(row.donor && !row.donor.blinded)" />
-                    <div class="donor__text">
-                      <template v-if="row.donor && !row.donor.blinded">
-                        <span class="donor__name">{{ row.donor.full_name }}</span>
-                        <span class="sub">{{ row.donor.donor_code }}</span>
-                      </template>
-                      <span v-else class="muted">Identity hidden</span>
-                    </div>
-                  </div>
+                  <span v-if="row.donor && !row.donor.blinded" class="donor-name">{{ row.donor.full_name }}</span>
+                  <span v-else class="muted">Identity hidden</span>
                 </td>
-                <td class="c-group">
-                  <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
-                  <span v-else class="muted" title="Not typed yet">—</span>
-                </td>
-                <td class="c-date nowrap">
-                  {{ formatShortDate(row.date) }}
-                  <span class="sub">{{ row.time }}</span>
-                </td>
-                <td class="c-bag">
-                  <span v-if="row.bag?.barcode" class="code code--bag">{{ row.bag.barcode }}</span>
-                  <span v-else class="muted muted--soft">{{ row.open ? 'Not drawn' : '—' }}</span>
-                  <span v-if="row.volume_ml" class="sub">{{ row.volume_ml }} mL</span>
-                </td>
-                <td class="c-appt">
-                  <span v-if="row.appointment?.code" class="code">{{ row.appointment.code }}</span>
-                  <span v-else class="tag">Walk-in</span>
-                  <span v-if="row.drive" class="sub sub--icon"><AssetIcon name="route" :size="12" />{{ row.drive }}</span>
-                </td>
-                <td class="c-status">
-                  <span class="badge" :class="`badge--${donationTone(row.status, row.status_label)}`">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ row.status_label }}
-                  </span>
-                </td>
+                <td class="c-group" :title="row.donor?.blood_type ? undefined : 'Not typed yet'">{{ row.donor?.blood_type || '—' }}</td>
+                <td class="c-date">{{ formatShortDate(row.date) }} {{ row.time }}</td>
+                <td class="c-bag">{{ row.bag?.barcode || (row.open ? 'Not drawn' : '—') }}</td>
+                <td class="c-appt" :title="row.drive || undefined">{{ row.appointment?.code ?? 'Walk-in' }}</td>
+                <td class="c-status">{{ row.status_label }}</td>
                 <td class="c-actions" @click.stop>
                   <div class="row-actions">
-                    <button type="button" class="icon-btn" :aria-label="`View ${row.code}`" title="View" @click="openDetail(row)">
-                      <AssetIcon name="eye" :size="15" />
-                    </button>
                     <NuxtLink
-                      v-if="row.open && isOwn(row) && canStartVisit && row.donor?.uuid"
+                      v-if="row.open && canStartVisit && row.donor?.uuid"
                       :to="continueLink(row.donor.uuid)"
                       class="act-btn"
                       :aria-label="`Continue ${row.code} at the Donation Counter`"
@@ -182,8 +150,11 @@
                       Continue
                       <AssetIcon name="arrow-right" :size="14" />
                     </NuxtLink>
+                    <button type="button" class="icon-btn" :aria-label="`View ${row.code}`" title="View" @click="openDetail(row)">
+                      <AssetIcon name="eye" :size="15" />
+                    </button>
                     <button
-                      v-if="row.open && isOwn(row) && canClose"
+                      v-if="row.open && canClose"
                       type="button"
                       class="icon-btn icon-btn--danger"
                       :disabled="!row.can.close"
@@ -227,7 +198,6 @@
           {{ detail.status_label }}
         </span>
         <span v-if="detail.source === 'paper'" class="chip chip--flat">Typed from paper</span>
-        <span v-if="!isOwn(detail)" class="chip chip--flat">Recorded at {{ detail.centre?.name ?? 'another centre' }}</span>
       </template>
 
       <div class="dd">
@@ -292,7 +262,7 @@
 
       <template #actions>
         <NuxtLink
-          v-if="detail.source === 'paper' && detail.paper_sheet && isOwn(detail) && canRecordPaper"
+          v-if="detail.source === 'paper' && detail.paper_sheet && canRecordPaper"
           :to="`/blood-center/paper-records/${detail.paper_sheet.id}`"
           class="btn-outline"
         >
@@ -300,7 +270,7 @@
           <AssetIcon name="arrow-right" :size="14" />
         </NuxtLink>
         <button type="button" class="btn-outline" @click="detail = null">Close</button>
-        <NuxtLink v-if="detail.open && isOwn(detail) && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-primary">
+        <NuxtLink v-if="detail.open && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-primary">
           Continue at the counter
           <AssetIcon name="arrow-right" :size="14" />
         </NuxtLink>
@@ -367,31 +337,27 @@ function continueLink(donorUuid) {
 const canClose = computed(() => can('donations.close'))
 const canRecordPaper = computed(() => can('donations.record_paper'))
 
-/**
- * The list holds every centre's donations (project owner, 2026-11-13), as
- * Donor Management holds every centre's donors. Another centre's visit is
- * read only: no Continue, no Close, no paper sheet to open.
- */
-function isOwn(row) {
-  return row?.scope !== 'cross_facility'
-}
+// The headings' classes, so the loading rows hide the same columns.
+const COLUMN_CLASSES = ['c-id', 'c-donor', 'c-group', 'c-date', 'c-bag', 'c-appt', 'c-status', 'c-actions']
 
-/** The recording centre on another centre's row: SPMC, else its name. */
-function centreLabel(row) {
-  return row.centre?.abbreviation || row.centre?.name || 'Other centre'
-}
+// Sized, as on Donor Management, for the buttons this role can see: Continue
+// is worded (about 94px), View and Close are 30px icons, 6px apart, plus the
+// cell's padding. Never narrower than its "Actions" heading.
+const actionsWidth = computed(() => {
+  const icons = 1 + (canClose.value ? 1 : 0)
+  const buttons = icons + (canStartVisit.value ? 1 : 0)
+  return Math.max(84, 34 + icons * 30 + (canStartVisit.value ? 94 : 0) + Math.max(0, buttons - 1) * 6)
+})
 
 /**
  * API SHAPE
  * -------------------------------------------------------------------------
  *  GET   /donation-records?search=&status=&blood_type_id=&from=&to=&page=
- *        -> paginator of every centre's donations; rows: { id, code, date,
- *           time, status, status_label, open, scope ('own_facility' |
- *           'cross_facility'), centre { id, name, abbreviation },
- *           donor (blinded without donors.view_identity), appointment,
+ *        -> paginator; rows: { id, code, date, time, status, status_label,
+ *           open, donor (blinded without donors.view_identity), appointment,
  *           drive, source ('counter' | 'paper'), paper_sheet, bag, volume_ml,
  *           screening, collection, rejection_reason, can: { close } }
- *  GET   /donation-records/export?(same filters)            -> CSV, this centre's only
+ *  GET   /donation-records/export?(same filters)            -> CSV
  *  PATCH /donations/{id}/status { status: 'rejected', rejection_reason }
  *        closes a visit left open (the counter's Cancel visit)
  * -------------------------------------------------------------------------
@@ -845,6 +811,7 @@ onPageReturn(() => load(pager.page))
   padding: 11px 10px;
   border-bottom: 1px solid var(--rb-border);
   vertical-align: middle;
+  color: var(--rb-text-primary);
   overflow: hidden;
 }
 
@@ -861,34 +828,46 @@ onPageReturn(() => load(pager.page))
 /* The whole row opens the record; the status says when a visit is still open. */
 .don-row { cursor: pointer; }
 .don-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
-.don-row--open { background: rgba(var(--rb-primary-rgb), 0.03); }
-.don-row--open:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
 
-/* Loading rows stand as tall as the rows they become. */
-.don-table tbody :deep(tr[aria-hidden="true"] td) { height: 65px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+/* Loading rows as tall as the real ones (the row's 30px buttons), so nothing jumps. */
+.don-table tbody :deep(tr[aria-hidden="true"] td) { height: 53px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
 .don-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 
-.c-id { width: 124px; }
-.c-group { width: 66px; }
-.c-date { width: 118px; }
-.c-bag { width: 128px; }
-.c-appt { width: 150px; }
+/* Widths include the cell's padding; the donor's name takes the rest. The
+   actions column is sized in the template, by the buttons the role sees. */
+.c-id { width: 140px; }
+.c-group { width: 64px; }
+.c-date { width: 156px; }
+.c-bag { width: 150px; }
+.c-appt { width: 130px; }
 .c-status { width: 150px; }
-.c-actions { width: 204px; }
+
+/* Plain text, one line each, as on Donor Management; the donor's name may wrap. */
+.don-table tbody td.c-id,
+.don-table tbody td.c-group,
+.don-table tbody td.c-date,
+.don-table tbody td.c-bag,
+.don-table tbody td.c-appt,
+.don-table tbody td.c-status {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.donor-name { text-transform: capitalize; overflow-wrap: anywhere; }
 
 /* Narrow panels keep who, when and where it stands. */
 @container (max-width: 980px) {
-  .c-appt { display: none; }
+  .c-appt, .don-table tbody :deep(td.c-appt) { display: none; }
 }
 
 @container (max-width: 860px) {
-  .c-bag { display: none; }
+  .c-bag, .don-table tbody :deep(td.c-bag) { display: none; }
 }
 
 .code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
 .code--bag { color: var(--rb-text-primary); }
 
-/* A donation typed from a drive's paper sheet, or recorded at another centre. */
+/* "Typed from paper" in the record dialog. */
 .chip {
   display: inline-block;
   margin-left: 6px;
@@ -901,21 +880,8 @@ onPageReturn(() => load(pager.page))
   color: var(--rb-text-secondary);
   vertical-align: 1px;
 }
-.donor { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.donor__text { min-width: 0; }
-.donor__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
-
-
-.tag {
-  display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt);
-  border: 1px solid var(--rb-border); font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary);
-}
-.sub--icon { display: flex; align-items: flex-start; gap: 4px; }
-.sub--icon :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
-.muted--soft { font-style: italic; }
 .sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
 .muted { color: var(--rb-text-secondary); }
-.nowrap { white-space: nowrap; }
 
 .blood {
   display: inline-flex;
@@ -931,7 +897,7 @@ onPageReturn(() => load(pager.page))
   white-space: nowrap;
 }
 
-/* Status: the colour lives on the dot, never on the badge's fill. */
+/* The record dialog's status: the colour lives on the dot, never on the badge's fill. */
 .badge {
   --tone: var(--rb-text-muted);
   display: inline-flex;

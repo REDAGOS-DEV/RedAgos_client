@@ -764,7 +764,7 @@ async function submit() {
     } else {
       const { roles: _roles, main_role: _main, custom_role: _custom, ...fields } = form
 
-      await bloodCenterService.createStaff({
+      const created = await bloodCenterService.createStaff({
         ...fields,
         phone: form.phone || null,
         employee_id: form.employee_id || null,
@@ -774,7 +774,13 @@ async function submit() {
         staff_privileges: [...form.staff_privileges],
         management_level: form.management_level || null,
       })
-      showBanner('Staff account created. A verification email has been sent.', 'success')
+      // An example.com address starts verified on the server: no code is sent.
+      showBanner(
+        created?.data?.email_verified
+          ? 'Staff account created. They can sign in now.'
+          : 'Staff account created. A verification email has been sent.',
+        'success',
+      )
     }
 
     modalOpen.value = false
