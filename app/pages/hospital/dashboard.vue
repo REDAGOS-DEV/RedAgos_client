@@ -20,91 +20,133 @@
 
       <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" class="low-stock-banner" />
 
-      <!-- Summary figures: each opens the page that owns the number. -->
-      <StatStrip :columns="3">
-        <StatItem :loading="loading" label="Available blood units" :value="unitsAvailable" hint="Across all compatible blood types" icon="blood-drop" tone="primary" to="/hospital/bloodavailability" />
-        <StatItem :loading="loading" label="Pending requests" :value="pendingCount" hint="Awaiting Blood Center approval" icon="clock" tone="warning" to="/hospital/bloodrequests" />
-        <StatItem :loading="loading" label="Approved requests" :value="approvedCount" hint="Ready for processing" icon="check-circle" tone="success" to="/hospital/bloodrequests" />
-        <StatItem :loading="loading" label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
-        <StatItem :loading="loading" label="Untagged Crossmatch" :value="untaggedCrossmatched" hint="Crossmatched units not transfused after 24 hrs" icon="user-x" tone="warning" to="/hospital/inventory?tag_status=untagged_crossmatched&untag_reason=transfusion_deadline_expired" />
-        <StatItem :loading="loading" label="Untagged Assigned" :value="untaggedAssigned" hint="Assigned units not crossmatched after 24 hrs" icon="user-x" tone="warning" to="/hospital/inventory?tag_status=untagged_assigned&untag_reason=crossmatch_deadline_expired" />
-      </StatStrip>
+      <!--
+        The summary as two chart cards (project owner, 2026-11-26, option A):
+        where the patient requests stand, and what the shelf holds by blood type.
+      -->
+      <HospitalDashboardSummary
+        :loading="loading"
+        :show-requests="can('hospital.requests.view')"
+        :show-stock="can('hospital.inventory.view')"
+        :pending="pendingCount"
+        :in-progress="approvedCount"
+        :fulfilled-today="completedToday"
+        :units-available="unitsAvailable"
+        :untagged-after="untaggedCrossmatched"
+        :untagged-before="untaggedAssigned"
+        :thresholds="thresholds"
+      />
 
-      <!-- The shelf by blood type, from Blood Bank Inventory (project owner, 2026-10-28). -->
-      <HospitalBloodTypeAvailability v-if="thresholds || thresholdsLoading" :thresholds="thresholds" />
+      <!-- The shelf by blood type is the Blood bank card's chart now; the type cards stay on Blood Bank Inventory (2026-11-26). -->
+
+      <!--
+        The two trend charts side by side (2026-11-26), so both read at a glance:
+        what was asked of blood centers, and what moved on the shelf.
+      -->
+      <div class="chart-row">
+        <!-- Blood request trend -->
+        <SectionCard title="Blood Request Trend" subtitle="Requests submitted over time" flush>
+          <template #actions>
+            <div class="segmented" role="tablist" aria-label="Trend period">
+              <button type="button" role="tab" :aria-selected="trendPeriod === 'weekly'"
+                class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'weekly' }"
+                @click="trendPeriod = 'weekly'">Weekly</button>
+              <button type="button" role="tab" :aria-selected="trendPeriod === 'monthly'"
+                class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'monthly' }"
+                @click="trendPeriod = 'monthly'">Monthly</button>
+              <button type="button" role="tab" :aria-selected="trendPeriod === 'yearly'"
+                class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'yearly' }"
+                @click="trendPeriod = 'yearly'">Yearly</button>
+            </div>
+          </template>
+
+          <!-- Trend summary stats -->
+          <div class="trend-stats">
+            <div class="trend-stat">
+              <p class="trend-stat__label">Total Requests</p>
+              <span v-if="loading" class="sk sk--figure" />
+              <p v-else class="trend-stat__value">{{ trendTotal }}</p>
+            </div>
+            <div class="trend-stat">
+              <p class="trend-stat__label">Avg. Daily Requests</p>
+              <span v-if="loading" class="sk sk--figure" />
+              <p v-else class="trend-stat__value">{{ trendAverage }}</p>
+            </div>
+            <div class="trend-stat">
+              <p class="trend-stat__label">Peak Day</p>
+              <span v-if="loading" class="sk sk--figure" />
+              <p v-else class="trend-stat__value trend-stat__value--sm">{{ trendPeak }}</p>
+            </div>
+            <div class="trend-stat">
+              <p class="trend-stat__label">Growth</p>
+              <span v-if="loading" class="sk sk--figure" />
+              <p v-else class="trend-stat__value" :class="trendGrowthClass">{{ trendGrowthLabel }}</p>
+            </div>
+          </div>
+
+          <div class="trend-body">
+            <SkeletonChart v-if="loading" />
+            <svg v-else-if="chartPoints.length" class="trend-svg" viewBox="0 0 640 200" preserveAspectRatio="none"
+              role="img" aria-label="Blood request trend chart">
+              <line v-for="g in gridLines" :key="g" x1="0" :x2="640" :y1="g" :y2="g" class="trend-grid" />
+              <line x1="0" x2="640" :y1="TREND_BASE" :y2="TREND_BASE" class="trend-base" />
+              <g v-for="(pt, i) in chartPoints" :key="i" class="trend-col" :class="{ 'trend-col--on': hoveredPoint === i }">
+                <!-- The whole period is the target, not only its bar. -->
+                <rect :x="pt.x - pt.slot / 2" y="0" :width="pt.slot" :height="TREND_BASE" class="trend-hit" />
+                <rect
+                  :x="pt.x - pt.w / 2"
+                  :y="pt.value ? pt.y : TREND_BASE - 2"
+                  :width="pt.w"
+                  :height="pt.value ? TREND_BASE - pt.y : 2"
+                  rx="3"
+                  class="trend-bar"
+                  :class="{ 'trend-bar--zero': !pt.value, 'trend-bar--animate': chartAnimateKey }"
+                />
+                <rect :x="pt.x - pt.slot / 2" y="0" :width="pt.slot" :height="TREND_BASE" fill="transparent"
+                  tabindex="0" role="button" :aria-label="`${pt.label}: ${pt.value} requests`"
+                  @mouseenter="hoveredPoint = i" @mouseleave="hoveredPoint = null"
+                  @focus="hoveredPoint = i" @blur="hoveredPoint = null" />
+              </g>
+            </svg>
+            <EmptyState v-else icon="trending-up" title="No trend yet" description="Not enough data yet to show a request trend." compact />
+
+            <div v-if="hoveredPoint !== null" class="trend-tooltip"
+              :style="{ left: `calc(20px + (100% - 40px) * ${tooltipLeft / 100})` }">
+              <span class="trend-tooltip__value">{{ chartPoints[hoveredPoint].value }} requests</span>
+              <span class="trend-tooltip__label">{{ chartPoints[hoveredPoint].label }}</span>
+            </div>
+
+            <div v-if="chartPoints.length" class="trend-labels" :style="{ '--trend-n': chartPoints.length }">
+              <span v-for="pt in chartPoints" :key="pt.label">{{ pt.label }}</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        <!-- What moved on the shelf, day by day (project owner, 2026-11-26: a dashboard is its charts). -->
+        <SectionCard v-if="can('hospital.inventory.view')" title="Bag Movements" subtitle="Stocked in, transfused and lost, the last 14 days" flush>
+          <template #actions>
+            <NuxtLink to="/hospital/request-history" class="panel-link">
+              View history
+              <AssetIcon name="chevron-right" :size="14" />
+            </NuxtLink>
+          </template>
+          <HospitalBagMovementsChart ref="bagMovements" />
+        </SectionCard>
+      </div>
 
       <!-- Main content -->
       <div class="main-grid">
         <!-- Left column -->
         <div class="col-left">
-          <!-- Blood request trend -->
-          <SectionCard title="Blood Request Trend" subtitle="Requests submitted over time" flush>
+          <!-- What runs out of date this week, and the bags to use first (2026-11-26). -->
+          <SectionCard v-if="can('hospital.inventory.view')" title="Expiring Soon" subtitle="Available bags by the day they expire, the next 7 days" flush>
             <template #actions>
-              <div class="segmented" role="tablist" aria-label="Trend period">
-                <button type="button" role="tab" :aria-selected="trendPeriod === 'weekly'"
-                  class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'weekly' }"
-                  @click="trendPeriod = 'weekly'">Weekly</button>
-                <button type="button" role="tab" :aria-selected="trendPeriod === 'monthly'"
-                  class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'monthly' }"
-                  @click="trendPeriod = 'monthly'">Monthly</button>
-                <button type="button" role="tab" :aria-selected="trendPeriod === 'yearly'"
-                  class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'yearly' }"
-                  @click="trendPeriod = 'yearly'">Yearly</button>
-              </div>
+              <NuxtLink to="/hospital/inventory?status=available" class="panel-link">
+                Open inventory
+                <AssetIcon name="chevron-right" :size="14" />
+              </NuxtLink>
             </template>
-
-            <!-- Trend summary stats -->
-            <div class="trend-stats">
-              <div class="trend-stat">
-                <p class="trend-stat__label">Total Requests</p>
-                <span v-if="loading" class="sk sk--figure" />
-                <p v-else class="trend-stat__value">{{ trendTotal }}</p>
-              </div>
-              <div class="trend-stat">
-                <p class="trend-stat__label">Avg. Daily Requests</p>
-                <span v-if="loading" class="sk sk--figure" />
-                <p v-else class="trend-stat__value">{{ trendAverage }}</p>
-              </div>
-              <div class="trend-stat">
-                <p class="trend-stat__label">Peak Day</p>
-                <span v-if="loading" class="sk sk--figure" />
-                <p v-else class="trend-stat__value trend-stat__value--sm">{{ trendPeak }}</p>
-              </div>
-              <div class="trend-stat">
-                <p class="trend-stat__label">Growth</p>
-                <span v-if="loading" class="sk sk--figure" />
-                <p v-else class="trend-stat__value" :class="trendGrowthClass">{{ trendGrowthLabel }}</p>
-              </div>
-            </div>
-
-            <div class="trend-body">
-              <SkeletonChart v-if="loading" />
-              <svg v-else-if="chartPoints.length" class="trend-svg" viewBox="0 0 640 200" preserveAspectRatio="none"
-                role="img" aria-label="Blood request trend chart">
-                <line v-for="g in gridLines" :key="g" x1="0" :x2="640" :y1="g" :y2="g" class="trend-grid" />
-                <path :d="areaPath" class="trend-area" :class="{ 'trend-area--animate': chartAnimateKey }" />
-                <path :d="linePath" class="trend-line" :class="{ 'trend-line--animate': chartAnimateKey }" />
-                <g v-for="(pt, i) in chartPoints" :key="i">
-                  <circle :cx="pt.x" :cy="pt.y" r="3.5" class="trend-dot"
-                    :class="{ 'trend-dot--active': hoveredPoint === i }" />
-                  <rect :x="pt.x - 18" y="0" width="36" height="200" fill="transparent"
-                    tabindex="0" role="button" :aria-label="`${pt.label}: ${pt.value} requests`"
-                    @mouseenter="hoveredPoint = i" @mouseleave="hoveredPoint = null"
-                    @focus="hoveredPoint = i" @blur="hoveredPoint = null" />
-                </g>
-              </svg>
-              <EmptyState v-else icon="trending-up" title="No trend yet" description="Not enough data yet to show a request trend." compact />
-
-              <div v-if="hoveredPoint !== null" class="trend-tooltip"
-                :style="{ left: tooltipLeft + '%' }">
-                <span class="trend-tooltip__value">{{ chartPoints[hoveredPoint].value }} requests</span>
-                <span class="trend-tooltip__label">{{ chartPoints[hoveredPoint].label }}</span>
-              </div>
-
-              <div v-if="chartPoints.length" class="trend-labels">
-                <span v-for="pt in chartPoints" :key="pt.label">{{ pt.label }}</span>
-              </div>
-            </div>
+            <HospitalExpiringSoonChart ref="expiringSoon" />
           </SectionCard>
 
           <!-- Recent blood requests -->
@@ -149,6 +191,9 @@
 
         <!-- Right column -->
         <div class="col-right">
+          <!-- The types that would run out first at the recent rate of use (2026-11-27). -->
+          <ShortestCover v-if="can('hospital.inventory.view')" />
+
           <!-- Today's activities -->
           <SectionCard title="Today's Activities" flush>
             <SkeletonList v-if="loading" class="dash-skeleton" :rows="2" />
@@ -186,19 +231,35 @@
         </div>
       </div>
 
-      <!-- Quick actions -->
-      <section class="quick-section">
-        <h2 class="quick-section__title">Quick Actions</h2>
-        <div class="quick-grid">
-          <NuxtLink v-for="item in quickActions" :key="item.path" :to="item.path" class="quick-card">
-            <div class="quick-card__icon">
-              <AssetIcon :name="item.icon" :size="20" />
-            </div>
-            <div class="quick-card__body">
-              <p class="quick-card__title">{{ item.title }}</p>
-              <p class="quick-card__desc">{{ item.description }}</p>
-            </div>
-            <AssetIcon name="chevron-right" :size="16" class="quick-card__chevron" />
+      <!--
+        Quick actions as one panel, like the KPI panels (2026-11-26): the main
+        action filled, the others plain, split by hairlines; the arrow moves
+        on hover.
+      -->
+      <section class="qa" aria-labelledby="qa-title">
+        <header class="qa__head">
+          <h2 id="qa-title" class="qa__title">
+            <span class="qa__title-icon" aria-hidden="true"><AssetIcon name="bolt" :size="15" /></span>
+            Quick actions
+          </h2>
+          <span class="qa__note">Jump straight to the work</span>
+        </header>
+        <div class="qa__grid" :style="{ '--qa-cols': quickActions.length }">
+          <NuxtLink
+            v-for="item in quickActions"
+            :key="item.path"
+            :to="item.path"
+            class="qa-tile"
+            :class="{ 'qa-tile--primary': item.primary }"
+          >
+            <span class="qa-tile__icon" aria-hidden="true">
+              <AssetIcon :name="item.icon" :size="18" />
+            </span>
+            <span class="qa-tile__body">
+              <span class="qa-tile__title">{{ item.title }}</span>
+              <span class="qa-tile__desc">{{ item.description }}</span>
+            </span>
+            <AssetIcon name="arrow-right" :size="16" class="qa-tile__go" />
           </NuxtLink>
         </div>
       </section>
@@ -212,11 +273,12 @@ import SkeletonChart from '~/components/ui/SkeletonChart.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import NeedsYou from '~/components/common/NeedsYou.vue'
-import HospitalBloodTypeAvailability from '~/components/Hospital/BloodTypeAvailability.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
-import StatStrip from '~/components/ui/StatStrip.vue'
-import StatItem from '~/components/ui/StatItem.vue'
 import SectionCard from '~/components/ui/SectionCard.vue'
+import ShortestCover from '~/components/Hospital/ShortestCover.vue'
+import HospitalBagMovementsChart from '~/components/Hospital/BagMovementsChart.vue'
+import HospitalDashboardSummary from '~/components/Hospital/DashboardSummary.vue'
+import HospitalExpiringSoonChart from '~/components/Hospital/ExpiringSoonChart.vue'
 import StatusBadge from '~/components/ui/StatusBadge.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import { ref, computed, onMounted, nextTick } from 'vue'
@@ -242,6 +304,8 @@ const approvedCount = ref(0)
 const completedToday = ref(0)
 const untaggedCrossmatched = ref(0)
 const untaggedAssigned = ref(0)
+
+/** The dashboard's two KPI panels: patient requests, then the blood bank's shelf. */
 
 // Widgets data
 const recentRequests = ref([])
@@ -312,6 +376,8 @@ const trendPeriod = ref('weekly')
 const hoveredPoint = ref(null)
 
 const gridLines = [20, 65, 110, 155]
+// The bars' baseline in the chart's 640 × 200 drawing.
+const TREND_BASE = 192
 
 const trendSource = computed(() => {
   if (trendPeriod.value === 'weekly') return weeklyTrend.value
@@ -323,18 +389,19 @@ const chartPoints = computed(() => {
   const source = trendSource.value
   if (!source.length) return []
 
+  // A slot per period across the width, the bar in its middle (2026-11-27).
   const chartWidth = 640
-  const chartHeight = 176
-  const padX = 20
   const padTop = 16
   const values = source.map(s => s.value)
   const maxVal = Math.max(...values, 1)
-
-  const step = source.length > 1 ? (chartWidth - padX * 2) / (source.length - 1) : 0
+  const slot = chartWidth / source.length
+  const w = Math.min(44, slot * 0.6)
 
   return source.map((d, i) => ({
-    x: padX + i * step,
-    y: padTop + (chartHeight - padTop) * (1 - d.value / maxVal),
+    x: slot * (i + 0.5),
+    y: padTop + (TREND_BASE - padTop) * (1 - d.value / maxVal),
+    slot,
+    w,
     value: d.value,
     label: d.label,
   }))
@@ -383,55 +450,32 @@ const tooltipLeft = computed(() => {
   return (chartPoints.value[hoveredPoint.value].x / 640) * 100
 })
 
-function buildSmoothPath(points) {
-  if (points.length < 2) return points.length === 1 ? `M ${points[0].x} ${points[0].y}` : ''
-  let d = `M ${points[0].x} ${points[0].y}`
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? i : i - 1]
-    const p1 = points[i]
-    const p2 = points[i + 1]
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1]
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p2.x - (p3.x - p1.x) / 6
-    const cp2y = p2.y - (p3.y - p1.y) / 6
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`
-  }
-  return d
-}
-
-const linePath = computed(() => buildSmoothPath(chartPoints.value))
-
-const areaPath = computed(() => {
-  const pts = chartPoints.value
-  if (pts.length < 2) return ''
-  const base = buildSmoothPath(pts)
-  const last = pts[pts.length - 1]
-  const first = pts[0]
-  return `${base} L ${last.x} 200 L ${first.x} 200 Z`
-})
-
 // ---------- Quick actions ----------
-const quickActions = [
-  {
-    path: '/hospital/bloodrequests/newrequest',
-    icon: 'file-plus',
-    title: 'Create Blood Request',
-    description: 'Submit a new request to the Blood Center',
-  },
+// The main action first and filled; Create only for a role that may raise one,
+// as the New Request button on Patient Request.
+const quickActions = computed(() => [
+  ...(can('hospital.requests.manage')
+    ? [{
+        path: '/hospital/bloodrequests/newrequest',
+        icon: 'file-plus',
+        title: 'Create blood request',
+        description: 'Ask a blood center for a patient\'s units',
+        primary: true,
+      }]
+    : []),
   {
     path: '/hospital/bloodavailability',
     icon: 'search',
-    title: 'Search Blood Availability',
+    title: 'Search blood availability',
     description: 'See which blood centers hold what you need',
   },
   {
     path: '/hospital/trackrequests',
     icon: 'route',
-    title: 'Track Requests',
-    description: 'Follow the status of active requests',
+    title: 'Track requests',
+    description: 'Follow where an active request stands',
   },
-]
+])
 
 // Loaded on its own so the banner and the type cards do not depend on the
 // dashboard call below. Supplementary: a failure leaves neither.
@@ -496,7 +540,10 @@ async function loadDashboard() {
 onMounted(loadDashboard)
 
 // Kept alive: back here, both reload.
-onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
+// Back on the page: the figures, the shelf and the movements chart, fresh.
+const bagMovements = ref(null)
+const expiringSoon = ref(null)
+onPageReturn(() => Promise.all([loadThresholds(), loadDashboard(), bagMovements.value?.reload(), expiringSoon.value?.reload()]))
 </script>
 
 <style scoped>
@@ -534,8 +581,7 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .trend-line--animate, .trend-area--animate { animation: none !important; }
-  .trend-line--animate { stroke-dashoffset: 0; }
+  .skeleton, .trend-bar--animate { animation: none !important; }
 }
 
 .low-stock-banner:empty { display: none; }
@@ -550,6 +596,14 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
+}
+
+/* The two trend charts side by side; one alone takes the row. */
+.chart-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.chart-row > :only-child { grid-column: 1 / -1; }
+.chart-row > * { min-width: 0; }
+@media (max-width: 1100px) {
+  .chart-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Layout */
@@ -645,34 +699,16 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
   height: 176px;
   overflow: visible;
 }
-.trend-grid { stroke: var(--rb-border); stroke-width: 1; }
-.trend-area { fill: rgba(var(--rb-primary-rgb), 0.08); }
-.trend-line {
-  fill: none;
-  stroke: var(--rb-primary);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-}
-.trend-line--animate {
-  stroke-dasharray: 1400;
-  stroke-dashoffset: 1400;
-  animation: drawLine 0.9s ease forwards;
-}
-@keyframes drawLine {
-  to { stroke-dashoffset: 0; }
-}
-.trend-area--animate { animation: fadeInArea 0.9s ease forwards; }
-@keyframes fadeInArea {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.trend-dot {
-  fill: var(--rb-surface);
-  stroke: var(--rb-primary);
-  stroke-width: 2;
-  transition: r 0.15s ease;
-}
-.trend-dot--active { r: 5.5; fill: var(--rb-primary); }
+.trend-grid { stroke: var(--rb-border); stroke-width: 1; stroke-dasharray: 3 4; }
+.trend-base { stroke: var(--rb-border-strong); stroke-width: 1; }
+/* A bar per period; the hovered period lightens behind its bar. */
+.trend-hit { fill: transparent; }
+.trend-col--on .trend-hit { fill: var(--rb-surface-alt); }
+.trend-bar { fill: var(--rb-primary); transition: opacity 0.15s ease; }
+.trend-bar--zero { fill: var(--rb-border); }
+.trend-col:not(.trend-col--on) .trend-bar:not(.trend-bar--zero) { opacity: 0.88; }
+.trend-bar--animate { transform-box: fill-box; transform-origin: bottom; animation: growBar 0.6s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes growBar { from { transform: scaleY(0); } }
 
 .trend-tooltip {
   position: absolute;
@@ -694,9 +730,11 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
 .trend-tooltip__value { font-weight: 700; }
 .trend-tooltip__label { color: #CBD5E1; font-size: 10.5px; }
 
+/* A label under each bar: as many equal columns as periods. */
 .trend-labels {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(var(--trend-n, 7), minmax(0, 1fr));
+  justify-items: center;
   margin-top: 6px;
   font-size: 11px;
   color: var(--rb-text-muted);
@@ -828,64 +866,60 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
   color: var(--rb-text-muted);
 }
 
-/* Quick actions */
-.quick-section__title {
-  margin: 0 0 12px;
-  font-size: var(--rb-fs-section);
-  font-weight: 700;
-  color: var(--rb-text-primary);
+/* ── Quick actions (2026-11-26) ──
+   One panel like the KPI panels: a header, then the actions split by
+   hairlines. The main action is filled in the primary colour; the arrow
+   slides on hover, the icon chip lifts. */
+/* A heading over separate tiles with room between them (2026-11-26: joined tiles read cramped). */
+.qa { display: flex; flex-direction: column; gap: 10px; }
+.qa__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.qa__title { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.qa__title-icon {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
 }
-.quick-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+.qa__note { font-size: 12px; color: var(--rb-text-muted); }
+.qa__grid { display: grid; grid-template-columns: repeat(var(--qa-cols, 3), minmax(0, 1fr)); gap: 12px; }
+
+.qa-tile {
+  display: flex; align-items: center; gap: 14px; min-width: 0;
+  padding: 18px; color: inherit; text-decoration: none;
+  border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  background: var(--rb-surface); box-shadow: var(--rb-shadow-sm);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.quick-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  border: 1px solid var(--rb-border);
-  border-radius: var(--rb-radius-lg);
-  background: var(--rb-surface);
-  box-shadow: var(--rb-shadow-sm);
-  text-decoration: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+.qa-tile:hover { background: var(--rb-surface-hover); border-color: rgba(var(--rb-primary-rgb), 0.4); }
+.qa-tile:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.qa-tile__icon {
+  display: grid; flex-shrink: 0; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+  transition: transform 0.2s ease;
 }
-.quick-card:hover {
-  border-color: rgba(var(--rb-primary-rgb), 0.35);
-  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.18);
+.qa-tile:hover .qa-tile__icon { transform: translateY(-2px); }
+.qa-tile__body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.qa-tile__title { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.qa-tile__desc { font-size: 12.5px; line-height: 1.4; color: var(--rb-text-secondary); }
+.qa-tile__go { flex-shrink: 0; color: var(--rb-text-muted); transition: transform 0.2s ease, color 0.15s ease; }
+.qa-tile:hover .qa-tile__go { transform: translateX(3px); color: var(--rb-primary-text); }
+
+/* The main action, filled. */
+.qa-tile--primary { background: var(--rb-primary); border-color: var(--rb-primary); }
+.qa-tile--primary:hover { background: color-mix(in srgb, var(--rb-primary) 90%, #000); border-color: color-mix(in srgb, var(--rb-primary) 90%, #000); }
+.qa-tile--primary .qa-tile__icon { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
+.qa-tile--primary .qa-tile__title { color: #FFFFFF; }
+.qa-tile--primary .qa-tile__desc { color: rgba(255, 255, 255, 0.82); }
+.qa-tile--primary .qa-tile__go, .qa-tile--primary:hover .qa-tile__go { color: #FFFFFF; }
+.qa-tile--primary:focus-visible { box-shadow: var(--rb-focus-ring); }
+
+@media (prefers-reduced-motion: reduce) {
+  .qa-tile__icon, .qa-tile__go { transition: none; }
+  .qa-tile:hover .qa-tile__icon, .qa-tile:hover .qa-tile__go { transform: none; }
 }
-.quick-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.quick-card__icon {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: rgba(var(--rb-primary-rgb), 0.1);
-  color: var(--rb-primary-text);
-}
-.quick-card__body { flex: 1; min-width: 0; }
-.quick-card__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--rb-text-primary);
-}
-.quick-card__desc {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--rb-text-secondary);
-}
-.quick-card__chevron { flex-shrink: 0; color: var(--rb-text-muted); transition: color 0.15s ease; }
-.quick-card:hover .quick-card__chevron { color: var(--rb-primary-text); }
 
 /* Responsive */
 @media (max-width: 1180px) {
-  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qa__grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -899,10 +933,10 @@ onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
 }
 @media (max-width: 640px) {
   .dashboard { padding: 16px 16px 32px; }
-  .quick-grid { grid-template-columns: 1fr; }
 }
 
 .needs-you { margin-bottom: 20px; }
+
 .load-error { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: rgba(var(--rb-accent-rgb), 0.08); font-size: 13px; color: var(--rb-accent-text); }
 .dash-skeleton { padding: 18px 20px; }
 </style>

@@ -1,11 +1,6 @@
 <template>
   <div class="st-page">
     <div class="st-inner">
-      <NuxtLink to="/blood-center/billing" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Invoices
-      </NuxtLink>
-
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form', 'list'], ['table']]" />
       </div>
@@ -23,6 +18,7 @@
       <template v-else-if="statement">
         <!-- HEADER: the document, its number and where it stands -->
         <header class="doc-header">
+          <BackButton to="/blood-center/billing" label="Invoices" class="doc-back" />
           <div class="doc-heading">
             <h1 class="kicker">Invoice</h1>
             <p class="page-title" :class="{ mono: latestRevision }">{{ latestRevision?.document_number || 'Not issued yet' }}</p>
@@ -480,6 +476,7 @@
  * from the payer's reference, like card and bank transfer.
  */
 import PageSkeleton from '~/components/ui/PageSkeleton.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
@@ -1014,20 +1011,12 @@ onMounted(loadAll)
 
 /* The way back to the page above, as on the drive roster: no breadcrumb
    in any portal (project owner, 2026-11-19). */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--rb-text-primary); }
 
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+/* The way back (ui/BackButton) beside the heading, which takes the room up to the actions. */
+.doc-header > .doc-back { align-self: flex-start; margin-top: 2px; }
+.doc-header > .doc-back + * { flex: 1 1 auto; min-width: 0; margin-left: -2px; }
 .kicker { margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--rb-primary-text); }
 .page-title { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 4px 0 0; letter-spacing: -0.01em; }
 .page-title.mono { letter-spacing: 0; }

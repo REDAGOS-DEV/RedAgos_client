@@ -67,7 +67,7 @@
           <template v-else>
             <div class="setting" role="group" aria-labelledby="set-components">
               <div class="setting__head">
-                <span id="set-components" class="setting__title">Blood Components</span>
+                <span id="set-components" class="setting__title">Components <span class="setting__count">{{ config.components.length }} of {{ componentOptions.length }}</span></span>
                 <button type="button" class="select-all" :aria-pressed="allComponents" @click="toggleAll('components')">
                   <AssetIcon :name="allComponents ? 'check-circle' : 'circle'" :size="14" /> Select All
                 </button>
@@ -83,7 +83,7 @@
 
             <div class="setting" role="group" aria-labelledby="set-types">
               <div class="setting__head">
-                <span id="set-types" class="setting__title">Blood Types</span>
+                <span id="set-types" class="setting__title">Blood Types <span class="setting__count">{{ config.bloodTypes.length }} of {{ typeOptions.length }}</span></span>
                 <button type="button" class="select-all" :aria-pressed="allTypes" @click="toggleAll('bloodTypes')">
                   <AssetIcon :name="allTypes ? 'check-circle' : 'circle'" :size="14" /> Select All
                 </button>
@@ -153,8 +153,8 @@
 
         <!-- The report's own figures, from the sheets just built. -->
         <dl v-if="sheet || generating" class="figures" :aria-busy="!sheet">
-          <div v-for="figure in figures" :key="figure.label" class="figure">
-            <dt>{{ figure.label }}</dt>
+          <div v-for="figure in figures" :key="figure.label" class="figure" :class="{ 'figure--zero': sheet && !figure.value }">
+            <dt><span class="figure__dot" :style="{ background: figure.color }" aria-hidden="true" />{{ figure.label }}</dt>
             <dd>
               <span v-if="!sheet" class="sk sk--line figure__sk" />
               <template v-else>{{ figure.value }}</template>
@@ -219,6 +219,18 @@
           :aria-busy="generating"
           @scroll.passive="onCanvasScroll"
         >
+          <!-- Before any report: what to do, held in view over the blank form. -->
+          <div v-if="!sheet && !generating" class="canvas__empty">
+            <div class="canvas__empty-card">
+              <span class="canvas__empty-icon" aria-hidden="true"><AssetIcon name="file-text" :size="22" /></span>
+              <p class="canvas__empty-title">Your report appears here</p>
+              <p class="canvas__empty-text">Choose the components and blood types, then generate. Each report is kept as its PDF under Generated Reports.</p>
+              <button type="button" class="btn-primary" :disabled="!canGenerate" @click="generate">
+                <AssetIcon name="file-text" :size="15" />
+                Generate Report
+              </button>
+            </div>
+          </div>
           <article
             v-for="(page, index) in drawnPages"
             :id="`sheet-${index}`"
@@ -593,12 +605,13 @@ const rowNumbers = computed(() => sheet.value?.rows ?? BLANK_ROWS)
 const bagTotal = computed(() => (sheet.value?.totals.crossmatched ?? 0) + (sheet.value?.totals.uncrossmatched ?? 0))
 /** The day's transfusions, listed with the crossmatched bags but no longer here. */
 const transfusedTotal = computed(() => sheet.value?.totals.transfused ?? 0)
+// Each figure's dot is its colour on the form: blue waiting, green transfused, black free (2026-11-27).
 const figures = computed(() => [
-  { label: 'Bags in date', value: bagTotal.value },
-  { label: 'Crossmatched', value: sheet.value?.totals.crossmatched ?? 0 },
-  { label: 'Uncrossmatched', value: sheet.value?.totals.uncrossmatched ?? 0 },
-  { label: 'Transfused today', value: transfusedTotal.value },
-  { label: 'Pages', value: sheet.value?.sheets.length ?? 0 },
+  { label: 'Bags in date', value: bagTotal.value, color: 'var(--rb-text-muted)' },
+  { label: 'Crossmatched', value: sheet.value?.totals.crossmatched ?? 0, color: '#1565C0' },
+  { label: 'Uncrossmatched', value: sheet.value?.totals.uncrossmatched ?? 0, color: 'var(--rb-text-primary)' },
+  { label: 'Transfused today', value: transfusedTotal.value, color: '#2E7D32' },
+  { label: 'Pages', value: sheet.value?.sheets.length ?? 0, color: 'var(--rb-border-strong)' },
 ])
 
 const options = () => ({ by: config.by, components: [...config.components], bloodTypes: [...config.bloodTypes] })
@@ -832,15 +845,21 @@ function formatTime(value) {
 }
 
 /* ── Tabs ── */
-.tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--rb-border); overflow: auto hidden; }
-.tabs__tab {
-  display: inline-flex; align-items: center; gap: 8px; padding: 10px 6px; margin-right: 14px;
-  border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; white-space: nowrap;
-  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--rb-text-secondary);
+/* New Report / Generated Reports: a segmented switch, as Stock Thresholds' views (2026-11-27). */
+.tabs {
+  display: inline-flex; align-self: flex-start; gap: 4px; padding: 4px; overflow: auto hidden;
+  border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface);
 }
-.tabs__tab:hover { color: var(--rb-text-primary); }
-.tabs__tab--on { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
-.tabs__tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; border-radius: 6px; }
+.tabs__tab {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px;
+  border: 0; border-radius: 9px; background: transparent; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--rb-text-secondary);
+  transition: background-color .15s ease, color .15s ease;
+}
+.tabs__tab:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.tabs__tab--on, .tabs__tab--on:hover { background: var(--rb-primary); color: #FFFFFF; }
+.tabs__tab--on .tabs__count { background: rgba(255, 255, 255, .22); color: #FFFFFF; }
+.tabs__tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .tabs__count {
   min-width: 20px; padding: 1px 7px; border-radius: 999px; text-align: center;
   background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); font-size: 11px; font-weight: 700;
@@ -862,8 +881,10 @@ function formatTime(value) {
 
 .setting { display: flex; flex-direction: column; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--rb-border); }
 .setting:last-child { border-bottom: 0; }
-.setting__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
-.setting__title { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+.setting__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; flex-wrap: nowrap; }
+.setting__head .select-all { flex: none; white-space: nowrap; }
+.setting__title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.setting__count { flex: none; white-space: nowrap; padding: 1px 7px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 
 .select-all {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 6px; border: 0; border-radius: 7px; background: none; cursor: pointer;
@@ -937,11 +958,17 @@ function formatTime(value) {
 .viewer__stale { font-weight: 600; color: var(--rb-warning-text, #B45309); }
 .viewer__note { color: var(--rb-text-secondary); }
 
-.figures { display: flex; flex-wrap: wrap; margin: 0; border-bottom: 1px solid var(--rb-border); }
-.figure { flex: 0 0 auto; min-width: 112px; padding: 8px 18px; border-right: 1px solid var(--rb-border); }
-.figure--wide { flex: 1 1 200px; min-width: 0; border-right: 0; }
-.figure dt { font-size: 11.5px; color: var(--rb-text-secondary); }
-.figure dd { display: flex; align-items: center; min-height: 26px; margin: 2px 0 0; font-size: 19px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+/* The report's figures: separate cards with room between them (2026-11-27). */
+.figures { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--rb-border); }
+.figure {
+  flex: 0 0 auto; min-width: 128px; padding: 10px 14px;
+  border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt);
+}
+.figure--wide { flex: 1 1 220px; min-width: 0; background: transparent; border-style: dashed; }
+.figure dt { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.figure__dot { width: 8px; height: 8px; flex: none; border-radius: 999px; }
+.figure dd { display: flex; align-items: center; min-height: 28px; margin: 2px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.figure--zero dd { color: var(--rb-text-muted); }
 .figure .figure__covers { display: block; font-size: 12.5px; font-weight: 500; line-height: 1.4; }
 .figure__sk { width: 44px; }
 
@@ -987,7 +1014,19 @@ function formatTime(value) {
   padding: 32px 36px 28px;
 }
 /* The form before there is a report: plainly not filled in. */
-.paper--blank > * { opacity: 0.45; }
+.paper--blank > * { opacity: 0.3; }
+
+/* What to do before any report, held in the middle of the view as it scrolls. */
+.canvas__empty { position: sticky; top: 42%; z-index: 3; height: 0; display: flex; align-items: flex-start; justify-content: center; }
+.canvas__empty-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(380px, 100%);
+  flex: none; padding: 24px 24px 22px; transform: translateY(-50%); text-align: center;
+  border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface);
+  box-shadow: 0 20px 48px -20px rgba(15, 23, 42, 0.35);
+}
+.canvas__empty-icon { display: grid; flex: none; place-items: center; width: 48px; height: 48px; margin-bottom: 4px; border-radius: 14px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.canvas__empty-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.canvas__empty-text { margin: 0 0 6px; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .paper__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .paper__facility { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }

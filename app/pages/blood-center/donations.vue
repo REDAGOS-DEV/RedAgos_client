@@ -343,10 +343,15 @@ const COLUMN_CLASSES = ['c-id', 'c-donor', 'c-group', 'c-date', 'c-bag', 'c-appt
 // Sized, as on Donor Management, for the buttons this role can see: Continue
 // is worded (about 94px), View and Close are 30px icons, 6px apart, plus the
 // cell's padding. Never narrower than its "Actions" heading.
+// Continue and Close only show on an open visit, so their room is kept only
+// when this page lists one; a page of finished donations has just the eye.
 const actionsWidth = computed(() => {
-  const icons = 1 + (canClose.value ? 1 : 0)
-  const buttons = icons + (canStartVisit.value ? 1 : 0)
-  return Math.max(84, 34 + icons * 30 + (canStartVisit.value ? 94 : 0) + Math.max(0, buttons - 1) * 6)
+  const anyOpen = rows.value.some((row) => row.open)
+  const close = anyOpen && canClose.value
+  const cont = anyOpen && canStartVisit.value
+  const icons = 1 + (close ? 1 : 0)
+  const buttons = icons + (cont ? 1 : 0)
+  return Math.max(72, 34 + icons * 30 + (cont ? 94 : 0) + Math.max(0, buttons - 1) * 6)
 })
 
 /**
@@ -833,14 +838,17 @@ onPageReturn(() => load(pager.page))
 .don-table tbody :deep(tr[aria-hidden="true"] td) { height: 53px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
 .don-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 
-/* Widths include the cell's padding; the donor's name takes the rest. The
-   actions column is sized in the template, by the buttons the role sees. */
-.c-id { width: 140px; }
-.c-group { width: 64px; }
-.c-date { width: 156px; }
-.c-bag { width: 150px; }
-.c-appt { width: 130px; }
-.c-status { width: 150px; }
+/* Widths include the cell's padding. Each column grows with the table, with a
+   floor its longest value fits in, so the spare room spreads across all of
+   them instead of pooling after the donor's name (2026-11-26). The donor
+   takes what is left; the actions column is sized in the template. */
+.c-id { width: max(132px, 11%); }
+.c-group { width: max(76px, 8%); }
+.c-date { width: max(160px, 14%); }
+.c-bag { width: max(120px, 12%); }
+.c-appt { width: max(110px, 11%); }
+.c-status { width: max(120px, 12%); }
+.don-table thead th.c-actions { text-align: right; }
 
 /* Plain text, one line each, as on Donor Management; the donor's name may wrap. */
 .don-table tbody td.c-id,

@@ -50,6 +50,8 @@
 
           <details v-if="event.lines?.length" class="history__lines">
             <summary>Fulfilment at this point</summary>
+            <!-- Boxed and scrollable, so no figure meets the edge; zeros quiet; the status one pill (2026-11-27). -->
+            <div class="history__table">
             <table>
               <thead>
                 <tr>
@@ -64,16 +66,17 @@
               </thead>
               <tbody>
                 <tr v-for="line in event.lines" :key="line.request_item_id ?? line.transfusion_request_item_id">
-                  <td>{{ line.component ? lineName(event, line) : '—' }}</td>
-                  <td class="num">{{ line.required ?? line.requested }}</td>
-                  <td v-if="isRequirementSnapshot(event)" class="num">{{ line.approved ?? 0 }}</td>
-                  <td class="num">{{ line.fulfilled }}</td>
-                  <td class="num">{{ line.remaining }}</td>
-                  <td v-if="isRequirementSnapshot(event)" class="num">{{ line.unallocated ?? 0 }}</td>
-                  <td>{{ line.status_label || line.status }}</td>
+                  <td class="history__component">{{ line.component ? lineName(event, line) : '—' }}</td>
+                  <td class="num history__strong">{{ line.required ?? line.requested }}</td>
+                  <td v-if="isRequirementSnapshot(event)" class="num" :class="figure(line.approved)">{{ line.approved ?? 0 }}</td>
+                  <td class="num" :class="figure(line.fulfilled)">{{ line.fulfilled }}</td>
+                  <td class="num" :class="figure(line.remaining)">{{ line.remaining }}</td>
+                  <td v-if="isRequirementSnapshot(event)" class="num" :class="Number(line.unallocated) > 0 ? 'history__alert' : 'history__zero'">{{ line.unallocated ?? 0 }}</td>
+                  <td><span class="history__pill" :class="`history__pill--${lineTone(line.status)}`">{{ line.status_label || line.status }}</span></td>
                 </tr>
               </tbody>
             </table>
+            </div>
           </details>
         </div>
       </li>
@@ -82,6 +85,21 @@
 </template>
 
 <script setup>
+/** A figure above zero reads at full weight; a zero, quietly. */
+function figure(value) {
+  return Number(value) > 0 ? 'history__strong' : 'history__zero'
+}
+
+/** The line status's tone: done green, part-way purple, waiting on someone amber, else neutral. */
+function lineTone(status) {
+  const s = String(status ?? '').toLowerCase()
+  if (s.includes('fulfil') || s === 'received') return 'ok'
+  if (s.includes('partial')) return 'progress'
+  if (s.includes('alloc') || s.includes('pending') || s.includes('await')) return 'warn'
+  if (s.includes('closed') || s.includes('cancel') || s.includes('reject') || s.includes('withdraw')) return 'muted'
+  return 'info'
+}
+
 /**
  * A request's history, as the API recorded it.
  *
@@ -303,30 +321,63 @@ function formatDateTime(value) {
 }
 
 .history__lines summary {
+  width: fit-content;
   cursor: pointer;
   color: var(--rb-primary-text);
   font-weight: 600;
+  border-radius: 4px;
+}
+
+.history__lines summary:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* The snapshot: boxed, scrolling inside itself when the column is narrow. */
+.history__table {
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
 }
 
 .history__lines table {
-  margin-top: 0.4rem;
   border-collapse: collapse;
   width: 100%;
-  max-width: 34rem;
+  min-width: 30rem;
 }
 
 .history__lines th,
 .history__lines td {
-  padding: 0.3rem 0.5rem;
+  padding: 0.45rem 0.7rem;
   text-align: left;
+  white-space: nowrap;
   border-bottom: 1px solid var(--rb-border);
   color: var(--rb-text-primary);
 }
 
+.history__lines tbody tr:last-child td { border-bottom: 0; }
+
 .history__lines th {
+  background: var(--rb-surface-alt);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--rb-text-secondary);
-  font-weight: 600;
 }
+
+.history__component { font-weight: 600; }
+.history__strong { font-weight: 700; }
+.history__zero { color: var(--rb-text-muted) !important; }
+.history__alert { font-weight: 700; color: var(--rb-accent-text) !important; }
+
+.history__pill {
+  display: inline-flex; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+  font-size: 11px; font-weight: 700;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.history__pill--ok { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
+.history__pill--progress { background: rgba(var(--rb-purple-rgb, 124, 58, 237), 0.12); color: var(--rb-purple-text, #6D28D9); }
+.history__pill--warn { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
+.history__pill--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 .num {
   text-align: right !important;

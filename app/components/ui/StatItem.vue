@@ -9,7 +9,7 @@
     :type="pressable && !to ? 'button' : undefined"
     :aria-pressed="pressable && !to ? pressed : undefined"
     class="si"
-    :class="[`si--${tone}`, { 'si--alert': alert, 'si--link': to || pressable, 'si--pressable': pressable && !to, 'si--pressed': pressed }]"
+    :class="[`si--${tone}`, { 'si--alert': alert, 'si--zero': inPanel && !loading && Number(value) === 0, 'si--link': to || pressable, 'si--pressable': pressable && !to, 'si--pressed': pressed }]"
   >
     <span v-if="icon" class="si__icon" :class="`si__icon--${tone}`" aria-hidden="true">
       <AssetIcon :name="icon" :size="16" />
@@ -27,9 +27,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed, inject, type Ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const NuxtLink = resolveComponent('NuxtLink')
+
+// Inside a StatStrip panel a zero is marked, so the panel can draw it quieter.
+const stripVariant = inject<Ref<string> | null>('statStripVariant', null)
+const inPanel = computed(() => stripVariant?.value === 'panel')
 
 withDefaults(defineProps<{
   label: string

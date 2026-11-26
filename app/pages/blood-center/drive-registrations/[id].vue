@@ -1,13 +1,9 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <!-- No breadcrumbs (2026-11-19): an off-sidebar page has its own way back. -->
-      <NuxtLink to="/blood-center/drives" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Donation Drives
-      </NuxtLink>
-
+      <!-- The way back sits beside the title (2026-11-26), as the header's breadcrumb also names it. -->
       <PageHeader :title="drive?.name || 'Drive roster'">
+        <template #back><BackButton to="/blood-center/drives" label="Blood Donation Drive" /></template>
         <template #actions>
           <button
             v-if="drive?.is_drive_day && canCheckIn"
@@ -355,6 +351,7 @@
  * answer.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import BackButton from '~/components/ui/BackButton.vue'
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
@@ -634,18 +631,6 @@ onMounted(load)
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-
-.back-link:hover { color: var(--rb-text-primary); }
 
 .link-panel { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
 .link-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

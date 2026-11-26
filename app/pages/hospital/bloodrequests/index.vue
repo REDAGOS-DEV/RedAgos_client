@@ -17,8 +17,8 @@
       </PageHeader>
 
       <!-- Summary figures -->
-      <StatStrip>
-        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.pending" @click="toggleStatus(CARD_STATUSES.pending)" label="Pending requests" :value="animatedCounts.pending" icon="clock" tone="warning">
+      <StatStrip variant="panel">
+        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.pending" @click="toggleStatus(CARD_STATUSES.pending)" label="Pending" :value="animatedCounts.pending" icon="clock" tone="warning">
           <template #hint>
             Awaiting Blood Center review
             <span v-if="trends.pending.hasData" class="stat-trend" :class="trends.pending.up ? 'up' : 'down'">
@@ -38,7 +38,7 @@
         </StatItem>
         <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.ready" @click="toggleStatus(CARD_STATUSES.ready)" label="Partially fulfilled" :value="animatedCounts.ready" icon="package-check" tone="purple">
           <template #hint>
-            Some units supplied, the rest outstanding
+            Some units still to come
             <span v-if="trends.ready.hasData" class="stat-trend" :class="trends.ready.up ? 'up' : 'down'">
               <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="11" />
               {{ trends.ready.label }}
@@ -122,16 +122,18 @@
 
         <!-- What waits on this blood bank, one click away; only what has something. -->
         <div v-if="hasQuickFilters || hasActiveFilters" class="quick-filters">
+          <span v-if="hasQuickFilters" class="quick-filters__label">Waiting on you</span>
           <button
             v-if="waitingCounts.receive"
             type="button"
-            class="quick"
+            class="quick quick--action"
             :class="{ 'quick--on': filters.waiting === 'receive' }"
             :aria-pressed="filters.waiting === 'receive'"
+            title="Show only requests with units dispatched to you and not yet received"
             @click="toggleWaiting('receive')"
           >
-            <AssetIcon name="package-check" :size="14" />
-            To receive
+            <span class="quick__dot" aria-hidden="true" />
+            Awaiting receipt
             <span class="quick__count">{{ waitingCounts.receive }}</span>
           </button>
           <button
@@ -165,16 +167,16 @@
         </div>
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && allRequests.length }">
-          <table class="list-table">
+          <table class="list-table req-table">
             <caption class="sr-only">Your patient transfusion requests, open STAT requests first, then newest first</caption>
             <thead>
               <tr>
-                <th scope="col">Reference</th>
-                <th scope="col">Patient</th>
-                <th scope="col">Needed</th>
-                <th scope="col">Requested</th>
-                <th scope="col">Progress</th>
-                <th scope="col" class="c-actions">Actions</th>
+                <th scope="col" class="c-ref">Reference</th>
+                <th scope="col" class="c-patient">Patient</th>
+                <th scope="col" class="c-need">Needed</th>
+                <th scope="col" class="c-date">Requested</th>
+                <th scope="col" class="c-progress">Progress</th>
+                <th scope="col" class="c-actions" :style="{ width: `${actionsWidth}px` }">Actions</th>
               </tr>
             </thead>
 
@@ -200,20 +202,27 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="req in pageItems" :key="req.id" class="list-row list-row--link" @click="openDrawer(req)">
+              <tr v-for="req in pageItems" :key="req.id" class="list-row list-row--link" :class="{ 'list-row--stat': isOpenStat(req) }" @click="openDrawer(req)">
                 <td>
+                  <!-- One line: the number, then STAT. An open STAT also marks the row's edge. -->
                   <div class="cell">
-                    <button type="button" class="code code-btn" :title="`Quick view of ${req.reference_number}`" @click="openDrawer(req)">{{ req.reference_number }}</button>
-                    <span v-if="req.priority === 'emergency'" class="tag tag--stat">STAT</span>
-                    <span v-if="req.is_walk_in" class="tag" title="Brought to the blood center by a watcher and confirmed by your blood bank by phone">Walk-in</span>
+                    <div class="ref">
+                      <button type="button" class="code code-btn" :title="`Quick view of ${req.reference_number}`" @click="openDrawer(req)">{{ req.reference_number }}</button>
+                      <span v-if="req.priority === 'emergency'" class="tag tag--stat">STAT</span>
+                    </div>
                     <span v-if="req.needs_allocation" class="tag tag--alert" title="Some units have not been asked of any facility">{{ req.unallocated }} unallocated</span>
-                    <span v-if="req.awaiting_receipt" class="tag tag--alert" title="Dispatched by the blood center, not yet received">{{ req.awaiting_receipt }} to receive</span>
                   </div>
                 </td>
                 <td>
                   <div class="cell">
                     <span class="cell__main">{{ req.patient || 'Not recorded' }}</span>
-                    <span v-if="req.purpose" class="cell__sub">{{ req.purpose }}</span>
+                    <!-- How it came in, beside what it is for, instead of a tag under the reference. -->
+                    <span v-if="req.purpose || req.is_walk_in" class="cell__sub">
+                      {{ req.purpose }}<template v-if="req.purpose && req.is_walk_in"> · </template><span
+                        v-if="req.is_walk_in"
+                        title="Brought to the blood center by a watcher and confirmed by your blood bank by phone"
+                      >Walk-in</span>
+                    </span>
                   </div>
                 </td>
                 <td>
@@ -228,22 +237,35 @@
                 </td>
                 <td class="nowrap">{{ formatDate(req.request_date) }}</td>
                 <td>
-                  <div class="progress" :title="progressLabel(req.status)" :aria-label="`Progress: ${progressLabel(req.status)}`">
-                    <span class="badge" :class="badgeClass(statusOf(req.status).tone)">
-                      <span class="badge__dot" aria-hidden="true" />
-                      {{ req.status_text }}
+                  <!-- The step by name; the bar shows where it sits among the four. -->
+                  <div class="progress" :aria-label="`Progress: ${progressLabel(req)}. ${rowProgress(req).text}`">
+                    <span class="badge" :class="badgeClass(rowProgress(req).tone)" aria-hidden="true">
+                      <span class="badge__dot" />
+                      {{ rowProgress(req).text }}
                     </span>
-                    <span class="progress__bar" aria-hidden="true">
-                      <span
-                        v-for="(step, i) in progressSteps"
-                        :key="step"
-                        class="progress__step"
-                        :class="{
-                          'progress__step--done': stepIndex(req.status) > i || req.status === 'fulfilled',
-                          'progress__step--current': stepIndex(req.status) === i && req.status !== 'fulfilled',
-                          'progress__step--halted': isHalted(req.status)
-                        }"
-                      />
+                    <span class="progress__track">
+                      <span class="progress__bar" aria-hidden="true">
+                        <span
+                          v-for="(step, i) in progressSteps"
+                          :key="step"
+                          class="progress__step"
+                          :title="`${step}${rowStepIndex(req) > i ? ' — done' : rowStepIndex(req) === i ? ' — now' : ''}`"
+                          :class="{
+                            'progress__step--done': rowStepIndex(req) > i,
+                            'progress__step--current': rowStepIndex(req) === i && !isHalted(req.status),
+                            'progress__step--action': rowStepIndex(req) === i && req.awaiting_receipt > 0,
+                            'progress__step--halted': isHalted(req.status)
+                          }"
+                        />
+                      </span>
+                      <!-- How long it has sat at this step, so a stuck request shows. -->
+                      <time
+                        v-if="rowStepTime(req)"
+                        class="progress__time"
+                        :class="{ 'progress__time--stale': isStale(req) }"
+                        :datetime="rowStepTime(req).at"
+                        :title="`${rowStepTime(req).label} ${formatDate(rowStepTime(req).at, true)}`"
+                      >{{ sinceStep(rowStepTime(req).at) }}</time>
                     </span>
                   </div>
                 </td>
@@ -329,90 +351,112 @@
       eyebrow="Request details"
       @close="closeDrawer"
     >
+      <!-- Who, what and how urgent at a glance (2026-11-26). -->
+      <template #meta>
+        <span v-if="selectedRequest.blood_type" class="blood qv-blood">{{ selectedRequest.blood_type }}</span>
+        <span v-if="selectedRequest.priority === 'emergency'" class="tag tag--stat">STAT</span>
+        <span class="qv-patient">{{ selectedRequest.patient || 'Patient not recorded' }}</span>
+      </template>
+
       <div class="quick-view">
-          <div class="drawer__status-row">
-            <StatusBadge :tone="statusOf(selectedRequest.status).tone">{{ selectedRequest.status_text }}</StatusBadge>
-            <StatusBadge :tone="priorityOf(selectedRequest.priority).tone" :dot="false">{{ priorityOf(selectedRequest.priority).label }} Priority</StatusBadge>
-          </div>
-
-          <dl class="drawer__grid">
-            <div class="drawer__field">
-              <dt>Hospital Name</dt>
-              <dd>{{ selectedRequest.hospital_name }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>{{ selectedRequest.kind === 'transfusion' ? 'Facilities asked' : 'Blood Center' }}</dt>
-              <dd>{{ selectedRequest.centre_name || '—' }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Source</dt>
-              <dd>{{ selectedRequest.source_label }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Fulfilled</dt>
-              <dd>{{ selectedRequest.fulfilled }} of {{ selectedRequest.units }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Blood Type</dt>
-              <dd>{{ selectedRequest.blood_type }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Blood Component</dt>
-              <dd>{{ selectedRequest.component }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>{{ selectedRequest.kind === 'transfusion' ? 'Units Required' : 'Units Requested' }}</dt>
-              <dd>{{ selectedRequest.units }}</dd>
-            </div>
-            <div v-if="selectedRequest.kind === 'transfusion'" class="drawer__field">
-              <dt>Unallocated</dt>
-              <dd>{{ selectedRequest.unallocated }}</dd>
-            </div>
-            <div v-if="selectedRequest.patient" class="drawer__field">
-              <dt>Patient</dt>
-              <dd>{{ selectedRequest.patient }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Requested By</dt>
-              <dd>{{ selectedRequest.requested_by }}</dd>
-            </div>
-            <div v-if="selectedRequest.raw?.needed_by" class="drawer__field">
-              <dt>Needed by</dt>
-              <dd>{{ formatDate(new Date(selectedRequest.raw.needed_by), true) }}</dd>
-            </div>
-            <div class="drawer__field">
-              <dt>Date Submitted</dt>
-              <dd>{{ formatDate(selectedRequest.request_date, true) }}</dd>
-            </div>
-            <div v-if="selectedRequest.reason" class="drawer__field drawer__field--full">
-              <dt>Reason</dt>
-              <dd>{{ selectedRequest.reason }}</dd>
-            </div>
-          </dl>
-
-          <div class="drawer__timeline-section">
-            <h3 class="drawer__section-title">Timeline</h3>
-            <div class="v-timeline">
-              <div v-for="(step, i) in detailSteps" :key="step" class="v-timeline__row">
-                <div class="v-timeline__rail">
-                  <span class="v-timeline__dot" :class="{
-                    'v-timeline__dot--done': detailStepIndex > i || (detailStepIndex === i && !isHalted(selectedRequest.status)),
-                    'v-timeline__dot--halted': isHalted(selectedRequest.status) && i === detailStepIndex
-                  }">
-                    <AssetIcon v-if="detailStepIndex > i" name="check" :size="11" />
-                  </span>
-                  <span v-if="i !== detailSteps.length - 1" class="v-timeline__line" :class="{ 'v-timeline__line--done': detailStepIndex > i }" />
-                </div>
-                <div class="v-timeline__body">
-                  <p class="v-timeline__label" :class="{ 'v-timeline__label--muted': detailStepIndex < i }">{{ step }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Units at the door come first: this blood bank's turn. -->
+        <div v-if="!isHalted(selectedRequest.status) && selectedRequest.awaiting_receipt" class="qv-callout" role="status">
+          <AssetIcon name="truck" :size="18" />
+          <p class="qv-callout__text">
+            <strong>{{ selectedRequest.awaiting_receipt }} unit{{ selectedRequest.awaiting_receipt === 1 ? '' : 's' }} dispatched</strong>{{
+              selectedRequest.step_times?.released ? ` ${sinceStep(selectedRequest.step_times.released)}` : ''
+            }}, not yet received.
+          </p>
         </div>
 
+        <div class="drawer__status-row">
+          <StatusBadge :tone="rowProgress(selectedRequest).tone">{{ rowProgress(selectedRequest).text }}</StatusBadge>
+        </div>
+
+        <div class="drawer__timeline-section">
+          <h3 class="drawer__section-title">Progress</h3>
+          <HospitalTransfusionStepper
+            :request="{ ...selectedRequest.raw, status: selectedRequest.status }"
+            :times="selectedRequest.step_times ?? {}"
+            :now="now"
+          />
+        </div>
+
+        <div class="qv-main">
+          <!-- How much has come: received, on the way, still to come. -->
+          <div v-if="!isHalted(selectedRequest.status)" class="qv-meter">
+            <p class="qv-meter__figures">
+              <strong>{{ fulfilmentOf(selectedRequest).released }} of {{ fulfilmentOf(selectedRequest).required }}</strong> released
+              · <strong>{{ fulfilmentOf(selectedRequest).received }}</strong> received
+            </p>
+            <span class="qv-meter__bar" aria-hidden="true">
+              <span class="qv-meter__fill qv-meter__fill--received" :style="{ width: `${fulfilmentOf(selectedRequest).receivedPct}%` }" />
+              <span class="qv-meter__fill qv-meter__fill--way" :style="{ width: `${fulfilmentOf(selectedRequest).onTheWayPct}%` }" />
+            </span>
+          </div>
+
+          <section class="qv-group" aria-labelledby="qv-need">
+            <h3 id="qv-need" class="qv-group__title">Need</h3>
+            <dl class="drawer__grid">
+              <div class="drawer__field"><dt>Blood Type</dt><dd>{{ selectedRequest.blood_type || '—' }}</dd></div>
+              <div class="drawer__field"><dt>Blood Component</dt><dd>{{ selectedRequest.component }}</dd></div>
+              <div class="drawer__field">
+                <dt>{{ selectedRequest.kind === 'transfusion' ? 'Units Required' : 'Units Requested' }}</dt>
+                <dd>{{ selectedRequest.units }}</dd>
+              </div>
+              <div v-if="selectedRequest.kind === 'transfusion'" class="drawer__field">
+                <dt>Unallocated</dt>
+                <dd :class="{ 'qv-warn': selectedRequest.unallocated > 0 }">{{ selectedRequest.unallocated }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="qv-group" aria-labelledby="qv-patient">
+            <h3 id="qv-patient" class="qv-group__title">Patient</h3>
+            <dl class="drawer__grid">
+              <div class="drawer__field"><dt>Patient</dt><dd>{{ selectedRequest.patient || 'Not recorded' }}</dd></div>
+              <div class="drawer__field"><dt>Source</dt><dd>{{ selectedRequest.source_label }}</dd></div>
+              <div v-if="selectedRequest.reason" class="drawer__field drawer__field--full">
+                <dt>Reason</dt>
+                <dd>{{ selectedRequest.reason }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="qv-group" aria-labelledby="qv-request">
+            <h3 id="qv-request" class="qv-group__title">Request</h3>
+            <dl class="drawer__grid">
+              <div class="drawer__field"><dt>Hospital Name</dt><dd>{{ selectedRequest.hospital_name }}</dd></div>
+              <div class="drawer__field">
+                <dt>{{ selectedRequest.kind === 'transfusion' ? 'Facilities asked' : 'Blood Center' }}</dt>
+                <dd>{{ selectedRequest.centre_name || '—' }}</dd>
+              </div>
+              <div class="drawer__field"><dt>Requested By</dt><dd>{{ selectedRequest.requested_by || '—' }}</dd></div>
+              <div class="drawer__field"><dt>Date Submitted</dt><dd>{{ formatDate(selectedRequest.request_date, true) }}</dd></div>
+              <div v-if="selectedRequest.raw?.needed_by" class="drawer__field">
+                <dt>Needed by</dt>
+                <dd>{{ formatDate(new Date(selectedRequest.raw.needed_by), true) }}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+      </div>
+
       <template #actions>
-          <button type="button" class="ui-btn ui-btn--primary" @click="viewDetails(selectedRequest)">
+          <button
+            v-if="canReceive && selectedRequest.awaiting_receipt && !isHalted(selectedRequest.status)"
+            type="button"
+            class="ui-btn ui-btn--primary"
+            @click="receiveFrom(selectedRequest)"
+          >
+            <AssetIcon name="package-check" :size="15" /> Receive
+          </button>
+          <button
+            type="button"
+            class="ui-btn"
+            :class="{ 'ui-btn--primary': !(canReceive && selectedRequest.awaiting_receipt) }"
+            @click="viewDetails(selectedRequest)"
+          >
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
           <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="askCancel(selectedRequest)">
@@ -430,10 +474,18 @@
       @close="detailsFor = null"
     >
       <template #meta>
-        <span>{{ detailsFor.patient || 'Patient not recorded' }}</span>
-        <StatusBadge :tone="statusOf(detailsFor.status).tone">{{ detailsFor.status_text }}</StatusBadge>
+        <span v-if="detailsFor.blood_type" class="blood qv-blood">{{ detailsFor.blood_type }}</span>
+        <span v-if="detailsFor.priority === 'emergency'" class="tag tag--stat">STAT</span>
+        <span class="qv-patient">{{ detailsFor.patient || 'Patient not recorded' }}</span>
+        <StatusBadge :tone="rowProgress(detailsFor).tone">{{ rowProgress(detailsFor).text }}</StatusBadge>
       </template>
-      <HospitalTransfusionRequestDetail :request-id="detailsFor.id" embedded @changed="refresh" />
+      <HospitalTransfusionRequestDetail
+        :request-id="detailsFor.id"
+        embedded
+        :can-receive="canReceive"
+        @changed="refresh"
+        @receive="receiveFrom(detailsFor)"
+      />
     </CenterModal>
 
     <HospitalTransfusionTrackDialog
@@ -469,6 +521,8 @@ import SelectField from '~/components/common/SelectField.vue'
 import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn } from '~/composables/useKeptAlive'
+import HospitalTransfusionStepper from '~/components/Hospital/TransfusionStepper.vue'
+import { TRANSFUSION_STEPS, isHaltedStatus, sinceShort, transfusionStepIndex } from '~/utils/transfusionSteps'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view', keepalive: true })
 
@@ -528,30 +582,102 @@ function priorityOf(priority) {
   return priorityMap[priority] ?? priorityMap.routine
 }
 
-// Fulfilment is counted at dispatch: released units move a request to
-// Partially Fulfilled, and every requested unit released makes it Fulfilled.
-const progressSteps = ['Submitted', 'Units tagged', 'Partially fulfilled', 'Fulfilled']
-const detailSteps = ['Submitted', 'Reviewed', 'Units tagged', 'Units released', 'Fulfilled']
+// The four steps, shared with the quick view and full details (utils/transfusionSteps).
+const progressSteps = TRANSFUSION_STEPS
+const isHalted = isHaltedStatus
+/** The step a row is on; progressSteps.length once nothing is left to do. */
+function rowStepIndex(req) {
+  // The row's own status: a cancel shows at once, before the server answers.
+  return transfusionStepIndex({ ...req.raw, status: req.status })
+}
+function progressLabel(req) {
+  if (isHalted(req.status)) return statusOf(req.status).label
+  const i = rowStepIndex(req)
+  return i >= progressSteps.length ? 'Complete' : `Step ${i + 1} of ${progressSteps.length}, ${progressSteps[i]}`
+}
+/**
+ * When the row reached the step it is on (step_times, from the list API), or
+ * when it finished or stopped. Awaiting receipt dates from the release.
+ */
+function rowStepTime(req) {
+  const times = req.step_times ?? {}
+  const pick = (label, at) => (at ? { label, at } : null)
+  if (req.status === 'cancelled') return pick('Cancelled', req.raw?.cancelled_at)
+  if (req.status === 'rejected') return pick('Rejected', req.raw?.closed_at)
+  const i = rowStepIndex(req)
+  if (i >= progressSteps.length) return pick('Completed', times.received ?? req.raw?.fulfilled_at ?? req.raw?.closed_at)
+  if (i >= 2) return pick('Released', times.released)
+  if (i === 1) return pick('Approved', times.approved)
+  // Still at Submitted: the Requested column already says when.
+  return null
+}
 
-function stepIndex(status) {
-  return { pending: 0, processing: 1, partial: 2, fulfilled: 3, rejected: 0, cancelled: 0 }[status] ?? 0
+/** How long ago, as a span: a date would only repeat the Requested column. */
+function sinceStep(iso) {
+  return sinceShort(iso, now.value)
 }
-function isHalted(status) {
-  return status === 'rejected' || status === 'cancelled'
+
+// Sitting at one step this long reads amber: a STAT after two hours, else a day.
+const STALE_MS = { emergency: 2 * 60 * 60 * 1000, routine: 24 * 60 * 60 * 1000 }
+function isStale(req) {
+  const t = rowStepTime(req)
+  if (!t || isHalted(req.status) || rowStepIndex(req) >= progressSteps.length) return false
+  return now.value - new Date(t.at).getTime() > (STALE_MS[req.priority] ?? STALE_MS.routine)
 }
-function progressLabel(status) {
-  if (isHalted(status)) return statusOf(status).label
-  return progressSteps[stepIndex(status)]
+
+// "5 min ago" moves on while the page is open.
+const now = ref(Date.now())
+let clock = null
+function startClock() {
+  now.value = Date.now()
+  clock ??= setInterval(() => { now.value = Date.now() }, 60_000)
 }
+function stopClock() {
+  clearInterval(clock)
+  clock = null
+}
+
+/** The row's status by name: what happened, or what this blood bank still has to do. */
+function rowProgress(req) {
+  if (!isHalted(req.status) && req.awaiting_receipt > 0) {
+    return { text: `Dispatched · ${req.awaiting_receipt} to receive`, tone: 'warning' }
+  }
+  if (req.status === 'processing') {
+    const approved = req.raw?.totals?.approved ?? 0
+    return { text: `Approved · ${approved} of ${req.units} unit${req.units === 1 ? '' : 's'}`, tone: statusOf(req.status).tone }
+  }
+  return { text: req.status_text, tone: statusOf(req.status).tone }
+}
+/**
+ * The actions column, as wide as the busiest row on this page (2026-11-26):
+ * three icons always, Receive and Cancel only where a row shows them, so no
+ * room is kept for a button no row has.
+ */
+const actionsWidth = computed(() => Math.max(...pageItems.value.map((req) => {
+  const receive = canReceive.value && req.awaiting_receipt > 0
+  const icons = 3 + (canCancel(req) ? 1 : 0)
+  const buttons = icons + (receive ? 1 : 0)
+  return 26 + icons * 32 + (receive ? 104 : 0) + (buttons - 1) * 6
+}), 140))
+
 function canCancel(req) {
   return req.kind === 'transfusion' ? canCancelTransfusion(req.raw) : req.status === 'pending'
 }
 
-const detailStepIndex = computed(() => {
-  if (!selectedRequest.value) return 0
-  const map = { pending: 1, processing: 3, partial: 4, fulfilled: 5, rejected: 1, cancelled: 1 }
-  return (map[selectedRequest.value.status] ?? 1) - 1
-})
+/** The quick view's fulfilment meter: received, on the way, and the rest of what is required. */
+function fulfilmentOf(req) {
+  const t = req.raw?.totals ?? {}
+  const required = Math.max(t.required ?? 0, 1)
+  const received = t.received ?? 0
+  const onTheWay = Math.max(0, (t.fulfilled ?? 0) - received)
+  return {
+    required: t.required ?? 0,
+    released: t.fulfilled ?? 0,
+    received,
+    receivedPct: (received / required) * 100,
+    onTheWayPct: (onTheWay / required) * 100,
+  }
+}
 
 // ---------- Live data ----------
 const allRequests = ref([])
@@ -582,6 +708,7 @@ function normalizeTransfusion(r) {
     priority: r.urgency_level ?? 'routine',
     status: r.status,
     request_date: r.request_date ? new Date(r.request_date) : null,
+    step_times: r.step_times ?? null,
     requested_by: r.requester_name
       ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : (r.recorder_name ? `Added by ${r.target_facility?.name ?? 'the blood center'}` : '')),
     reason: r.cancellation_reason ?? '',
@@ -744,6 +871,12 @@ function openDrawer(req) {
 function closeDrawer() {
   drawerOpen.value = false
 }
+/** Receive from a dialog: the dialog gives way to ReceiveDeliveryDialog. */
+function receiveFrom(req) {
+  drawerOpen.value = false
+  detailsFor.value = null
+  receiving.value = req
+}
 
 // ---------- Row / global actions ----------
 function openNewRequest() {
@@ -872,15 +1005,23 @@ async function loadRequests({ quiet = false } = {}) {
 onMounted(() => {
   loadRequests()
   window.addEventListener('keydown', handleGlobalKeydown)
+  startClock()
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  stopClock()
 })
 
-// Kept alive: away, Escape belongs to the page on screen; back, the list
-// reloads in place.
-onDeactivated(() => window.removeEventListener('keydown', handleGlobalKeydown))
-onActivated(() => window.addEventListener('keydown', handleGlobalKeydown))
+// Kept alive: away, Escape belongs to the page on screen and the clock
+// stops; back, the list reloads in place.
+onDeactivated(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  stopClock()
+})
+onActivated(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+  startClock()
+})
 onPageReturn(refresh)
 </script>
 
@@ -970,20 +1111,6 @@ onPageReturn(refresh)
 .drawer__field dd { font-size: 14px; font-weight: 500; color: var(--text-primary); margin: 0; line-height: 1.45; }
 
 .drawer__section-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 14px; }
-.v-timeline { display: flex; flex-direction: column; }
-.v-timeline__row { display: flex; gap: 12px; }
-.v-timeline__rail { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
-.v-timeline__dot {
-  width: 20px; height: 20px; border-radius: 999px; background: var(--rb-border-strong); color: #fff;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.v-timeline__dot--done { background: var(--success); }
-.v-timeline__dot--halted { background: var(--danger); }
-.v-timeline__line { flex: 1; width: 2px; background: var(--border); margin: 2px 0; min-height: 22px; }
-.v-timeline__line--done { background: var(--success); }
-.v-timeline__body { padding-bottom: 18px; display: flex; align-items: center; }
-.v-timeline__label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.v-timeline__label--muted { color: var(--text-muted); font-weight: 500; }
 
 
 
@@ -1032,20 +1159,60 @@ onPageReturn(refresh)
 .quick__count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 11.5px; font-weight: 700; text-align: center; color: var(--rb-text-primary); }
 .quick--on { border-color: rgba(var(--rb-primary-rgb), 0.55); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
 .quick--on .quick__count { background: var(--rb-primary); color: #FFFFFF; }
+.quick-filters__label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-muted); }
+/* Units at the door: the same amber as "Dispatched" in the Progress column. */
+.quick__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--rb-warning); flex-shrink: 0; }
+.quick--action .quick__count { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
+.quick--action:hover { border-color: rgba(var(--rb-warning-rgb), 0.55); }
+.quick--action.quick--on { border-color: rgba(var(--rb-warning-rgb), 0.6); background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); }
+.quick--action.quick--on .quick__count { background: var(--rb-warning); color: #FFFFFF; }
 .quick--stat { color: var(--rb-accent-text); }
 .quick--stat.quick--on { border-color: rgba(var(--rb-accent-rgb), 0.55); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 .quick--stat.quick--on .quick__count { background: var(--rb-accent); }
 .quick-clear { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
 
+/* Column widths (2026-11-26): each a share of the table with a floor its
+   content fits in, so spare room spreads across the row instead of pooling
+   before the actions; the patient takes what is left. */
+.req-table { table-layout: fixed; }
+.req-table .c-ref { width: max(150px, 13%); }
+.req-table .c-need { width: max(200px, 19%); }
+.req-table .c-date { width: max(120px, 11%); }
+.req-table .c-progress { width: max(250px, 23%); }
+.req-table tbody td { overflow: hidden; }
+
 /* The row: who, what, how far. */
-.tag--stat { border-color: transparent; background: var(--rb-accent); font-weight: 700; color: #FFFFFF; }
+.tag--stat { margin: 0; border-color: transparent; background: var(--rb-accent); font-weight: 700; color: #FFFFFF; }
+.ref { display: flex; align-items: center; gap: 6px; }
+.ref .code-btn { align-self: auto; }
+/* An open STAT: a red edge on the row, seen while scanning without a taller row. */
+.list-row--stat td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+
 .need { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* One width for every type, so the component names line up down the column. */
+.need .blood {
+  flex-shrink: 0;
+  width: 42px;
+  min-width: 0;
+  padding: 2px 0;
+  border-color: rgba(var(--rb-accent-rgb), 0.35);
+  background: rgba(var(--rb-accent-rgb), 0.07);
+  color: var(--rb-accent-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.need > .muted { width: 42px; flex-shrink: 0; text-align: center; }
+
 .progress { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.progress__track { display: inline-flex; align-items: center; gap: 8px; }
 .progress__bar { display: grid; grid-template-columns: repeat(4, 22px); gap: 3px; }
-.progress__step { height: 4px; border-radius: 999px; background: var(--rb-border); }
-.progress__step--done { background: var(--rb-success); }
-.progress__step--current { background: var(--rb-primary); }
-.progress__step--halted { background: var(--rb-border-hover); }
+.progress__time { font-size: 11px; color: var(--rb-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.progress__time--stale { font-weight: 600; color: var(--rb-warning-text); }
+.progress__step { height: 4px; border-radius: 999px; background-color: var(--rb-border); }
+.progress__step--done { background-color: var(--rb-success); }
+.progress__step--current { background-color: var(--rb-primary); }
+.progress__step--action { background-color: var(--rb-warning); }
+.progress__step--halted { background-color: var(--rb-border-hover); }
 
 /* Quick view: its fields beside its timeline. */
 /* The dialog sits on the body, outside .requests-page and the tokens it sets. */
@@ -1060,11 +1227,40 @@ onPageReturn(refresh)
   --success: var(--rb-success);
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 28px;
 }
-.quick-view .drawer__status-row { grid-column: 1 / -1; }
-.quick-view .drawer__grid { grid-column: 2; grid-row: 2; }
-.quick-view .drawer__timeline-section { grid-column: 1; grid-row: 2; padding-right: 24px; border-right: 1px solid var(--rb-border); }
+.quick-view .qv-callout, .quick-view .drawer__status-row { grid-column: 1 / -1; }
+.quick-view .drawer__timeline-section { grid-column: 1; min-width: 190px; padding-right: 24px; border-right: 1px solid var(--rb-border); }
+.quick-view .qv-main { grid-column: 2; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 @media (max-width: 640px) {
   .quick-view { grid-template-columns: minmax(0, 1fr); }
-  .quick-view .drawer__grid, .quick-view .drawer__timeline-section { grid-column: 1; grid-row: auto; border-right: 0; padding-right: 0; }
+  .quick-view .qv-main, .quick-view .drawer__timeline-section { grid-column: 1; border-right: 0; padding-right: 0; }
 }
+
+/* Header: type, STAT and patient beside the reference. */
+.qv-blood { width: 42px; min-width: 0; padding: 2px 0; border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.07); color: var(--rb-accent-text); }
+.qv-patient { font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); }
+
+/* Amber: units at the door, the same tone as "Dispatched" in the list. */
+.qv-callout {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: 10px;
+  border: 1px solid rgba(var(--rb-warning-rgb), 0.4);
+  background: rgba(var(--rb-warning-rgb), 0.1);
+  color: var(--rb-warning-text);
+}
+.qv-callout__text { margin: 0; font-size: 13px; line-height: 1.45; }
+
+.qv-meter { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-radius: 10px; background: var(--rb-surface-alt); }
+.qv-meter__figures { margin: 0; font-size: 13px; color: var(--rb-text-secondary); }
+.qv-meter__figures strong { color: var(--rb-text-primary); }
+.qv-meter__bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--rb-border); }
+.qv-meter__fill { height: 100%; transition: width 0.3s ease; }
+.qv-meter__fill--received { background: var(--rb-success); }
+.qv-meter__fill--way { background: var(--rb-warning); }
+
+.qv-group { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--rb-border); }
+.qv-group__title { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-text-muted); }
+.qv-group .drawer__grid { gap: 12px 16px; }
+.qv-group .drawer__field dt { font-size: 11.5px; font-weight: 500; color: var(--rb-text-muted); }
+.qv-warn { color: var(--rb-warning-text) !important; font-weight: 700 !important; }
+@media (prefers-reduced-motion: reduce) { .qv-meter__fill { transition: none; } }
 </style>

@@ -27,27 +27,31 @@
         <button type="button" class="btn-link" @click="loadNotifications(page)">Retry</button>
       </div>
 
-      <section class="panel" aria-labelledby="inbox-title">
-        <h2 id="inbox-title" class="sr-only">Your notifications</h2>
+      <!--
+        Laid out as the blood centre's Notifications page (project owner,
+        2026-11-27): the kinds as one tab bar, "Unread only" as a switch, and
+        every notification in one card, grouped by day.
+      -->
+      <div class="nt__bar">
+        <div class="nt__tabs" role="tablist" aria-label="Show">
+          <button
+            v-for="option in TABS"
+            :key="option.key"
+            type="button"
+            role="tab"
+            class="nt__tab"
+            :class="{ 'nt__tab--on': tab === option.key }"
+            :aria-selected="tab === option.key"
+            @click="chooseTab(option.key)"
+          >
+            <AssetIcon :name="option.icon" :size="14" />
+            {{ option.label }}
+          </button>
+        </div>
 
-        <!-- The tabs are the server's filters, so they reach every page; the search reads the page shown. -->
-        <div class="inbox-bar">
-          <div class="inbox-tabs" role="group" aria-label="Show">
-            <button
-              v-for="option in TABS"
-              :key="option.key"
-              type="button"
-              class="inbox-tab"
-              :class="{ 'inbox-tab--on': tab === option.key }"
-              :aria-pressed="tab === option.key"
-              @click="chooseTab(option.key)"
-            >
-              {{ option.label }}
-              <span v-if="option.key === 'unread' && unreadCount" class="inbox-tab__count">{{ unreadCount }}</span>
-            </button>
-          </div>
-
-          <label class="search inbox-search">
+        <div class="nt__tools">
+          <!-- The search reads the page shown. -->
+          <label class="search nt__search">
             <AssetIcon name="search" :size="15" class="search__icon" />
             <input
               v-model="searchQuery"
@@ -57,36 +61,53 @@
               aria-label="Search the notifications on this page"
             >
           </label>
+          <label class="nt__unread">
+            <input v-model="unreadOnly" type="checkbox" class="nt__switch" @change="loadNotifications()">
+            Unread only
+            <span v-if="unreadCount" class="nt__count-pill">{{ unreadCount }}</span>
+          </label>
         </div>
+      </div>
+
+      <section class="nt__card" aria-labelledby="inbox-title">
+        <h2 id="inbox-title" class="sr-only">Your notifications</h2>
 
         <!-- Loading: what this browser last saw here, rows or the empty message. -->
         <div v-if="isLoading && !notifications.length && skeletonRows" aria-busy="true">
-          <p class="inbox-group__head"><span class="sk sk--line" style="width: 64px" /></p>
+          <p class="nt__group-label"><span class="sk sk--line" style="width: 64px" /></p>
           <NotificationRow v-for="n in skeletonRows" :key="n" skeleton />
         </div>
-        <div v-else-if="isLoading && !notifications.length" class="empty-state inbox-empty-sk" aria-busy="true">
-          <span class="sk empty-state__icon" />
+        <div v-else-if="isLoading && !notifications.length" class="nt__empty" aria-busy="true">
+          <span class="sk nt__empty-icon" />
           <span class="sk sk--line" style="width: 150px" />
           <span class="sk sk--line" style="width: min(360px, 80%)" />
         </div>
 
-        <div v-else-if="!shown.length" class="empty-state">
-          <span class="empty-state__icon"><AssetIcon :name="hasActiveFilters ? 'search-x' : 'bell'" :size="20" /></span>
-          <p class="empty-state__title">{{ hasActiveFilters ? 'No notifications match' : 'You\'re all caught up' }}</p>
-          <p class="empty-state__text">
-            {{ hasActiveFilters ? 'Try another search, or clear the filters.' : 'No notifications at the moment. Everything is up to date.' }}
+        <div v-else-if="!shown.length" class="nt__empty">
+          <span class="nt__empty-icon" aria-hidden="true"><AssetIcon :name="hasActiveFilters ? 'search-x' : 'check-check'" :size="24" /></span>
+          <h3 class="nt__empty-title">{{ hasActiveFilters ? (unreadOnly && !searchQuery.trim() ? 'Nothing unread' : 'No notifications match') : 'You\'re all caught up' }}</h3>
+          <p class="nt__empty-text">
+            {{ hasActiveFilters ? 'Try another kind or search, or show read ones too.' : 'No notifications at the moment. Everything is up to date.' }}
           </p>
-          <button v-if="hasActiveFilters" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
+          <button v-if="hasActiveFilters" type="button" class="ui-btn" @click="resetFilters">Clear filters</button>
         </div>
 
-        <div v-else :class="{ 'inbox--busy': isLoading }">
-          <section v-for="group in groups" :key="group.key" class="inbox-group" :aria-label="group.label">
-            <h3 class="inbox-group__head" :class="{ 'inbox-group__head--action': group.key === 'action' }">{{ group.label }}</h3>
-            <NotificationRow v-for="n in group.items" :key="n.id" :item="n" @open="openNotification" @read="markRead" />
-          </section>
-        </div>
+        <template v-else>
+          <div :class="{ 'nt--busy': isLoading }">
+            <div v-for="group in groups" :key="group.key" class="nt__group">
+              <p class="nt__group-label" :class="{ 'nt__group-label--urgent': group.key === 'action' }">{{ group.label }}</p>
+              <ul class="nt__list">
+                <li v-for="n in group.items" :key="n.id">
+                  <NotificationRow :item="n" @open="openNotification" @read="markRead" />
+                </li>
+              </ul>
+            </div>
+          </div>
 
-        <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" :busy="isLoading" @go="loadNotifications" />
+          <footer class="nt__foot">
+            <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" :busy="isLoading" @go="loadNotifications" />
+          </footer>
+        </template>
       </section>
     </div>
   </div>
@@ -123,12 +144,14 @@ const updatedAt = ref(null)
 // The server's category names, sent as its `category` filter. Only what is
 // sent to a hospital account has a tab (project owner, 2026-11-02).
 const CATEGORY_TABS = [
-  { key: 'request', label: 'Blood Requests' },
-  { key: 'inventory', label: 'Stock Alerts' },
+  { key: 'request', label: 'Blood Requests', icon: 'clipboard-list' },
+  { key: 'inventory', label: 'Stock Alerts', icon: 'package' },
 ]
-const TABS = [{ key: 'all', label: 'All' }, { key: 'unread', label: 'Unread' }, ...CATEGORY_TABS]
+const TABS = [{ key: 'all', label: 'All', icon: 'bell' }, ...CATEGORY_TABS]
 
 const tab = ref('all')
+// Unread only: a switch beside the kinds, as on the blood centre's page (2026-11-27).
+const unreadOnly = ref(false)
 
 function chooseTab(key) {
   tab.value = key
@@ -149,11 +172,12 @@ const to = computed(() => Math.min(page.value * meta.value.per_page, total.value
 // ======================= SEARCH =======================
 const searchQuery = ref('')
 
-const hasActiveFilters = computed(() => Boolean(tab.value !== 'all' || searchQuery.value.trim()))
+const hasActiveFilters = computed(() => Boolean(tab.value !== 'all' || unreadOnly.value || searchQuery.value.trim()))
 
 function resetFilters() {
   searchQuery.value = ''
   tab.value = 'all'
+  unreadOnly.value = false
   loadNotifications()
 }
 
@@ -243,19 +267,19 @@ async function loadNotifications(target = 1) {
   isLoading.value = true
   loadError.value = ''
   // A new tab's rows are not this one's: back to the skeleton, not the old list.
-  if (target === 1 && meta.value.page === 1 && tabLoaded !== tab.value) notifications.value = []
+  if (target === 1 && meta.value.page === 1 && tabLoaded !== filterKey()) notifications.value = []
   try {
     const res = await hospitalService.listNotifications({
       page: target,
       per_page: 20,
       category: CATEGORY_TABS.some((option) => option.key === tab.value) ? tab.value : undefined,
-      read: tab.value === 'unread' ? false : undefined,
+      read: unreadOnly.value ? false : undefined,
     })
     notifications.value = (res?.notifications ?? []).map(normalizeHospitalNotification)
     meta.value = { page: 1, per_page: 20, total: 0, last_page: 1, ...(res?.meta ?? {}) }
     updatedAt.value = new Date()
-    tabLoaded = tab.value
-    if (tab.value === 'all' && target === 1) rememberShape()
+    tabLoaded = filterKey()
+    if (tab.value === 'all' && !unreadOnly.value && target === 1) rememberShape()
     if (typeof res?.unread_count === 'number') {
       unreadCount.value = res.unread_count
       sharedUnread.set(res.unread_count)
@@ -268,7 +292,9 @@ async function loadNotifications(target = 1) {
   }
 }
 
-let tabLoaded = 'all'
+// What the rows on screen were loaded for: the kind and the switch.
+const filterKey = () => `${tab.value}:${unreadOnly.value}`
+let tabLoaded = 'all:false'
 
 onMounted(() => {
   readShape()
@@ -283,28 +309,40 @@ onPageReturn(() => loadNotifications(meta.value.page))
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-.inbox-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 18px; }
-.inbox-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.inbox-tab {
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px;
-  border: 1px solid var(--rb-border-strong); border-radius: 999px; background: var(--rb-surface); cursor: pointer;
-  color: var(--rb-text-secondary); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
-}
-.inbox-tab:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-text-primary); }
-.inbox-tab--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
-.inbox-tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.inbox-tab__count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--rb-primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
-.inbox-search { flex: 0 1 300px; }
+/* The blood centre's Notifications page, for the blood bank (2026-11-27). */
+.nt__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.nt__tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface); }
+.nt__tab { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; }
+.nt__tab:hover:not(.nt__tab--on) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.nt__tab--on { background: var(--rb-primary); color: #fff; }
+.nt__tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.nt__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.nt__search { width: 260px; }
+.nt__unread { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; white-space: nowrap; }
+.nt__switch { position: relative; width: 34px; height: 20px; margin: 0; border-radius: 999px; background: var(--rb-border-strong); appearance: none; cursor: pointer; transition: background-color 0.15s ease; }
+.nt__switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s ease; }
+.nt__switch:checked { background: var(--rb-primary); }
+.nt__switch:checked::after { transform: translateX(14px); }
+.nt__switch:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.nt__count-pill { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--rb-primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 
-.inbox--busy { opacity: 0.6; transition: opacity 0.15s ease; }
-.inbox-group__head {
-  display: flex; align-items: center; min-height: 34px; margin: 0; padding: 0 18px; border-top: 1px solid var(--rb-border);
-  background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; color: var(--rb-text-secondary);
+.nt__card { padding: 8px 10px; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface); }
+.nt__group-label { margin: 12px 12px 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rb-text-muted); }
+.nt__group-label--urgent { color: var(--rb-accent-text); }
+.nt__list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.nt__foot { margin-top: 8px; padding-top: 4px; border-top: 1px solid var(--rb-border); }
+.nt--busy { opacity: 0.6; transition: opacity 0.15s ease; }
+
+.nt__empty { display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 231px; justify-content: center; padding: 48px 24px; text-align: center; }
+.nt__empty-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); box-shadow: 0 0 0 6px rgba(var(--rb-success-rgb), 0.05); }
+.nt__empty-title { margin: 6px 0 0; font-size: 17px; font-weight: 800; }
+.nt__empty-text { max-width: 460px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nt__switch, .nt__switch::after { transition: none; }
 }
-.inbox-group__head--action { color: var(--rb-accent-text); }
-.inbox-empty-sk { gap: 10px; min-height: 231px; }
 
 @media (max-width: 640px) {
-  .inbox-search { flex: 1 1 100%; }
+  .nt__search { width: 100%; }
 }
 </style>

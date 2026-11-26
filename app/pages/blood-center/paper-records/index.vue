@@ -1,13 +1,11 @@
 <template>
   <div class="paper-page">
     <div class="paper-inner">
-      <NuxtLink to="/blood-center/donations" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Donations
-      </NuxtLink>
-
       <header class="header-row">
-        <h1 class="page-title">Paper Records</h1>
+        <div class="title-lead">
+          <BackButton to="/blood-center/donations" label="Donations" />
+          <h1 class="page-title">Paper Records</h1>
+        </div>
         <button type="button" class="btn-primary" @click="openNewSheet()">
           <AssetIcon name="plus" :size="15" />
           New sheet
@@ -257,6 +255,7 @@
 
 <script setup>
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -513,17 +512,6 @@ onPageReturn(async () => {
 
 /* The way back to the page above, as on the drive roster: no breadcrumb
    in any portal (project owner, 2026-11-19). */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--rb-text-primary); }
 
 .sr-only {
   position: absolute;
@@ -559,6 +547,8 @@ onPageReturn(async () => {
 
 /* ---------- Header and buttons ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+/* The way back (ui/BackButton) beside the title. */
+.title-lead { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 
 .btn-primary,

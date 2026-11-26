@@ -2,25 +2,26 @@
   <div class="ptr-page" :class="{ 'ptr-page--embedded': embedded }">
     <div class="ptr-inner">
       <header v-if="!embedded" class="page-header">
-        <NuxtLink to="/hospital/bloodrequests" class="back-link back-link--narrow">
-          <AssetIcon name="arrow-left" :size="14" />
-          Back to Patient Request
-        </NuxtLink>
-
         <div v-if="request" class="page-header__row">
-          <div>
-            <p class="eyebrow">Blood Request</p>
-            <h1 class="page-title mono">{{ request.reference_number }}</h1>
-            <p class="page-subtitle">
-              {{ request.patient?.full_name || '—' }}
-              · {{ request.blood_type?.code || '—' }}
-              · <span :class="{ 'stat': request.is_emergency }">{{ PRIORITY_LABELS[request.urgency_level] || request.urgency_label }}</span>
-              · {{ request.source_label }}
-            </p>
+          <div class="title-lead">
+            <BackButton to="/hospital/bloodrequests" label="Patient Request" />
+            <div>
+              <p class="eyebrow">Blood Request</p>
+              <h1 class="page-title mono">{{ request.reference_number }}</h1>
+              <p class="page-subtitle">
+                {{ request.patient?.full_name || '—' }}
+                · {{ request.blood_type?.code || '—' }}
+                · <span :class="{ 'stat': request.is_emergency }">{{ PRIORITY_LABELS[request.urgency_level] || request.urgency_label }}</span>
+                · {{ request.source_label }}
+              </p>
+            </div>
           </div>
           <span class="status-chip" :class="`tone--${statusTone}`">{{ transfusionProgressLabel(request) }}</span>
         </div>
-        <h1 v-else class="page-title">Blood Request</h1>
+        <div v-else class="title-lead">
+          <BackButton to="/hospital/bloodrequests" label="Patient Request" />
+          <h1 class="page-title">Blood Request</h1>
+        </div>
       </header>
 
       <PageSkeleton v-if="loading" :sections="[['table'], ['list', 'list']]" :columns="8" :rows="3" />
@@ -36,10 +37,24 @@
           <span>{{ actionError }}</span>
         </div>
 
+        <!-- UNITS AT THE DOOR: this blood bank's turn, so it comes first (2026-11-26). -->
+        <div v-if="awaiting > 0 && !isHaltedStatus(request.status)" class="callout callout--action" role="status">
+          <span class="callout__icon"><AssetIcon name="truck" :size="17" /></span>
+          <p class="callout__text">
+            <strong>{{ awaiting }} unit{{ awaiting === 1 ? '' : 's' }} dispatched</strong>{{
+              stepTimes.released ? ` ${sinceShort(stepTimes.released)}` : ''
+            }}, not yet received. Receive {{ awaiting === 1 ? 'it' : 'them' }} into your blood bank.
+          </p>
+          <button v-if="embedded && canReceive" type="button" class="ui-btn ui-btn--primary" @click="emit('receive')">
+            <AssetIcon name="package-check" :size="15" />
+            Receive
+          </button>
+        </div>
+
         <!-- UNITS ASKED OF NOBODY -->
         <section v-if="request.is_open && request.needs_allocation" class="panel panel--attention">
           <div class="attention">
-            <AssetIcon name="circle-alert" :size="18" />
+            <span class="attention__icon"><AssetIcon name="circle-alert" :size="18" /></span>
             <div class="attention__text">
               <h2 class="panel-title">
                 {{ request.totals.unallocated }} unit{{ request.totals.unallocated === 1 ? '' : 's' }} still unallocated
@@ -87,7 +102,7 @@
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">What the patient needs</h2>
+              <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="droplets" :size="15" /></span>What the patient needs</h2>
               <p class="panel-hint">
                 {{ request.totals.required }} required · {{ request.totals.approved }} approved ·
                 {{ request.totals.remaining }} remaining
@@ -110,7 +125,7 @@
 
         <!-- ALLOCATIONS -->
         <section class="panel">
-          <h2 class="panel-title">Facility allocations</h2>
+          <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="building-2" :size="15" /></span>Facility allocations</h2>
           <p class="panel-hint">
             Each facility reviews its own share. Approving tags units for this patient; a rejected or withdrawn share
             returns its units to unallocated.
@@ -133,7 +148,7 @@
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Bags in your blood bank</h2>
+              <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="package" :size="15" /></span>Bags in your blood bank</h2>
               <p class="panel-hint">
                 Bags received for this patient, and bags from your own stock tagged to them. Tag, crossmatch and
                 transfuse them from Blood Bank Inventory.
@@ -165,7 +180,7 @@
 
         <!-- WALK-IN -->
         <section v-if="request.walk_in" class="panel">
-          <h2 class="panel-title">Walk-in</h2>
+          <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="user" :size="15" /></span>Walk-in</h2>
           <WalkInDetailsCard
             :walk-in="request.walk_in"
             :centre-name="walkInCentre"
@@ -176,7 +191,12 @@
         <div class="ptr-split">
         <!-- DETAILS -->
         <section class="panel">
-          <h2 class="panel-title">Details</h2>
+          <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="file-text" :size="15" /></span>Details</h2>
+          <!-- The four steps, as the list row and the quick view show them. -->
+          <div class="progress-block">
+            <h3 class="sub-title">Progress</h3>
+            <TransfusionStepper :request="request" :times="stepTimes" />
+          </div>
           <dl class="details">
             <div><dt>Requested</dt><dd>{{ formatDateTime(request.request_date) }}</dd></div>
             <div v-if="request.needed_by"><dt>Needed by</dt><dd>{{ formatDateTime(request.needed_by) }}</dd></div>
@@ -191,7 +211,7 @@
 
         <!-- HISTORY -->
         <section class="panel">
-          <h2 class="panel-title">History</h2>
+          <h2 class="panel-title"><span class="panel-icon"><AssetIcon name="history" :size="15" /></span>History</h2>
           <RequestHistoryTimeline
             :events="events"
             :loading="historyLoading"
@@ -275,6 +295,9 @@ import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 import FacilityAllocationCard from '~/components/Hospital/FacilityAllocationCard.vue'
 import SourcingPanel from '~/components/Hospital/SourcingPanel.vue'
 import TransfusionRequirementTable from '~/components/Hospital/TransfusionRequirementTable.vue'
+import TransfusionStepper from '~/components/Hospital/TransfusionStepper.vue'
+import BackButton from '~/components/ui/BackButton.vue'
+import { awaitingReceipt, isHaltedStatus, sinceShort, stepTimesFromEvents } from '~/utils/transfusionSteps'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { PRIORITY_LABELS, REQUEST_STATUS_TONES } from '~/types/bloodRequest'
 import { HOSPITAL_UNIT_STATUS_LABELS, HOSPITAL_UNIT_STATUS_TONES } from '~/types/hospitalInventory'
@@ -290,9 +313,11 @@ const props = defineProps({
   requestId: { type: [Number, String], required: true },
   // In the Patient Request dialog: its header carries the reference.
   embedded: { type: Boolean, default: false },
+  // In the dialog: offer Receive, which the list page opens (ReceiveDeliveryDialog).
+  canReceive: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['changed'])
+const emit = defineEmits(['changed', 'receive'])
 
 const requestId = computed(() => props.requestId)
 
@@ -335,6 +360,10 @@ const statusTone = computed(() => {
 })
 
 const splitProblems = computed(() => allocationProblems(plan.value, split.value))
+
+const awaiting = computed(() => awaitingReceipt(request.value))
+/** When each step last happened, read off the history loaded beside the request. */
+const stepTimes = computed(() => stepTimesFromEvents(events.value, request.value?.request_date ?? null))
 
 /** The centre a walk-in was recorded at: the allocation that carries it. */
 const walkInCentre = computed(() =>
@@ -527,11 +556,9 @@ function formatDateTime(value) {
 }
 .ptr-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.back-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--rb-text-secondary); text-decoration: none; margin-bottom: 8px;
-}
-.back-link:hover { color: var(--rb-primary-text); }
+/* The way back (ui/BackButton) beside the title. */
+.title-lead { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.title-lead > .page-title { line-height: 36px; }
 .page-header__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .eyebrow { margin: 0 0 2px; font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--rb-text-secondary); }
 .page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
@@ -551,7 +578,41 @@ function formatDateTime(value) {
   box-shadow: var(--rb-shadow-sm);
   padding: 20px;
 }
-.panel--attention { border-color: rgba(var(--rb-accent-rgb), .35); }
+/* Units asked of nobody: tinted, not only bordered, so it never passes for a plain panel. */
+.panel--attention { border-color: rgba(var(--rb-accent-rgb), .35); background: rgba(var(--rb-accent-rgb), .05); }
+.attention__icon {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(var(--rb-accent-rgb), .12); color: var(--rb-accent-text);
+}
+
+/* A small chip before each section's title, so a long dialog scans by section. */
+.panel-title { display: flex; align-items: center; gap: 8px; }
+.panel-icon {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text);
+}
+.attention .panel-title { display: block; }
+
+/* Units at the door: amber, the list's "Dispatched" tone. */
+.callout {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--rb-radius-lg);
+}
+.callout--action {
+  border: 1px solid rgba(var(--rb-warning-rgb), .4);
+  background: rgba(var(--rb-warning-rgb), .1);
+  color: var(--rb-warning-text);
+}
+.callout__icon {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  display: grid; place-items: center; background: rgba(var(--rb-warning-rgb), .16);
+}
+.callout__text { flex: 1; margin: 0; font-size: 13px; line-height: 1.45; }
+
+.progress-block { margin: 6px 0 16px; padding-bottom: 16px; border-bottom: 1px solid var(--rb-border); }
+.sub-title { margin: 0 0 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rb-text-muted); }
 .panel--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .panel-head__actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -652,7 +713,7 @@ function formatDateTime(value) {
 @media (max-width: 720px) {
   .ptr-page { padding: 14px; }
   .ptr-split { grid-template-columns: minmax(0, 1fr); }
-  .attention { flex-direction: column; }
+  .attention, .callout { flex-direction: column; align-items: flex-start; }
   .allocate__actions { flex-direction: column-reverse; }
   .allocate__actions > * { width: 100%; }
 }

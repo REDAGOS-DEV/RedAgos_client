@@ -237,6 +237,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useSidebar } from '~/composables/useSidebar.js'
+import { HOSPITAL_NAV_GROUPS } from '~/utils/hospitalNav'
 
 const {
   collapsed,
@@ -387,69 +388,8 @@ const dotStyle = badge => ({
   boxShadow: '0 0 0 2px ' + (isDark.value ? 'var(--rb-chrome, #1E293B)' : 'var(--rb-chrome, #FFFFFF)'),
 })
 
-/*
- * Each item names the hospital ability its page needs (hospital roles,
- * project owner 2026-10-11), and a role without it does not see the item.
- * Presentation only: the server refuses the endpoints with `can:` either way.
- */
-const NAV_GROUPS = [
-  {
-    label: 'Main',
-    items: [
-      { label: 'Dashboard', path: '/hospital/dashboard', icon: 'layout-dashboard' }
-    ]
-  },
-  {
-    label: 'Receiving',
-    items: [
-      // Patient Request sits under Receiving; there is no "Requests" folder.
-      // Track Requests is off the menu; its page is still reached from the
-      // dashboard. Blood Availability came back on 2026-11-01, rebuilt. Direct
-      // Distribution is gone: outside blood is added on Stock Intake
-      // (project owner, 2026-10-30).
-      { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
-      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' },
-      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'search', requires: 'hospital.requests.view' }
-    ]
-  },
-  {
-    label: 'Stock and Supply',
-    items: [
-      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', requires: 'hospital.inventory.view' },
-      // Stock-in's own page, apart from the inventory (project owner, 2026-10-28).
-      { label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', requires: 'hospital.inventory.stock_in' },
-      { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', requires: 'hospital.inventory.view' }
-    ]
-  },
-  {
-    // The blood bank's own reports, starting with its paper inventory sheet
-    // (project owner, 2026-10-28).
-    label: 'Reports',
-    items: [
-      { label: 'Inventory Report', path: '/hospital/inventory-report', icon: 'clipboard-list', requires: 'hospital.inventory.view' }
-    ]
-  },
-  {
-    // How the blood bank is set up, starting with the days each center gets
-    // its weekly request, off the Weekly Request page (project owner, 2026-10-30).
-    label: 'Facility Settings',
-    items: [
-      { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', requires: 'hospital.requests.view' }
-    ]
-  },
-  // Ang Finance group (billing, transactions) kay gitangtang: walay page files
-  // para niini, so 404 ang tanan. Ibalik ni kung naa nay backend + page — tan-awa
-  // ang Phase P sa audit plan. Help Center came back on 2026-11-02, with its page.
-  {
-    label: 'System',
-    items: [
-      { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
-      { label: 'Help Center', path: '/hospital/help', icon: 'help-circle' },
-      // My activity is the Settings page's Activity tab; not in the sidebar (project owner, 2026-11-11).
-      { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
-    ]
-  }
-]
+// The menu by section, shared with the header's breadcrumb (utils/hospitalNav).
+const NAV_GROUPS = HOSPITAL_NAV_GROUPS
 
 // The server knows no user (the token lives in the browser), so the server
 // render and hydration show the whole menu, as they always have; the role's
