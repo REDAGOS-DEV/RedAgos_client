@@ -404,7 +404,7 @@ describe('pages and navigation', () => {
   })
 
   it('links the hospital page from its sidebar and its search', () => {
-    expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/stock-thresholds'")
+    expect(source('app/utils/hospitalNav.ts')).toContain("path: '/hospital/stock-thresholds'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
     expect(layout).toContain("label: 'Stock Thresholds', path: '/hospital/stock-thresholds'")

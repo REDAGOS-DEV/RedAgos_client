@@ -227,7 +227,7 @@ describe('the paper records pages', () => {
   it('are reached from the Donations list and from a drive already held', () => {
     expect(donations).toContain("const canRecordPaper = computed(() => can('donations.record_paper'))")
     expect(donations).toContain('to="/blood-center/paper-records"')
-    expect(donations).toContain("v-if=\"row.source === 'paper'\"")
+    expect(donations).toContain(":title=\"row.source === 'paper' ? `Typed from paper sheet ${row.paper_sheet?.code}` : undefined\"")
     expect(drives).toContain(':to="`/blood-center/paper-records?drive=${drive.id}`"')
     // On the first visit and on a return to the kept-alive list with another drive's link.
     expect(list).toContain('if (fresh) openNewSheet(route.query.drive)')

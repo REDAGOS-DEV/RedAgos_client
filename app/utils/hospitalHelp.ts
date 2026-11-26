@@ -109,7 +109,7 @@ export const HOSPITAL_HELP_GUIDES: HospitalHelpGuide[] = [
     summary: 'Restock your shelf from a blood center on your request days.',
     steps: [
       'Open Weekly Request. Today shows a card for each blood center, with the ones due today first.',
-      'On a center that is Due today, press Send request.',
+      'On a center that is Due today, press Send today\'s request.',
       'Add a line for each component and blood type, with the units you want, and send it.',
       'The center supplies what it can. You may be sent all, part or none of what you asked for.',
       'Receive what it dispatches. Only the units you actually receive are added to your inventory.',
