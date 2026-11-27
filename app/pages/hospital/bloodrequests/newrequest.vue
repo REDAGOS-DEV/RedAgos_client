@@ -1,14 +1,11 @@
 <template>
   <div class="nr-page">
     <div class="nr-inner">
-      <NuxtLink to="/hospital/bloodrequests" class="back-link back-link--narrow">
-        <AssetIcon name="arrow-left" :size="14" />
-        Back to Patient Request
-      </NuxtLink>
-
       <!-- The title on the left, how far along on the right (2026-11-01). -->
       <div class="nr-head">
-        <PageHeader title="New Blood Request" :subtitle="hospitalPageSubtitle('newRequest', can)" />
+        <PageHeader title="New Blood Request" :subtitle="hospitalPageSubtitle('newRequest', can)">
+          <template #back><BackButton to="/hospital/bloodrequests" label="Patient Request" /></template>
+        </PageHeader>
         <ol v-if="!submitted" class="steps" aria-label="Request steps">
           <li
             v-for="(label, key, index) in STEPS"
@@ -83,30 +80,133 @@
 
         <div class="nr-layout">
           <div class="nr-main">
-            <template v-if="step === 'details'">
-              <!-- OWN STOCK CHECK: the first thing asked, because it may end the request here -->
-              <section class="panel stock-gate fade-in" :class="{ 'stock-gate--ok': form.stock_confirmed, 'stock-gate--error': errors.stock_confirmed }">
-                <span class="stock-gate__icon"><AssetIcon :name="form.stock_confirmed ? 'check' : 'package'" :size="20" /></span>
-                <div class="stock-gate__body">
-                  <h2 class="panel-title">Your own stock first</h2>
-                  <ul v-if="ownStockLines.length" class="own-stock" aria-label="Your stock of what this patient needs">
-                    <li v-for="row in ownStockLines" :key="row.key" class="own-stock__row" :class="{ 'own-stock__row--enough': row.enough }">
-                      <AssetIcon :name="row.enough ? 'circle-alert' : 'package'" :size="14" />
-                      <span>You have <strong>{{ row.available }}</strong> {{ row.code }} {{ row.name }} available<template v-if="row.enough">, enough for the {{ row.needed }} needed. Use your own stock if you can.</template><template v-else>.</template></span>
-                    </li>
-                  </ul>
-                  <label class="check">
-                    <input v-model="form.stock_confirmed" type="checkbox">
-                    <span>We checked our own inventory and it cannot cover this patient's need.</span>
-                  </label>
-                  <p v-if="errors.stock_confirmed" class="field-error">{{ errors.stock_confirmed }}</p>
-                </div>
-                <button type="button" class="ui-btn ui-btn--sm stock-gate__link" @click="openStock">
-                  <AssetIcon name="package" :size="14" />
-                  View my stock
-                </button>
-              </section>
+            <!--
+              STEP 1, STOCK CHECK (project owner, 2026-11-26): what the patient
+              needs, against this blood bank's own shelf, line by line, before
+              anything else is asked. The confirmation opens the next step.
+            -->
+            <template v-if="step === 'stock'">
+              <section
+                class="panel stock-step fade-in"
+                :class="{ 'stock-step--ok': form.stock_confirmed, 'stock-step--error': errors.stock_confirmed && !form.stock_confirmed }"
+                aria-labelledby="stock-step-title"
+              >
+                <header class="stock-step__head">
+                  <div>
+                    <h2 id="stock-step-title" class="stock-step__title">What does the patient need?</h2>
+                    <p class="stock-step__lede">Choose the blood type and components. Your own shelf is checked as you go, and a blood center is asked only for what it cannot cover.</p>
+                  </div>
+                  <button type="button" class="ui-btn ui-btn--sm" @click="openStock">
+                    <AssetIcon name="package" :size="14" />
+                    View my stock
+                  </button>
+                </header>
 
+                <div class="stock-step__type">
+                  <label for="btype" class="field-label">Blood type <span class="req">*</span></label>
+                  <SelectField
+                    id="btype"
+                    v-model="form.blood_type_id"
+                    :options="bloodTypes.map((t) => ({ value: t.id, label: t.label }))"
+                    placeholder="Select…"
+                    :invalid="Boolean(errors.blood_type_id)"
+                  />
+                  <p v-if="errors.blood_type_id" class="field-error">{{ errors.blood_type_id }}</p>
+                </div>
+
+                <p v-if="errors.items" class="field-error field-error--block">{{ errors.items }}</p>
+
+                <!-- One row per component: what is asked, and what the shelf holds of it. -->
+                <div class="need-rows" aria-live="polite">
+                  <div class="need-row need-row--head" aria-hidden="true">
+                    <span>Component</span>
+                    <span>Units</span>
+                    <span>On your shelf</span>
+                    <span />
+                  </div>
+                  <div v-for="(line, index) in form.items" :key="index" class="need-row" :class="`need-row--${shelfState(line)}`">
+                    <div class="need-row__field">
+                      <label :for="`c-${index}`" class="sr-only">Blood component {{ index + 1 }}</label>
+                      <SelectField
+                        :id="`c-${index}`"
+                        v-model="line.component_id"
+                        :options="components.map((c) => ({ value: c.id, label: c.name, disabled: isComponentTaken(c.id, index) }))"
+                        placeholder="Select a component…"
+                        :invalid="Boolean(lineErrors[index]?.component_id)"
+                        @change="onComponentChange(line)"
+                      />
+                      <p v-if="lineErrors[index]?.component_id" class="field-error">{{ lineErrors[index].component_id }}</p>
+                    </div>
+                    <div class="need-row__field">
+                      <label :for="`q-${index}`" class="sr-only">Units of component {{ index + 1 }}</label>
+                      <input
+                        :id="`q-${index}`"
+                        v-model.number="line.quantity"
+                        type="number"
+                        min="1"
+                        max="100"
+                        class="input"
+                        :class="{ 'input--error': lineErrors[index]?.quantity }"
+                      >
+                      <p v-if="lineErrors[index]?.quantity" class="field-error">{{ lineErrors[index].quantity }}</p>
+                    </div>
+                    <div class="need-row__shelf">
+                      <template v-if="shelfState(line) === 'pending'">
+                        <span class="need-row__muted">{{ stockLoading && !stock ? 'Reading…' : 'Choose a blood type and component' }}</span>
+                      </template>
+                      <template v-else-if="shelfState(line) === 'unknown'">
+                        <span class="need-row__muted">Could not be read</span>
+                      </template>
+                      <template v-else>
+                        <strong class="need-row__count">{{ shelfOf(line) }}</strong>
+                        <span class="need-row__verdict">
+                          <AssetIcon :name="shelfState(line) === 'enough' ? 'check' : 'x'" :size="13" />
+                          {{ shelfState(line) === 'enough' ? 'Enough on your shelf' : shelfOf(line) ? `${line.quantity - shelfOf(line)} short` : 'None on your shelf' }}
+                        </span>
+                      </template>
+                    </div>
+                    <button
+                      v-if="form.items.length > 1"
+                      type="button"
+                      class="need-row__remove"
+                      :aria-label="`Remove component ${index + 1}`"
+                      title="Remove"
+                      @click="removeLine(index)"
+                    >
+                      <AssetIcon name="x" :size="15" />
+                    </button>
+                    <span v-else />
+                  </div>
+                  <button type="button" class="need-rows__add" :disabled="!canAddLine" @click="addLine">
+                    <AssetIcon name="plus" :size="14" />
+                    Add component
+                  </button>
+                </div>
+
+                <!-- The shelf can cover some of it: say so before anything is confirmed. -->
+                <div v-if="shelfCovers" class="stock-step__covers" role="status">
+                  <AssetIcon name="triangle-alert" :size="16" />
+                  <p>
+                    Your shelf already holds enough <strong>{{ shelfCovers }}</strong>. Tag those bags to this patient from
+                    <NuxtLink to="/hospital/inventory?status=available" target="_blank">Blood Bank Inventory</NuxtLink>
+                    if they can be used, and ask a blood center only for the rest.
+                  </p>
+                </div>
+
+                <!-- The confirmation: still the checkbox, given room and a state. -->
+                <label class="confirm-tile" :class="{ 'confirm-tile--on': form.stock_confirmed }">
+                  <input v-model="form.stock_confirmed" type="checkbox" class="confirm-tile__box" :aria-invalid="Boolean(errors.stock_confirmed && !form.stock_confirmed)">
+                  <span class="confirm-tile__text">
+                    <strong>We checked our own inventory and it cannot cover this patient's need.</strong>
+                    <span class="confirm-tile__hint">Required before you continue to the patient's details.</span>
+                  </span>
+                </label>
+                <p v-if="errors.stock_confirmed && !form.stock_confirmed" class="field-error" role="alert">{{ errors.stock_confirmed }}</p>
+              </section>
+            </template>
+
+            <!-- STEP 2, PATIENT: who it is for, how urgent, and why each component. -->
+            <template v-else-if="step === 'details'">
               <!-- PATIENT -->
               <section class="panel fade-in" style="--delay:40ms">
                 <h2 class="panel-title panel-title--icon"><AssetIcon name="user" :size="17" /> Patient</h2>
@@ -171,19 +271,7 @@
                     <p v-if="errors.patient_sex" class="field-error">{{ errors.patient_sex }}</p>
                   </div>
 
-                  <div class="field">
-                    <label for="btype" class="field-label">Blood type <span class="req">*</span></label>
-                    <SelectField
-                      id="btype"
-                      v-model="form.blood_type_id"
-                      :options="bloodTypes.map((t) => ({ value: t.id, label: t.label }))"
-                      placeholder="Select…"
-                      :invalid="Boolean(errors.blood_type_id)"
-                    />
-                    <p v-if="errors.blood_type_id" class="field-error">{{ errors.blood_type_id }}</p>
-                  </div>
-
-                  <div class="field">
+                  <div class="field field--half">
                     <span class="field-label">Priority <span class="req">*</span></span>
                     <div class="priority-row">
                       <label
@@ -235,59 +323,20 @@
                 </div>
               </section>
 
-              <!-- COMPONENTS -->
+              <!-- WHY EACH COMPONENT: chosen on the stock check, justified here. -->
               <section class="panel fade-in" style="--delay:80ms">
-                <div class="panel-head">
-                  <h2 class="panel-title panel-title--icon"><AssetIcon name="droplets" :size="17" /> Components needed</h2>
-                  <button
-                    type="button"
-                    class="ui-btn ui-btn--sm"
-                    :disabled="!canAddLine"
-                    @click="addLine"
-                  >
-                    <AssetIcon name="plus" :size="14" />
-                    Add component
-                  </button>
-                </div>
-
-                <p v-if="errors.items" class="field-error field-error--block">{{ errors.items }}</p>
+                <h2 class="panel-title panel-title--icon"><AssetIcon name="droplets" :size="17" /> Indication for each component</h2>
 
                 <div v-for="(line, index) in form.items" :key="index" class="line">
                   <span class="line-no" aria-hidden="true">{{ index + 1 }}</span>
 
                   <div class="line-fields">
+                    <p class="line-head">
+                      <strong>{{ componentName(line.component_id) || 'Component' }}</strong>
+                      <span>{{ line.quantity }} unit{{ line.quantity === 1 ? '' : 's' }}<template v-if="bloodTypeLabel !== '—'"> · {{ bloodTypeLabel }}</template></span>
+                      <button type="button" class="btn-link line-head__edit" @click="step = 'stock'">Change</button>
+                    </p>
                     <div class="field-grid">
-                      <div class="field field--three-quarter">
-                        <label :for="`c-${index}`" class="field-label">Blood component <span class="req">*</span></label>
-                        <SelectField
-                          :id="`c-${index}`"
-                          v-model="line.component_id"
-                          :options="components.map((c) => ({ value: c.id, label: c.name, disabled: isComponentTaken(c.id, index) }))"
-                          placeholder="Select…"
-                          :invalid="Boolean(lineErrors[index]?.component_id)"
-                          @change="onComponentChange(line)"
-                        />
-                        <p v-if="lineErrors[index]?.component_id" class="field-error">
-                          {{ lineErrors[index].component_id }}
-                        </p>
-                      </div>
-
-                      <div class="field">
-                        <label :for="`q-${index}`" class="field-label">No. of units <span class="req">*</span></label>
-                        <input
-                          :id="`q-${index}`"
-                          v-model.number="line.quantity"
-                          type="number"
-                          min="1"
-                          max="100"
-                          class="input"
-                          :class="{ 'input--error': lineErrors[index]?.quantity }"
-                        >
-                        <p v-if="lineErrors[index]?.quantity" class="field-error">
-                          {{ lineErrors[index].quantity }}
-                        </p>
-                      </div>
-
                       <div class="field field--full">
                         <label :for="`i-${index}`" class="field-label">
                           Indication for transfusion
@@ -325,15 +374,6 @@
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    v-if="form.items.length > 1"
-                    type="button"
-                    class="btn-link btn-link--danger line-remove"
-                    @click="removeLine(index)"
-                  >
-                    Remove
-                  </button>
                 </div>
               </section>
             </template>
@@ -425,18 +465,28 @@
               </div>
 
               <div class="summary__actions">
-                <template v-if="step === 'details'">
+                <template v-if="step === 'stock'">
+                  <button type="button" class="ui-btn ui-btn--primary" @click="continueToDetails">
+                    Continue to patient
+                    <AssetIcon name="arrow-right" :size="16" />
+                  </button>
+                  <NuxtLink to="/hospital/bloodrequests" class="ui-btn" @click="clearDraft">Cancel</NuxtLink>
+                </template>
+                <template v-else-if="step === 'details'">
                   <button type="button" class="ui-btn ui-btn--primary" :disabled="planLoading" @click="findFacilities">
                     <AssetIcon name="search" :size="16" />
                     {{ planLoading ? 'Searching…' : 'Find facilities' }}
                   </button>
-                  <NuxtLink to="/hospital/bloodrequests" class="ui-btn" @click="clearDraft">Cancel</NuxtLink>
+                  <button type="button" class="ui-btn" @click="step = 'stock'">Back</button>
+                  <NuxtLink to="/hospital/bloodrequests" class="ui-btn ui-btn--ghost" @click="clearDraft">Cancel</NuxtLink>
                 </template>
                 <template v-else-if="step === 'sourcing'">
                   <button type="button" class="ui-btn ui-btn--primary" :disabled="!plan || splitProblems.length > 0" @click="step = 'review'">
                     Review request
                   </button>
                   <button type="button" class="ui-btn" @click="step = 'details'">Back</button>
+                  <!-- Leaving from any step, as from the first (2026-11-26). -->
+                  <NuxtLink to="/hospital/bloodrequests" class="ui-btn ui-btn--ghost" @click="clearDraft">Cancel</NuxtLink>
                 </template>
                 <template v-else>
                   <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
@@ -444,6 +494,7 @@
                     {{ submitting ? 'Sending…' : 'Send request' }}
                   </button>
                   <button type="button" class="ui-btn" :disabled="submitting" @click="step = 'sourcing'">Back</button>
+                  <NuxtLink v-if="!submitting" to="/hospital/bloodrequests" class="ui-btn ui-btn--ghost" @click="clearDraft">Cancel</NuxtLink>
                 </template>
               </div>
             </div>
@@ -453,34 +504,104 @@
     </div>
 
     <!-- The shelf, right here: leaving the page would lose what has been typed (2026-11-01). -->
+    <!--
+      The shelf, whole (2026-11-26): what it holds at a glance, this patient's
+      type first, each cell coloured by its stock level, and the confirmation
+      one click away once it is clear the shelf cannot cover the patient.
+    -->
     <CenterModal v-if="stockOpen" title="Your blood bank's stock" eyebrow="Available units" size="lg" @close="stockOpen = false">
-      <table v-if="stockLoading || stock?.blood_types?.length" class="stock-table">
-        <thead v-if="stock">
-          <tr>
-            <th scope="col">Blood type</th>
-            <th v-for="component in stock.components" :key="component.id" scope="col" class="num" :class="{ 'stock-table__on': isNeededComponent(component.id) }">{{ component.name }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <SkeletonRows v-if="stockLoading" :columns="5" :rows="8" />
-          <template v-else>
-            <tr v-for="type in stock.blood_types" :key="type.id" :class="{ 'stock-table__row--on': type.id === form.blood_type_id }">
-              <th scope="row"><span class="stock-type">{{ type.code }}</span></th>
-              <td
-                v-for="component in stock.components"
-                :key="component.id"
-                class="num"
-                :class="{ 'stock-table__none': !stockCount(type.id, component.id), 'stock-table__hit': type.id === form.blood_type_id && isNeededComponent(component.id) }"
-              >
-                {{ stockCount(type.id, component.id) }}
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      <p v-else class="stock-note" :class="{ 'stock-note--error': stockError }">{{ stockError || 'No stock to show yet.' }}</p>
+      <div class="sv">
+        <p v-if="stockError && !stock" class="stock-note stock-note--error" role="alert">
+          <AssetIcon name="circle-alert" :size="15" />
+          {{ stockError }}
+          <button type="button" class="btn-link" @click="loadStock">Try again</button>
+        </p>
+
+        <template v-else>
+          <!-- This patient's blood type first: one card per component (project owner, 2026-11-26). -->
+          <section v-if="patientTypeCode" class="sv-patient" aria-labelledby="sv-patient-title">
+            <header class="sv-patient__head">
+              <h3 id="sv-patient-title" class="sv-patient__title">
+                <span class="sv-patient__type">{{ patientTypeCode }}</span>
+                This patient's blood type
+              </h3>
+              <span class="sv-patient__meta">
+                <template v-if="stockAsOf">As of {{ stockAsOf }} · </template>
+                <button type="button" class="btn-link" :disabled="stockLoading" @click="loadStock">Refresh</button>
+              </span>
+            </header>
+
+            <p v-if="stockLoading && !stock" class="stock-note"><AssetIcon name="loader" :size="14" class="shelf__spin" /> Reading your shelf…</p>
+            <ul v-else class="sv-cards">
+              <li v-for="card in patientCards" :key="card.id" class="sv-card" :class="`sv-card--${card.state}`">
+                <span class="sv-card__name">{{ card.name }}</span>
+                <span class="sv-card__count">{{ card.available }}</span>
+                <span class="sv-card__foot">
+                  <template v-if="card.state === 'enough'"><AssetIcon name="check" :size="13" /> Covers the {{ card.needed }} needed</template>
+                  <template v-else-if="card.state === 'short'"><AssetIcon name="x" :size="13" /> {{ card.needed - card.available }} short of {{ card.needed }} needed</template>
+                  <template v-else>Not asked for</template>
+                </span>
+              </li>
+            </ul>
+          </section>
+          <p v-else class="stock-note"><AssetIcon name="info" :size="14" /> Choose the patient's blood type on the form, and their shelf shows here first.</p>
+
+          <!-- Every blood type, on request. -->
+          <button type="button" class="sv-toggle" :aria-expanded="showAllTypes || !patientTypeCode" @click="showAllTypes = !showAllTypes">
+            <AssetIcon :name="showAllTypes || !patientTypeCode ? 'chevron-down' : 'chevron-right'" :size="15" />
+            {{ showAllTypes || !patientTypeCode ? 'All blood types' : 'Show all blood types' }}
+            <span class="sv-toggle__count">{{ shelfTotal }} unit{{ shelfTotal === 1 ? '' : 's' }} on the shelf</span>
+          </button>
+
+          <div v-if="showAllTypes || !patientTypeCode" class="sv-table-wrap">
+            <table class="stock-table">
+              <caption class="sr-only">Available units by blood type and component</caption>
+              <thead v-if="stock">
+                <tr>
+                  <th scope="col" class="stock-table__corner">Blood type</th>
+                  <th
+                    v-for="component in stock.components"
+                    :key="component.id"
+                    scope="col"
+                    class="num"
+                    :class="{ 'stock-table__on': isNeededComponent(component.id) }"
+                  >
+                    {{ component.name }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <SkeletonRows v-if="stockLoading && !stock" :columns="5" :rows="8" />
+                <template v-else-if="stock">
+                  <tr v-for="type in stockTypesOrdered" :key="type.id" :class="{ 'stock-table__row--on': type.id === form.blood_type_id }">
+                    <th scope="row">
+                      <span class="stock-type">{{ type.code }}</span>
+                      <span v-if="type.id === form.blood_type_id" class="stock-table__this">This patient</span>
+                    </th>
+                    <td v-for="component in stock.components" :key="component.id" class="num">
+                      <strong v-if="stockCount(type.id, component.id)">{{ stockCount(type.id, component.id) }}</strong>
+                      <span v-else class="stock-table__none" aria-label="None">—</span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
 
       <template #actions>
+        <!-- The confirmation, from where the shelf was checked. -->
+        <button
+          v-if="step === 'stock' && !form.stock_confirmed && stock"
+          type="button"
+          class="ui-btn"
+          :title="shelfCovers ? `Your shelf shows enough of ${shelfCovers}` : undefined"
+          @click="confirmStockFromDialog"
+        >
+          <AssetIcon name="check" :size="15" />
+          Confirm stock can't cover
+        </button>
         <button type="button" class="ui-btn ui-btn--primary" @click="stockOpen = false">Done</button>
       </template>
     </CenterModal>
@@ -489,6 +610,7 @@
 
 <script setup>
 import PageHeader from '~/components/ui/PageHeader.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import CenterModal from '~/components/ui/CenterModal.vue'
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
@@ -515,7 +637,8 @@ definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashb
  * quantity editable), review, and send — one facility allocation per centre.
  */
 
-const STEPS = { details: 'Patient & need', sourcing: 'Facilities', review: 'Review' }
+// The stock check comes first (project owner, 2026-11-26): nothing else is asked until the shelf is seen.
+const STEPS = { stock: 'Stock check', details: 'Patient', sourcing: 'Facilities', review: 'Review' }
 
 const loadingReference = ref(true)
 const submitting = ref(false)
@@ -528,7 +651,7 @@ const components = ref([])
 const priorities = ref([])
 const facilities = ref([])
 
-const step = ref('details')
+const step = ref('stock')
 const stepIndex = computed(() => Object.keys(STEPS).indexOf(step.value))
 
 const plan = ref(null)
@@ -615,8 +738,7 @@ const stockLoading = ref(false)
 const stockError = ref('')
 const stock = ref(null)
 
-async function openStock() {
-  stockOpen.value = true
+async function loadStock() {
   stockLoading.value = true
   stockError.value = ''
   try {
@@ -629,6 +751,51 @@ async function openStock() {
   }
 }
 
+function openStock() {
+  stockOpen.value = true
+  showAllTypes.value = false
+  loadStock()
+}
+
+// The stock dialog's figures (2026-11-26).
+const shelfTotal = computed(() => (stock.value?.cells ?? []).reduce((sum, cell) => sum + (cell.available || 0), 0))
+const patientTypeCode = computed(() => stock.value?.blood_types?.find(type => type.id === form.blood_type_id)?.code ?? '')
+// This patient's type first; the rest as the shelf lists them.
+const stockTypesOrdered = computed(() => {
+  const types = stock.value?.blood_types ?? []
+  return [...types.filter(type => type.id === form.blood_type_id), ...types.filter(type => type.id !== form.blood_type_id)]
+})
+const stockAsOf = computed(() => (stock.value?.as_of
+  ? new Date(stock.value.as_of).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  : ''))
+// The full table waits behind a toggle once the patient's type is known.
+const showAllTypes = ref(false)
+/**
+ * One card per component in this patient's blood type: the components asked
+ * for first, each saying whether the shelf covers it.
+ */
+const patientCards = computed(() => {
+  const needed = new Map(form.items.filter(line => line.component_id).map(line => [line.component_id, Number(line.quantity) || 0]))
+  return (stock.value?.components ?? [])
+    .map((component) => {
+      const available = stockCount(form.blood_type_id, component.id)
+      const want = needed.get(component.id) ?? 0
+      return {
+        id: component.id,
+        name: component.name,
+        available,
+        needed: want,
+        state: want > 0 ? (available >= want ? 'enough' : 'short') : 'other',
+      }
+    })
+    .sort((a, b) => Number(b.needed > 0) - Number(a.needed > 0))
+})
+/** Give the own-stock confirmation from the dialog, once the shelf was seen. */
+function confirmStockFromDialog() {
+  form.stock_confirmed = true
+  stockOpen.value = false
+}
+
 // Each component asked for, against this blood bank's own shelf.
 const ownStockLines = computed(() => {
   if (!stock.value || !form.blood_type_id) return []
@@ -636,9 +803,45 @@ const ownStockLines = computed(() => {
   return form.items.filter(line => line.component_id).map(line => {
     const available = stockCount(form.blood_type_id, line.component_id)
     const needed = Number(line.quantity) || 0
-    return { key: line.component_id, code, name: componentName(line.component_id), available, needed, enough: needed > 0 && available >= needed }
+    const enough = needed > 0 && available >= needed
+    return {
+      key: line.component_id, code, name: componentName(line.component_id), available, needed, enough,
+      // enough: use yours first; some: short of it; none: nothing on the shelf.
+      state: enough ? 'enough' : available > 0 ? 'some' : 'none',
+    }
   })
 })
+
+/** What the shelf holds of one line's component, in the patient's blood type. */
+function shelfOf(line) {
+  return stockCount(form.blood_type_id, line.component_id)
+}
+/** pending: nothing to check yet; unknown: the shelf could not be read; enough or short. */
+function shelfState(line) {
+  if (!form.blood_type_id || !line.component_id) return 'pending'
+  if (!stock.value) return stockLoading.value ? 'pending' : 'unknown'
+  const needed = Number(line.quantity) || 0
+  return needed > 0 && shelfOf(line) >= needed ? 'enough' : 'short'
+}
+
+/*
+ * The confirmation holds for the need it was given against: change the blood
+ * type, a component or its units and it has to be given again (2026-11-26).
+ * Registered in this order so a restored draft, which sets both at once,
+ * keeps its confirmation.
+ */
+const needSignature = computed(() => JSON.stringify([
+  form.blood_type_id,
+  form.items.map(line => [line.component_id, Number(line.quantity) || 0]),
+]))
+let confirmedFor = ''
+watch(() => form.stock_confirmed, (on) => { confirmedFor = on ? needSignature.value : '' }, { immediate: true })
+watch(needSignature, (signature) => {
+  if (form.stock_confirmed && confirmedFor && signature !== confirmedFor) form.stock_confirmed = false
+})
+
+/** The components the shelf alone could cover, named, for the warning on the confirmation. */
+const shelfCovers = computed(() => ownStockLines.value.filter((row) => row.enough).map((row) => row.name).join(', '))
 
 const neededByMin = computed(() => {
   const now = new Date()
@@ -662,7 +865,7 @@ const summaryPatientMeta = computed(() => [
 const totalRemaining = computed(() => splitTotals.value.reduce((sum, total) => sum + (total.remaining > 0 ? total.remaining : 0), 0))
 const summaryLines = computed(() => {
   // From the facility step on, each line says how much of it is allocated.
-  if (step.value !== 'details' && splitTotals.value.length) {
+  if ((step.value === 'sourcing' || step.value === 'review') && splitTotals.value.length) {
     return splitTotals.value.map(total => ({
       key: total.componentId,
       name: total.component,
@@ -681,6 +884,9 @@ const bloodTypeLabel = computed(() => bloodTypes.value.find((t) => t.id === form
 const priorityLabel = computed(() => priorities.value.find((p) => p.value === form.urgency_level)?.label ?? form.urgency_level)
 
 onMounted(async () => {
+  // The shelf is read at once, so the own-stock check shows it as the form
+  // is filled; it never holds the form up (2026-11-26).
+  loadStock()
   try {
     const [reference, eligible] = await Promise.all([
       hospitalService.referenceData(),
@@ -758,13 +964,42 @@ function facilityName(id) {
  * guard: the server refuses the same things, and anything it rejects is shown
  * through applyServerErrors().
  */
-function validate() {
+/** The server's error keys that belong to the stock check (step 1). */
+const STOCK_STEP_KEYS = /^(blood_type_id|internal_stock_confirmed|stock_confirmed|items|lines)(\.\d+\.(component_id|quantity))?$/
+
+function resetErrors() {
   Object.keys(errors).forEach((key) => delete errors[key])
   lineErrors.value = form.items.map(() => ({}))
+}
 
+const isValid = () => Object.keys(errors).length === 0
+  && lineErrors.value.every((lineError) => Object.keys(lineError).length === 0)
+
+/** Step 1: the blood type, the components and units, and the own-stock confirmation. */
+function checkStock() {
   if (!form.blood_type_id) errors.blood_type_id = 'Select the blood type required.'
-
+  if (form.items.length === 0) errors.items = 'Add at least one blood component to this request.'
+  form.items.forEach((line, index) => {
+    const lineError = lineErrors.value[index]
+    if (!line.component_id) lineError.component_id = 'Select the blood component required.'
+    if (!line.quantity || line.quantity < 1) lineError.quantity = 'Request at least one unit.'
+    if (line.quantity > 100) lineError.quantity = 'A single component cannot exceed 100 units.'
+  })
   if (!form.stock_confirmed) errors.stock_confirmed = "Confirm your own stock cannot cover this patient before asking other facilities."
+}
+
+/** From the stock check to the patient's details. */
+function continueToDetails() {
+  submitError.value = ''
+  resetErrors()
+  checkStock()
+  if (isValid()) step.value = 'details'
+}
+
+function validate() {
+  resetErrors()
+  checkStock()
+
   if (!form.patient_surname) errors.patient_surname = 'Enter the patient surname.'
   if (!form.patient_first_name) errors.patient_first_name = 'Enter the patient first name.'
   if (form.patient_age === null || form.patient_age === '') errors.patient_age = 'Enter the patient age.'
@@ -772,14 +1007,8 @@ function validate() {
 
   if (form.needed_by && new Date(form.needed_by) <= new Date()) errors.needed_by = 'The time needed must be in the future.'
 
-  if (form.items.length === 0) errors.items = 'Add at least one blood component to this request.'
-
   form.items.forEach((line, index) => {
     const lineError = lineErrors.value[index]
-
-    if (!line.component_id) lineError.component_id = 'Select the blood component required.'
-    if (!line.quantity || line.quantity < 1) lineError.quantity = 'Request at least one unit.'
-    if (line.quantity > 100) lineError.quantity = 'A single component cannot exceed 100 units.'
 
     if (line.component_id && codesFor(line.component_id).length && !line.indication_code) {
       lineError.indication_code = 'Select the indication for this component.'
@@ -827,6 +1056,10 @@ async function findFacilities() {
 
   if (!validate()) {
     submitError.value = 'Please correct the highlighted fields.'
+    // A problem on the stock check sends staff back to it.
+    const stockProblem = ['blood_type_id', 'items', 'stock_confirmed'].some((key) => errors[key])
+      || lineErrors.value.some((lineError) => lineError.component_id || lineError.quantity)
+    if (stockProblem) step.value = 'stock'
     return
   }
 
@@ -891,6 +1124,7 @@ async function sendTransfusion() {
     // Send staff back to wherever the server found the problem.
     const keys = Object.keys(bag)
     if (keys.some((key) => key.startsWith('allocations'))) step.value = 'sourcing'
+    else if (keys.some((key) => STOCK_STEP_KEYS.test(key))) step.value = 'stock'
     else if (keys.length) step.value = 'details'
   } finally {
     submitting.value = false
@@ -956,7 +1190,7 @@ function startOver() {
 function startAnother() {
   submitted.value = null
   submitError.value = ''
-  step.value = 'details'
+  step.value = 'stock'
   plan.value = null
   split.value = {}
   Object.keys(errors).forEach((key) => delete errors[key])
@@ -976,12 +1210,6 @@ function startAnother() {
 }
 /* The full content width, like every staff page (2026-10-15). */
 .nr-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
-
-.back-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--rb-text-secondary); text-decoration: none; margin-bottom: 8px;
-}
-.back-link:hover { color: var(--rb-primary-text); }
 
 .nr-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin-bottom: 18px; }
 
@@ -1018,19 +1246,95 @@ function startAnother() {
 }
 
 /* Own stock: a gate, so it reads differently from the fields after it. */
-.stock-gate { display: flex; align-items: flex-start; gap: 14px; transition: border-color .15s; }
-.stock-gate__icon {
-  display: grid; flex: none; place-items: center; width: 42px; height: 42px; border-radius: 12px;
-  background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text);
+/* ── Step 1, the stock check (2026-11-26) ──
+   An amber edge until the shelf is confirmed, green once it is, red when it
+   was missed. Each component sits on one row with what the shelf holds of it. */
+.stock-step {
+  --gate: var(--rb-warning);
+  position: relative; display: flex; flex-direction: column; gap: 18px; overflow: hidden;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.stock-gate__body { flex: 1; min-width: 0; }
-.stock-gate__link { flex: none; text-decoration: none; }
-.stock-gate--ok { border-color: rgba(var(--rb-success-rgb), .45); }
-.stock-gate--ok .stock-gate__icon { background: rgba(var(--rb-success-rgb), .14); color: var(--rb-success-text); }
-.stock-gate--error { border-color: var(--rb-accent); }
-.check { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); cursor: pointer; }
-.check input { flex: none; margin-top: 2px; width: 16px; height: 16px; accent-color: var(--rb-primary); }
-.stock-gate .field-error { margin-top: 6px; }
+.stock-step::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--gate); }
+.stock-step--ok { --gate: var(--rb-success); }
+.stock-step--error { --gate: var(--rb-accent); border-color: var(--rb-accent); }
+.stock-step__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.stock-step__title { margin: 0; font-size: 17px; font-weight: 700; color: var(--rb-text-primary); }
+.stock-step__lede { margin: 4px 0 0; max-width: 64ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+.stock-step__type { display: flex; flex-direction: column; gap: 5px; max-width: 240px; }
+
+.need-rows { display: flex; flex-direction: column; border: 1px solid var(--rb-border); border-radius: 12px; overflow: hidden; }
+.need-row {
+  --state: var(--rb-border);
+  display: grid; grid-template-columns: minmax(0, 1fr) 96px 190px 32px; align-items: start; gap: 12px;
+  padding: 12px 14px; border-top: 1px solid var(--rb-border); background: var(--rb-surface);
+}
+.need-row--head {
+  align-items: center; padding: 8px 14px; border-top: 0; background: var(--rb-surface-alt);
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--rb-text-muted);
+}
+.need-row--enough { --state: var(--rb-success); }
+.need-row--short { --state: var(--rb-accent); }
+.need-row__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.need-row__shelf {
+  display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 12px;
+  border-radius: 10px; border: 1px solid var(--rb-border);
+  background: color-mix(in srgb, var(--state) 7%, var(--rb-surface));
+}
+.need-row--enough .need-row__shelf, .need-row--short .need-row__shelf { border-color: color-mix(in srgb, var(--state) 35%, transparent); }
+.need-row__count { font-size: 20px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.need-row__verdict { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--state); }
+.need-row--short .need-row__verdict { color: var(--rb-accent-text); }
+.need-row--enough .need-row__verdict { color: var(--rb-success-text); }
+.need-row__muted { font-size: 12px; color: var(--rb-text-muted); }
+.need-row__remove {
+  display: grid; place-items: center; width: 32px; height: 42px; padding: 0; border: 0; border-radius: 8px;
+  background: none; color: var(--rb-text-muted); cursor: pointer;
+}
+.need-row__remove:hover { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); }
+.need-row__remove:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.need-rows__add {
+  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 0; border-top: 1px dashed var(--rb-border-strong);
+  background: var(--rb-surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer;
+}
+.need-rows__add:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), .05); }
+.need-rows__add:disabled { color: var(--rb-text-muted); cursor: not-allowed; }
+.need-rows__add:focus-visible { outline: none; box-shadow: inset var(--rb-focus-ring); }
+
+.stock-step__covers {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid rgba(var(--rb-warning-rgb), .4); background: rgba(var(--rb-warning-rgb), .1); color: var(--rb-warning-text);
+}
+.stock-step__covers p { margin: 0; font-size: 13px; line-height: 1.5; }
+.stock-step__covers :deep(svg) { flex: none; margin-top: 2px; }
+.stock-step__covers a { color: inherit; font-weight: 700; }
+
+.shelf__spin { animation: shelf-spin 0.9s linear infinite; }
+@keyframes shelf-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .shelf__spin { animation: none; } }
+
+/* Step 2: each component, named, above its indication. */
+.line-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 10px; font-size: 13px; color: var(--rb-text-secondary); }
+.line-head strong { font-size: 14px; color: var(--rb-text-primary); }
+.line-head__edit { margin-left: auto; font-size: 12.5px; }
+
+
+/* The confirmation tile: the checkbox, given room and a state. */
+.confirm-tile {
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; cursor: pointer;
+  border: 1.5px solid var(--rb-border-strong); border-radius: 12px; background: var(--rb-surface);
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.confirm-tile:hover { border-color: rgba(var(--rb-primary-rgb), .5); }
+.confirm-tile:focus-within { box-shadow: var(--rb-focus-ring); }
+.confirm-tile--on { border-color: rgba(var(--rb-success-rgb), .6); background: rgba(var(--rb-success-rgb), .07); }
+.stock-step--error .confirm-tile { border-color: var(--rb-accent); }
+.confirm-tile__box { flex: none; width: 18px; height: 18px; margin-top: 1px; accent-color: var(--rb-success); cursor: pointer; }
+.confirm-tile__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.confirm-tile__text strong { font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); }
+.confirm-tile__hint { font-size: 12px; color: var(--rb-text-muted); }
+.confirm-tile__warn { display: flex; align-items: flex-start; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-warning-text); }
+.confirm-tile__warn :deep(svg) { flex: none; margin-top: 1px; }
+.stock-step .field-error { margin: -10px 0 0; }
 
 /* Fields */
 .field-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
@@ -1186,7 +1490,10 @@ function startAnother() {
   .field, .field--third, .field--three-quarter { grid-column: span 6; }
   .field--half { grid-column: 1 / -1; }
   .field--third, .field--full { grid-column: 1 / -1; }
-  .stock-gate { flex-wrap: wrap; }
+  .stock-step__head { flex-wrap: wrap; }
+  .need-row { grid-template-columns: minmax(0, 1fr) 80px 32px; }
+  .need-row--head { display: none; }
+  .need-row__shelf { grid-column: 1 / -1; grid-row: 2; }
   .line { flex-wrap: wrap; }
   .line-no { margin-top: 0; }
   .line-fields { flex-basis: 100%; order: 3; }
@@ -1198,14 +1505,6 @@ function startAnother() {
 .banner--info { background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); border: 1px solid rgba(var(--rb-primary-rgb), 0.22); }
 .banner__action { margin-left: auto; color: var(--rb-primary-text); text-decoration: underline; }
 
-/* What the shelf holds, for what is being asked. */
-.own-stock { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; padding: 0; list-style: none; }
-.own-stock__row { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; color: var(--rb-text-secondary); }
-.own-stock__row :deep(svg) { flex: none; margin-top: 2px; }
-.own-stock__row strong { color: var(--rb-text-primary); }
-.own-stock__row--enough { color: var(--rb-warning-text); }
-.own-stock__row--enough strong { color: inherit; }
-
 .needed-by { margin-top: 14px; }
 .field-optional { font-weight: 500; color: var(--rb-text-secondary); }
 
@@ -1215,16 +1514,65 @@ function startAnother() {
 .steps__back:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 /* The shelf in the dialog; what this patient needs stands out. */
+/* ── The stock dialog (2026-11-26) ── */
+.sv { display: flex; flex-direction: column; gap: 16px; }
+/* This patient's type: one card per component. */
+.sv-patient { display: flex; flex-direction: column; gap: 12px; }
+.sv-patient__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sv-patient__title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.sv-patient__type {
+  display: inline-grid; place-items: center; min-width: 44px; height: 30px; padding: 0 8px; border-radius: 8px;
+  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); font-size: 14px; font-weight: 800;
+}
+.sv-patient__meta { font-size: 12.5px; color: var(--rb-text-muted); }
+
+.sv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.sv-card {
+  --tone: var(--rb-border);
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; min-width: 0;
+  border: 1px solid var(--rb-border); border-top: 3px solid var(--tone); border-radius: 12px; background: var(--rb-surface);
+}
+.sv-card--enough { --tone: var(--rb-success); }
+.sv-card--short { --tone: var(--rb-accent); }
+.sv-card__name { font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-card__count { font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.sv-card--other .sv-card__count { color: var(--rb-text-muted); }
+.sv-card__foot { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--rb-text-muted); }
+.sv-card--enough .sv-card__foot { color: var(--rb-success-text); }
+.sv-card--short .sv-card__foot { color: var(--rb-accent-text); }
+.sv-card--other .sv-card__foot { font-weight: 500; }
+
+/* The rest of the shelf, on request. */
+.sv-toggle {
+  display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-primary-text);
+}
+.sv-toggle:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
+.sv-toggle__count { margin-left: 4px; font-weight: 500; color: var(--rb-text-muted); }
+
+.sv-table-wrap { overflow-x: auto; border: 1px solid var(--rb-border); border-radius: 12px; }
 .stock-table { width: 100%; border-collapse: collapse; font-size: 13.5px; color: var(--rb-text-primary); }
-.stock-table th, .stock-table td { padding: 10px 12px; border-bottom: 1px solid var(--rb-border); text-align: left; }
-.stock-table thead th { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); vertical-align: bottom; }
+.stock-table th, .stock-table td { padding: 9px 12px; border-bottom: 1px solid var(--rb-border); text-align: left; }
+.stock-table thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--rb-surface-alt);
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--rb-text-secondary);
+  vertical-align: bottom; white-space: normal; line-height: 1.3;
+}
+.stock-table tbody th { white-space: nowrap; }
 .stock-table tbody tr:last-child th, .stock-table tbody tr:last-child td { border-bottom: 0; }
-.stock-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.stock-table thead .stock-table__on { color: var(--rb-primary-text); font-weight: 700; }
-.stock-table__row--on { background: rgba(var(--rb-primary-rgb), 0.06); }
+.stock-table .num { text-align: center; font-variant-numeric: tabular-nums; }
+.stock-table thead .stock-table__on { color: var(--rb-primary-text); box-shadow: inset 0 -2px 0 var(--rb-primary); }
+.stock-table__row--on { background: rgba(var(--rb-primary-rgb), 0.05); }
+.stock-table__row--on th { box-shadow: inset 3px 0 0 var(--rb-primary); }
+.stock-table__this {
+  margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0; text-transform: none;
+}
 .stock-table__none { color: var(--rb-text-muted); }
-.stock-table__hit { font-weight: 800; color: var(--rb-primary-text); box-shadow: inset 0 0 0 1.5px rgba(var(--rb-primary-rgb), 0.5); border-radius: 6px; }
+.stock-table__hit { background: rgba(var(--rb-primary-rgb), 0.08); }
+
 .stock-type { font-weight: 700; }
-.stock-note { margin: 0; font-size: 13.5px; color: var(--rb-text-secondary); }
+.stock-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; color: var(--rb-text-secondary); }
 .stock-note--error { color: var(--rb-accent-text); }
 </style>

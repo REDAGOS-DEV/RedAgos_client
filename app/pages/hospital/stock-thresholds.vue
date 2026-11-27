@@ -6,6 +6,8 @@
     facility-noun="blood bank"
   >
     <template #subtitle>{{ hospitalPageSubtitle('thresholds', can) }}</template>
+    <!-- How long the shelf lasts at the blood bank's own rate of use (2026-11-27). -->
+    <template #below-stock><DaysOfCover /></template>
   </StockThresholdsPanel>
 </template>
 
@@ -20,6 +22,7 @@
  */
 import { hospitalService } from '~/api/hospital/HospitalService'
 import StockThresholdsPanel from '~/components/common/StockThresholdsPanel.vue'
+import DaysOfCover from '~/components/Hospital/DaysOfCover.vue'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 const { can } = useUser()

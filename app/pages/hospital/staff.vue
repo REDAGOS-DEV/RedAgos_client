@@ -9,20 +9,6 @@
         <button type="button" class="btn-link" @click="refresh">Retry</button>
       </div>
 
-      <!-- What each role covers, from the server. -->
-      <section class="roles" aria-label="Roles">
-        <article v-for="role in roles" :key="role.value" class="role-card">
-          <div class="role-card__top">
-            <span class="role-card__icon" :class="`role-card__icon--${role.value}`">
-              <AssetIcon :name="ROLE_ICONS[role.value] || 'user-circle'" :size="18" />
-            </span>
-            <h2 class="role-card__title">{{ role.label }}</h2>
-            <span class="role-card__count">{{ roleCount(role.value) }}</span>
-          </div>
-          <p class="role-card__desc">{{ role.description }}</p>
-        </article>
-      </section>
-
       <section class="panel" aria-labelledby="roster-title">
         <h2 id="roster-title" class="sr-only">Staff accounts</h2>
 
@@ -41,7 +27,7 @@
             </label>
 
             <SelectField v-model="roleFilter" class="sel-filter" size="sm" aria-label="Filter by role"
-              :options="[{ value: '', label: 'All roles' }, ...roles.map((role) => ({ value: role.value, label: role.label }))]" />
+              :options="[{ value: '', label: 'All roles' }, ...roles.map((role) => ({ value: role.value, label: `${role.label} (${roleCount(role.value)})` }))]" />
 
             <SelectField v-model="accountFilter" class="sel-filter" size="sm" aria-label="Filter by account"
               :options="ACCOUNT_FILTERS" />
@@ -112,12 +98,20 @@
               <tr v-for="member in pageItems" :key="member.uuid" class="list-row" :class="{ 'row--removed': member.deleted_at }">
                 <td>
                   <div class="cell">
-                    <span class="cell__main">{{ member.full_name }}</span>
-                    <span v-if="member.is_you" class="tag">You</span>
+                    <span class="cell__main">
+                      {{ member.full_name }}
+                      <span v-if="member.is_you" class="tag">You</span>
+                    </span>
                     <span class="cell__sub">{{ member.email }}</span>
                   </div>
                 </td>
-                <td class="nowrap">{{ member.hospital_role_label || '—' }}</td>
+                <td class="nowrap">
+                  <span v-if="member.hospital_role_label" class="role-pill" :class="`role-pill--${member.hospital_role}`">
+                    <AssetIcon :name="ROLE_ICONS[member.hospital_role] || 'user-circle'" :size="13" />
+                    {{ member.hospital_role_label }}
+                  </span>
+                  <span v-else>—</span>
+                </td>
                 <td>{{ member.position || '—' }}</td>
                 <td>
                   <span class="badge" :class="accountBadge(member)">
@@ -213,10 +207,13 @@
 
           <fieldset class="field">
             <legend class="field-label">Role</legend>
-            <label v-for="role in roles" :key="role.value" class="role-option" :class="{ 'role-option--on': form.hospital_role === role.value }">
-              <input v-model="form.hospital_role" type="radio" name="hospital_role" :value="role.value" required>
-              <strong>{{ role.label }}</strong>
-            </label>
+            <div class="role-options">
+              <label v-for="role in roles" :key="role.value" class="role-option" :class="[`role-option--${role.value}`, { 'role-option--on': form.hospital_role === role.value }]">
+                <input v-model="form.hospital_role" class="sr-only" type="radio" name="hospital_role" :value="role.value" required>
+                <AssetIcon :name="ROLE_ICONS[role.value] || 'user-circle'" :size="14" />
+                {{ role.label }}
+              </label>
+            </div>
             <span v-if="errors.hospital_role" class="field-error">{{ errors.hospital_role }}</span>
           </fieldset>
 
@@ -228,7 +225,8 @@
             </label>
             <label class="field">
               <span class="field-label">Confirm password</span>
-              <input v-model="form.password_confirmation" type="password" class="field-input" required autocomplete="new-password">
+              <input v-model="form.password_confirmation" type="password" class="field-input" :class="{ 'field-input--bad': passwordsDiffer }" required autocomplete="new-password">
+              <span v-if="passwordsDiffer" class="field-error">The passwords do not match.</span>
             </label>
           </div>
 
@@ -267,10 +265,13 @@
 
           <fieldset class="field">
             <legend class="field-label">Role</legend>
-            <label v-for="role in roles" :key="role.value" class="role-option" :class="{ 'role-option--on': editForm.hospital_role === role.value }">
-              <input v-model="editForm.hospital_role" type="radio" name="edit_hospital_role" :value="role.value" required>
-              <strong>{{ role.label }}</strong>
-            </label>
+            <div class="role-options">
+              <label v-for="role in roles" :key="role.value" class="role-option" :class="[`role-option--${role.value}`, { 'role-option--on': editForm.hospital_role === role.value }]">
+                <input v-model="editForm.hospital_role" class="sr-only" type="radio" name="edit_hospital_role" :value="role.value" required>
+                <AssetIcon :name="ROLE_ICONS[role.value] || 'user-circle'" :size="14" />
+                {{ role.label }}
+              </label>
+            </div>
             <span v-if="editErrors.hospital_role" class="field-error">{{ editErrors.hospital_role }}</span>
           </fieldset>
 
@@ -424,16 +425,15 @@ function accountBadge(member) {
   return { removed: 'badge--neutral', unverified: 'badge--warn', active: 'badge--ok' }[accountKey(member)]
 }
 
-// ── Role cards ──
+// ── Role icons, and how many active people each role has, for the role filter ──
 const ROLE_ICONS = {
   head: 'shield-check',
   inventory_staff: 'package',
   requesting_staff: 'clipboard-list',
 }
-// Active accounts in a role, for the card's count.
+// Active accounts in a role, beside it in the role filter.
 function roleCount(role) {
-  const n = staff.value.filter((member) => !member.deleted_at && member.hospital_role === role).length
-  return n === 1 ? '1 person' : `${n} people`
+  return staff.value.filter((member) => !member.deleted_at && member.hospital_role === role).length
 }
 
 function initialsOf(name) {
@@ -546,6 +546,7 @@ const blank = () => ({
 })
 
 const adding = ref(false)
+const passwordsDiffer = computed(() => Boolean(form.password_confirmation) && form.password !== form.password_confirmation)
 const saving = ref(false)
 const form = reactive(blank())
 const errors = reactive({})
@@ -597,22 +598,21 @@ onPageReturn(refresh)
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.role-card { padding: 14px 16px; border-radius: var(--rb-radius-lg); border: 1px solid var(--rb-border); background: var(--rb-surface); box-shadow: var(--rb-shadow-sm); }
-.role-card__top { display: flex; align-items: center; gap: 10px; }
-.role-card__icon {
-  display: flex; flex-shrink: 0; align-items: center; justify-content: center;
-  width: 36px; height: 36px; border-radius: 11px;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+/* Role colours, each apart from the others and from the green You (2026-11-27): Head purple, inventory amber, requesting teal. */
+.role-pill--head, .role-option--head { --role: var(--rb-purple); --role-rgb: var(--rb-purple-rgb); --role-text: var(--rb-purple-text); }
+.role-pill--inventory_staff, .role-option--inventory_staff { --role: var(--rb-warning); --role-rgb: var(--rb-warning-rgb); --role-text: var(--rb-warning-text); }
+.role-pill--requesting_staff, .role-option--requesting_staff { --role: var(--rb-teal); --role-rgb: var(--rb-teal-rgb); --role-text: var(--rb-teal-text); }
+
+/* The roster: the role as a pill in its colour. */
+.cell__main { display: flex; align-items: center; gap: 6px; }
+/* You: your own row, in green, apart from the blue of Requesting staff (2026-11-27). */
+.cell__main .tag { margin: 0; border-color: rgba(var(--rb-success-rgb), .35); background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); font-weight: 700; }
+.role-pill {
+  --role: var(--rb-primary); --role-rgb: var(--rb-primary-rgb); --role-text: var(--rb-primary-text);
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
+  background: rgba(var(--role-rgb), .1); color: var(--role-text); font-size: 12px; font-weight: 700;
 }
-.role-card__icon--head { background: rgba(var(--rb-purple-rgb), 0.1); color: var(--rb-purple-text); }
-.role-card__icon--inventory_staff { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
-.role-card__title { flex: 1; min-width: 0; margin: 0; font-size: 14px; font-weight: 700; }
-.role-card__count {
-  flex-shrink: 0; padding: 2px 9px; border-radius: 999px;
-  background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-size: 11.5px; font-weight: 600;
-}
-.role-card__desc { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+.row--removed .role-pill { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
 
 .edit-who {
   display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;
@@ -639,11 +639,19 @@ onPageReturn(refresh)
 .field-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .field-error, .form-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
-.role-option { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--rb-border); cursor: pointer; }
-.role-option + .role-option { margin-top: 6px; }
-.role-option--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .05); }
-.role-option input { margin-top: 3px; }
-.role-option strong { display: block; font-size: 13px; }
+/* Role choice: one row of options, the chosen one in its role's colour. */
+.role-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.role-option {
+  --role: var(--rb-primary); --role-rgb: var(--rb-primary-rgb); --role-text: var(--rb-primary-text);
+  display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--rb-border-strong); background: var(--rb-surface); cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.role-option:hover { border-color: rgba(var(--role-rgb), .5); color: var(--rb-text-primary); }
+.role-option--on { border-color: var(--role); background: rgba(var(--role-rgb), .08); color: var(--role-text); }
+.role-option:has(input:focus-visible) { box-shadow: var(--rb-focus-ring); }
+.field-input--bad { border-color: var(--rb-accent); }
+
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .45); }
 .dialog { width: min(560px, 100%); border: 1px solid var(--rb-border); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 18px; background: var(--rb-surface); box-shadow: 0 20px 50px -12px rgba(15, 23, 42, .35); }

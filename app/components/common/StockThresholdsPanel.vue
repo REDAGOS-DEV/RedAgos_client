@@ -29,20 +29,6 @@
           {{ busy ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
-
-      <aside class="guide" aria-label="What the levels mean">
-        <span class="guide__icon" aria-hidden="true"><AssetIcon name="info" :size="18" /></span>
-        <dl class="guide__list">
-          <div>
-            <dt>PAR Level</dt>
-            <dd>The target stock level to keep for smooth operations.</dd>
-          </div>
-          <div>
-            <dt>Critical Level</dt>
-            <dd>The minimum stock level before a low-stock alert is sent.</dd>
-          </div>
-        </dl>
-      </aside>
     </header>
 
     <div v-if="loadError" class="alert" role="alert">
@@ -89,7 +75,15 @@
           </button>
         </div>
 
+        <dl class="levels-key" aria-label="What the levels mean">
+          <div><dt>PAR</dt><dd>the stock to keep for smooth operations</dd></div>
+          <div><dt>Critical</dt><dd>the floor: below it, a low-stock alert goes out</dd></div>
+        </dl>
+
         <StockThresholdGrid v-show="view === 'stock'" :status="status" @set-levels="(level) => (view = level)" />
+
+        <!-- Beside the stock now, what a page adds: the blood bank's days of cover (2026-11-27). -->
+        <div v-show="view === 'stock'" v-if="$slots['below-stock']" class="below-stock"><slot name="below-stock" /></div>
 
         <StockLevelCard
           v-for="level in LEVELS"
@@ -427,13 +421,14 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* heading and the guide beside it */
-.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+/* heading, with Refresh at its right */
+.page-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px 24px; }
 .page-head__text { flex: 1 1 auto; min-width: 0; }
-.page-head__title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
-.page-head__subtitle { margin: 6px 0 0; max-width: 66ch; font-size: var(--rb-text-base); line-height: 1.6; color: var(--rb-text-secondary); }
+.page-head__title { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+.page-head__subtitle { margin: 4px 0 0; max-width: 72ch; font-size: var(--rb-fs-small, 13px); line-height: 1.5; color: var(--rb-text-secondary); }
 
-.scope { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin-top: 12px; }
+.scope { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.scope__item:not(.scope__item--note) { padding: 3px 11px; border-radius: 999px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
 .scope__item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--rb-text-secondary); }
 .scope__item strong { color: var(--rb-text-primary); }
 .scope__item--note { padding: 3px 11px; border-radius: 999px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); font-weight: 600; }
@@ -442,15 +437,15 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 14px;
   border: 1px solid var(--rb-border-strong);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--rb-surface);
-  color: var(--rb-text-secondary);
+  color: var(--rb-text-primary);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -458,29 +453,6 @@ onBeforeUnmount(() => {
 .refresh:disabled { opacity: 0.45; cursor: not-allowed; }
 .refresh:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
-.guide {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex: 0 1 460px;
-  padding: 14px 18px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.28);
-  border-radius: var(--rb-radius-md);
-  background: rgba(var(--rb-primary-rgb), 0.06);
-}
-.guide__icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--rb-primary);
-  color: #fff;
-}
-.guide__list { display: grid; gap: 10px; margin: 0; }
-.guide__list dt { font-size: var(--rb-text-base); font-weight: 700; color: var(--rb-primary-text); }
-.guide__list dd { margin: 1px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .alert {
   display: flex;
@@ -513,6 +485,13 @@ onBeforeUnmount(() => {
 .callout :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
 
 .empty { margin: 0; padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
+
+/* The two levels, one line each, beside the views. */
+.levels-key { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: -6px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.levels-key div { display: flex; gap: 5px; }
+.levels-key dt { font-weight: 700; color: var(--rb-text-primary); }
+.levels-key dd { margin: 0; }
+
 
 /* The view switch */
 .views { display: inline-flex; flex-wrap: wrap; align-self: flex-start; gap: 4px; padding: 4px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface); }
@@ -572,16 +551,12 @@ onBeforeUnmount(() => {
 .spin { animation: panel-spin 0.9s linear infinite; }
 @keyframes panel-spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 1100px) {
-  .page-head { flex-direction: column; }
-  .guide { flex-basis: auto; width: 100%; max-width: 640px; }
-}
 
 @media (max-width: 760px) {
   .panel { padding: 16px 16px 32px; gap: 14px; }
   .page-head__title { font-size: 22px; }
   .page-head__subtitle { font-size: var(--rb-text-sm); }
-  .guide { padding: 12px 14px; }
+  .page-head { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

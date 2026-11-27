@@ -17,6 +17,13 @@
 
     <!-- ============== SEARCH SECTION ============== -->
     <section class="card search-card">
+      <div class="search-head">
+        <h2 class="search-title">
+          <span class="search-title__icon" aria-hidden="true"><AssetIcon name="route" :size="15" /></span>
+          Track a request
+        </h2>
+        <p class="search-hint">Type or scan its reference: <span class="mono">RQ-…</span> for a blood center's share, <span class="mono">PTR-…</span> for a patient request.</p>
+      </div>
       <form class="search-form" @submit.prevent="handleSearchSubmit">
         <div class="search-input-wrap">
           <AssetIcon name="search" class="search-icon" />
@@ -24,7 +31,8 @@
             v-model="referenceInput"
             type="text"
             class="search-input"
-            placeholder="Search by Reference Number..."
+            @input="onSearchInput"
+            placeholder="Reference, patient, or blood center"
             aria-label="Search by reference number"
             @focus="showRecentDropdown = true"
           />
@@ -62,22 +70,110 @@
       <SkeletonList v-if="isLoadingRecent" class="recent-loading" :rows="2" />
     </section>
 
-    <!-- ============== EMPTY STATE ============== -->
-    <section v-if="!hasSearched" class="card">
-      <template v-if="recentRequests.length">
-        <h2 class="section-title">Recent requests</h2>
-        <ul class="recent-list">
-          <li v-for="item in recentRequests.slice(0, 6)" :key="item.reference_number">
-            <button type="button" class="recent-row" @click="handleSelectRecent(item.reference_number)">
-              <span class="recent-row__ref">{{ item.reference_number }}</span>
-              <span class="recent-row__what">{{ bloodTypeSummary(item) }} · {{ componentSummary(item) || '—' }}</span>
-              <span class="status-badge status-badge--sm" :class="`badge--${TONE_BADGES[REQUEST_STATUS_TONES[item.status]] ?? 'neutral'}`">{{ requestStatusLabel(item) }}</span>
-              <AssetIcon name="arrow-right" :size="14" class="recent-row__go" />
-            </button>
-          </li>
-        </ul>
-      </template>
-      <EmptyState v-else icon="package-search" title="No Request Selected" description="Search using a blood request reference number to begin tracking." />
+    <!-- ============== EVERY REQUEST ============== -->
+    <!-- Every request this blood bank raised, newest first, to open and follow
+         (project owner, 2026-11-27): the search above narrows it as you type. -->
+    <section v-if="!hasSearched" class="card list-card" aria-labelledby="all-title">
+      <header class="list-card__head">
+        <h2 id="all-title" class="section-title list-card__title">
+          All requests
+          <span class="list-card__count">{{ listMeta.total }}</span>
+        </h2>
+        <div class="status-tabs" role="group" aria-label="Show requests by status">
+          <button
+            v-for="tab in STATUS_TABS"
+            :key="tab.value || 'all'"
+            type="button"
+            class="status-tab"
+            :class="[`status-tab--${tab.tone}`, { 'status-tab--on': listStatus === tab.value }]"
+            :aria-pressed="listStatus === tab.value"
+            @click="setListStatus(tab.value)"
+          >
+            <span class="status-tab__dot" aria-hidden="true" />
+            {{ tab.label }}
+          </button>
+        </div>
+      </header>
+
+      <p v-if="listError" class="list-card__error" role="alert">
+        {{ listError }}
+        <button type="button" class="btn-link" @click="loadList(listMeta.page)">Try again</button>
+      </p>
+
+      <div class="all-wrap" :class="{ 'all-wrap--busy': listLoading && listRows.length }">
+        <table class="all-table">
+          <caption class="sr-only">Every blood request from this blood bank</caption>
+          <thead>
+            <tr>
+              <th scope="col">Reference</th>
+              <th scope="col">Blood</th>
+              <th scope="col" class="num">Units</th>
+              <th scope="col">Blood center</th>
+              <th scope="col">Submitted</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Track</span></th>
+            </tr>
+          </thead>
+          <tbody v-if="listLoading && !listRows.length">
+            <tr v-for="n in 6" :key="n" aria-hidden="true">
+              <td v-for="c in 7" :key="c"><span class="sk sk--line" :style="{ width: c === 7 ? '40px' : '70%' }" /></td>
+            </tr>
+          </tbody>
+          <tbody v-else-if="!listRows.length">
+            <tr>
+              <td colspan="7">
+                <EmptyState
+                  :icon="referenceInput.trim() || listStatus ? 'search-x' : 'package-search'"
+                  :title="referenceInput.trim() || listStatus ? 'No requests match' : 'No requests yet'"
+                  :description="referenceInput.trim() || listStatus ? 'Try another reference or status.' : 'Requests your blood bank raises appear here, to follow from submission to receipt.'"
+                  compact
+                />
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr
+              v-for="item in listRows"
+              :key="item.reference_number"
+              class="all-row"
+              :class="{ 'all-row--stat': item.urgency_level === 'emergency' }"
+              tabindex="0"
+              :aria-label="`Track ${item.reference_number}`"
+              @click="handleSelectRecent(item.reference_number)"
+              @keydown.enter.self="handleSelectRecent(item.reference_number)"
+            >
+              <td>
+                <span class="all-ref mono">{{ item.reference_number }}</span>
+                <span v-if="item.urgency_level === 'emergency'" class="all-stat">STAT</span>
+              </td>
+              <td>
+                <span class="all-blood">
+                  <span class="all-type">{{ bloodTypeSummary(item) }}</span>
+                  <span class="all-comp">{{ componentSummary(item) || '—' }}</span>
+                </span>
+              </td>
+              <td class="num">{{ item.quantity ?? '—' }}</td>
+              <td class="all-center">{{ item.target_facility?.name || '—' }}</td>
+              <td class="all-date">{{ formatDate(item.request_date) }}</td>
+              <td>
+                <span class="status-badge status-badge--sm" :class="`badge--${TONE_BADGES[REQUEST_STATUS_TONES[item.status]] ?? 'neutral'}`">{{ requestStatusLabel(item) }}</span>
+              </td>
+              <td class="all-go"><span>Track</span><AssetIcon name="arrow-right" :size="14" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ListPager
+        v-if="listMeta.total"
+        :page="listMeta.page"
+        :last-page="listMeta.lastPage"
+        :from="listMeta.from"
+        :to="listMeta.to"
+        :total="listMeta.total"
+        :busy="listLoading"
+        @go="loadList"
+      />
     </section>
 
     <!-- ============== ERROR STATE ============== -->
@@ -96,6 +192,11 @@
     <!-- ============== MAIN TRACKING VIEW ============== -->
     <template v-else-if="request">
       <!-- WHERE IT IS: the reference, what was asked, and each step with its time -->
+      <button type="button" class="back-to-list" @click="backToList">
+        <AssetIcon name="arrow-left" :size="14" />
+        All requests
+      </button>
+
       <section class="card hero-card">
         <div class="hero-card__top">
           <span class="hero-ref">{{ request.reference_number }}</span>
@@ -238,46 +339,71 @@
             </div>
           </section>
 
-          <!-- THE UNITS ON THEIR WAY -->
-          <section v-if="pickup?.units_dispatched" class="card side-card">
-            <h3 class="side-card__title">On the way</h3>
-            <div class="pickup-rows">
-              <div class="pickup-row">
-                <span class="info-label">From</span>
-                <span class="info-value">{{ pickup.facility || '—' }}</span>
-              </div>
-              <div v-if="pickup.address" class="pickup-row">
-                <span class="info-label">Address</span>
-                <span class="info-value">{{ pickup.address }}</span>
-              </div>
-              <div class="pickup-row">
-                <span class="info-label">Units dispatched</span>
-                <span class="info-value">{{ pickup.units_dispatched }}<template v-if="pickup.awaiting_confirmation">, {{ pickup.awaiting_confirmation }} to confirm</template></span>
-              </div>
-              <div class="pickup-row">
-                <span class="info-label">Dispatched</span>
-                <span class="info-value">{{ formatDateTime(pickup.dispatched_at) }}</span>
+          <!-- THE UNITS ON THEIR WAY: kept in view on every live request, saying
+               so when nothing is released yet, rather than vanishing (2026-11-27).
+               Laid out as a shipment: where from, how many, when (2026-11-27). -->
+          <section v-if="pickup?.facility && !['rejected', 'cancelled'].includes(request?.status)" class="card side-card ship" aria-labelledby="ship-title">
+            <header class="ship__head">
+              <span class="ship__icon" aria-hidden="true"><AssetIcon name="truck" :size="16" /></span>
+              <h3 id="ship-title" class="ship__title">On the way</h3>
+              <span
+                v-if="pickup.units_dispatched"
+                class="ship__chip"
+                :class="pickup.awaiting_confirmation ? 'ship__chip--wait' : 'ship__chip--done'"
+              >
+                <AssetIcon :name="pickup.awaiting_confirmation ? 'clock' : 'check'" :size="12" />
+                {{ pickup.awaiting_confirmation ? 'To confirm' : 'All received' }}
+              </span>
+            </header>
+
+            <div class="ship__from">
+              <span class="ship__from-icon" aria-hidden="true"><AssetIcon name="hospital" :size="15" /></span>
+              <div class="ship__from-text">
+                <span class="ship__label">From</span>
+                <span class="ship__name">{{ pickup.facility }}</span>
+                <span v-if="pickup.address" class="ship__addr">{{ pickup.address }}</span>
               </div>
             </div>
+
+            <p v-if="!pickup.units_dispatched" class="pickup-wait">
+              <AssetIcon name="clock" :size="14" />
+              Nothing released yet. The units show here once the blood center releases them.
+            </p>
+            <template v-else>
+              <dl class="ship__figs">
+                <div class="ship__fig">
+                  <dt>Dispatched</dt>
+                  <dd>{{ pickup.units_dispatched }} <span>unit{{ pickup.units_dispatched === 1 ? '' : 's' }}</span></dd>
+                </div>
+                <div class="ship__fig" :class="{ 'ship__fig--wait': pickup.awaiting_confirmation }">
+                  <dt>To confirm</dt>
+                  <dd>{{ pickup.awaiting_confirmation }} <span>unit{{ pickup.awaiting_confirmation === 1 ? '' : 's' }}</span></dd>
+                </div>
+              </dl>
+              <p v-if="pickup.dispatched_at" class="ship__when">
+                <AssetIcon name="clock" :size="13" />
+                Released {{ formatDateTime(pickup.dispatched_at) }}
+              </p>
+            </template>
           </section>
 
           <section class="card side-card">
             <h3 class="side-card__title">Quick Actions</h3>
             <div class="quick-actions">
-              <button class="ui-btn btn--full" type="button" @click="viewRequestDetails">
+              <button class="ui-btn ui-btn--primary btn--full" type="button" @click="viewRequestDetails">
                 <AssetIcon name="eye" />
                 <span>View Request Details</span>
               </button>
-              <button class="ui-btn btn--full" type="button" @click="handleDownloadPdf">
+              <button class="ui-btn ui-btn--download btn--full quick-btn" type="button" @click="handleDownloadPdf">
                 <AssetIcon name="download" />
                 <span>Download PDF</span>
               </button>
-              <button class="ui-btn btn--full" type="button" @click="handlePrint">
+              <button class="ui-btn btn--full quick-btn" type="button" @click="handlePrint">
                 <AssetIcon name="printer" />
                 <span>Print</span>
               </button>
               <button
-                class="ui-btn btn--full"
+                class="ui-btn btn--full quick-btn"
                 type="button"
                 :disabled="!centerContact"
                 @click="contactBloodCenter"
@@ -300,6 +426,8 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import ListPager from '~/components/common/ListPager.vue'
+import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeSummary, componentSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -340,7 +468,71 @@ const {
   searchByReference,
   selectRecent,
   refreshStatus,
+  clearSearch,
 } = useTrackRequests()
+
+// ── Every request, as a list (2026-11-27) ──
+const STATUS_TABS = [
+  { value: '', label: 'All', tone: 'neutral' },
+  { value: 'pending', label: 'Pending', tone: 'info' },
+  { value: 'processing', label: 'Processing', tone: 'progress' },
+  { value: 'partial', label: 'Partially fulfilled', tone: 'warning' },
+  { value: 'fulfilled', label: 'Fulfilled', tone: 'success' },
+  { value: 'rejected', label: 'Rejected', tone: 'danger' },
+  { value: 'cancelled', label: 'Cancelled', tone: 'muted' },
+]
+const LIST_PER_PAGE = 15
+const listRows = ref([])
+const listLoading = ref(false)
+const listError = ref('')
+const listStatus = ref('')
+const listMeta = reactive({ page: 1, lastPage: 1, from: 0, to: 0, total: 0 })
+let listSeq = 0
+
+async function loadList(page = 1) {
+  const seq = ++listSeq
+  listLoading.value = true
+  listError.value = ''
+  try {
+    const search = referenceInput.value.trim()
+    const res = await hospitalService.listRequests({
+      page,
+      per_page: LIST_PER_PAGE,
+      ...(listStatus.value ? { status: listStatus.value } : {}),
+      ...(search ? { search } : {}),
+    })
+    if (seq !== listSeq) return
+    listRows.value = res?.data ?? []
+    listMeta.page = res?.current_page ?? page
+    listMeta.lastPage = Math.max(1, res?.last_page ?? 1)
+    listMeta.total = res?.total ?? listRows.value.length
+    listMeta.from = listMeta.total ? (listMeta.page - 1) * (res?.per_page ?? LIST_PER_PAGE) + 1 : 0
+    listMeta.to = Math.min(listMeta.page * (res?.per_page ?? LIST_PER_PAGE), listMeta.total)
+  } catch (err) {
+    if (seq === listSeq) listError.value = err?.message || 'Your requests could not be loaded.'
+  } finally {
+    if (seq === listSeq) listLoading.value = false
+  }
+}
+
+function setListStatus(value) {
+  listStatus.value = listStatus.value === value ? '' : value
+  loadList(1)
+}
+
+// Typing narrows the list; a pause, then one call.
+let searchTimer = null
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { if (!hasSearched.value) loadList(1) }, 300)
+}
+onBeforeUnmount(() => clearTimeout(searchTimer))
+
+/** From a request back to every request. */
+function backToList() {
+  clearSearch()
+  loadList(listMeta.page)
+}
 
 const showRecentDropdown = ref(false)
 const isRefreshing = ref(false)
@@ -359,6 +551,7 @@ function openFromLink() {
 
 onMounted(() => {
   fetchRecent()
+  loadList(1)
   openFromLink()
 })
 
@@ -366,6 +559,7 @@ onMounted(() => {
 // is looked up again, unless a new link asks for another.
 onPageReturn(() => {
   fetchRecent()
+  loadList(listMeta.page)
   if (!openFromLink()) handleRefresh()
 })
 
@@ -577,6 +771,13 @@ function contactBloodCenter() {
 .search-card {
   padding: 20px 24px;
 }
+.search-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.search-title { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.search-title__icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.search-hint { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+/* References keep the portal's font, with figures that line up (2026-11-27). */
+.mono { font-variant-numeric: tabular-nums; }
+.search-hint .mono { font-weight: 700; color: var(--rb-text-primary); }
 .search-form {
   display: flex;
   gap: 12px;
@@ -597,8 +798,10 @@ function contactBloodCenter() {
   width: 100%;
   border: 1px solid var(--rb-border);
   border-radius: 12px;
-  padding: 14px 40px 14px 42px;
-  font-size: 15px;
+  height: 44px;
+  padding: 0 40px 0 42px;
+  font: inherit;
+  font-size: 14px;
   color: var(--rb-text-primary);
   background: var(--rb-surface-alt);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -620,6 +823,7 @@ function contactBloodCenter() {
 .search-btn {
   flex: 0 0 auto;
   min-width: 120px;
+  height: 44px;
 }
 .recent-loading {
   margin-top: 10px;
@@ -668,7 +872,7 @@ function contactBloodCenter() {
   background: rgba(var(--rb-primary-rgb), 0.06);
 }
 .recent-item__ref {
-  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
@@ -715,7 +919,7 @@ function contactBloodCenter() {
   background: linear-gradient(135deg, var(--rb-surface) 0%, rgba(var(--rb-primary-rgb), 0.06) 100%);
 }
 .hero-ref {
-  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
   font-weight: 700;
   color: var(--rb-text-primary);
@@ -849,7 +1053,7 @@ function contactBloodCenter() {
   letter-spacing: 0.03em;
 }
 .info-value { font-size: 14px; color: var(--rb-text-primary); line-height: 1.5; }
-.info-value--mono { font-family: 'SFMono-Regular', Consolas, monospace; }
+.info-value--mono { font-variant-numeric: tabular-nums; }
 
 /* ---------- Vertical timeline ---------- */
 .v-timeline { list-style: none; margin: 0; padding: 0; }
@@ -930,7 +1134,7 @@ function contactBloodCenter() {
 
 .empty-hint { font-size: 13px; color: var(--rb-text-muted); margin: 0; }
 .track-walk-in { margin-bottom: 10px; color: var(--rb-text-secondary); }
-.track-ptr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
+.track-ptr { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--rb-primary-text); }
 
 /* ---------- Documents ---------- */
 .documents-table { display: flex; flex-direction: column; gap: 10px; }
@@ -980,6 +1184,31 @@ function contactBloodCenter() {
 
 .pickup-rows { display: flex; flex-direction: column; gap: 12px; }
 .pickup-row { display: flex; flex-direction: column; gap: 3px; }
+/* On the way, as a shipment (2026-11-27). */
+.ship { display: flex; flex-direction: column; gap: 14px; }
+.ship__head { display: flex; align-items: center; gap: 10px; }
+.ship__icon { display: grid; flex: none; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.ship__title { flex: 1; margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.ship__chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.ship__chip--wait { background: rgba(var(--rb-warning-rgb, 217, 119, 6), .12); color: var(--rb-warning-text, #B45309); }
+.ship__chip--done { background: rgba(var(--rb-success-rgb, 22, 163, 74), .12); color: var(--rb-success-text, #15803D); }
+.ship__from { display: flex; gap: 10px; padding: 12px; border: 1px solid var(--rb-border); border-radius: 12px; }
+.ship__from-icon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.ship__from-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.ship__label { font-size: 12px; color: var(--rb-text-muted); }
+.ship__name { font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--rb-text-primary); }
+.ship__addr { font-size: 12.5px; color: var(--rb-text-secondary); }
+.ship__figs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.ship__fig { padding: 10px 12px; border-radius: 12px; background: var(--rb-surface-alt); }
+.ship__fig dt { font-size: 12px; color: var(--rb-text-secondary); }
+.ship__fig dd { margin: 2px 0 0; font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.ship__fig dd span { font-size: 12px; font-weight: 600; color: var(--rb-text-muted); }
+.ship__fig--wait { background: rgba(var(--rb-warning-rgb, 217, 119, 6), .1); }
+.ship__fig--wait dd { color: var(--rb-warning-text, #B45309); }
+.ship__when { display: flex; align-items: center; gap: 6px; margin: 0; padding-top: 12px; border-top: 1px solid var(--rb-border); font-size: 12.5px; color: var(--rb-text-secondary); }
+.ship__when :deep(svg) { color: var(--rb-text-muted); }
+.pickup-wait { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--rb-surface-alt); font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+.pickup-wait :deep(svg) { flex: none; margin-top: 2px; color: var(--rb-text-muted); }
 .countdown-chip {
   display: inline-flex;
   align-items: center;
@@ -994,6 +1223,8 @@ function contactBloodCenter() {
 }
 
 .quick-actions { display: flex; flex-direction: column; gap: 10px; }
+.quick-btn :deep(svg) { color: var(--rb-primary-text); }
+.quick-btn:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), .45); color: var(--rb-primary-text); }
 
 /* ---------- Empty / error states ---------- */
 .empty-state {
@@ -1079,12 +1310,85 @@ function contactBloodCenter() {
 .hero-card .stepper { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--rb-border); }
 .stepper-time { font-size: 11.5px; color: var(--rb-text-secondary); text-align: center; }
 .update-desc--note { color: var(--rb-text-secondary); }
+/* ── Every request (2026-11-27) ── */
+.list-card { display: flex; flex-direction: column; gap: 14px; }
+.list-card__head { display: flex; flex-direction: column; gap: 10px; }
+.list-card__title { display: flex; align-items: center; gap: 8px; margin: 0; }
+.list-card__count { min-width: 22px; padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; text-align: center; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.list-card__error { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 13px; color: var(--rb-accent-text); }
+
+.status-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.status-tab {
+  --tab: var(--rb-text-muted);
+  display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px;
+  border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer;
+}
+.status-tab--info { --tab: var(--rb-primary); }
+.status-tab--progress { --tab: var(--rb-purple, #7C3AED); }
+.status-tab--warning { --tab: var(--rb-warning); }
+.status-tab--success { --tab: var(--rb-success); }
+.status-tab--danger { --tab: var(--rb-accent); }
+.status-tab__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--tab); }
+.status-tab:hover { color: var(--rb-text-primary); border-color: var(--rb-border-strong); }
+.status-tab--on { border-color: color-mix(in srgb, var(--tab) 55%, transparent); background: color-mix(in srgb, var(--tab) 9%, var(--rb-surface)); color: var(--rb-text-primary); }
+.status-tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.all-wrap { overflow-x: auto; border: 1px solid var(--rb-border); border-radius: 12px; transition: opacity .15s ease; }
+.all-wrap--busy { opacity: .55; }
+.all-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.all-table th {
+  padding: 9px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left; white-space: nowrap;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--rb-text-secondary);
+}
+.all-table td { padding: 11px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.all-table tbody tr:last-child td { border-bottom: 0; }
+.all-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.all-row { cursor: pointer; transition: background-color .12s ease; }
+.all-row:hover { background: rgba(var(--rb-primary-rgb), .05); }
+.all-row:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
+.all-row--stat td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.all-ref { font-weight: 700; color: var(--rb-primary-text); white-space: nowrap; }
+.all-stat { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--rb-accent); color: #FFFFFF; font-size: 10.5px; font-weight: 700; }
+.all-blood { display: flex; align-items: center; gap: 8px; }
+.all-type { flex: none; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(var(--rb-accent-rgb), .35); background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); font-size: 12px; font-weight: 700; }
+.all-comp { white-space: nowrap; }
+.all-center, .all-date { white-space: nowrap; color: var(--rb-text-secondary); }
+.all-go { display: flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--rb-text-muted); }
+.all-row:hover .all-go { color: var(--rb-primary-text); }
+
+.back-to-list {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 6px 10px; border: 1px solid var(--rb-border);
+  border-radius: 9px; background: var(--rb-surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer;
+}
+.back-to-list:hover { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), .45); }
+.back-to-list:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* Recent requests: a grid of cards (2026-11-27). */
+.recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.recent-card {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; height: 100%; padding: 14px 16px;
+  border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt);
+  font: inherit; text-align: left; color: var(--rb-text-primary); cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .2s ease;
+}
+.recent-card:hover { border-color: rgba(var(--rb-primary-rgb), .45); background: var(--rb-surface); box-shadow: 0 8px 20px -12px rgba(15, 23, 42, .25); }
+.recent-card:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.recent-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.recent-card__ref { font-size: 13px; font-weight: 700; color: var(--rb-primary-text); }
+.recent-card__what { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; color: var(--rb-text-secondary); }
+.recent-card__type {
+  flex: none; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(var(--rb-accent-rgb), .35);
+  background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); font-size: 12px; font-weight: 700;
+}
+.recent-card__go { display: inline-flex; align-items: center; gap: 4px; align-self: flex-end; font-size: 12px; font-weight: 600; color: var(--rb-text-muted); transition: color .15s ease, gap .15s ease; }
+.recent-card:hover .recent-card__go { color: var(--rb-primary-text); gap: 7px; }
 .recent-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .recent-list li + li { border-top: 1px solid var(--rb-border); }
 .recent-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 11px 4px; border: 0; background: none; font: inherit; font-size: 13px; text-align: left; color: var(--rb-text-primary); cursor: pointer; }
 .recent-row:hover { background: var(--rb-surface-hover); }
 .recent-row:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
-.recent-row__ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--rb-primary-text); }
+.recent-row__ref { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--rb-primary-text); }
 .recent-row__what { flex: 1; min-width: 0; color: var(--rb-text-secondary); }
 .recent-row__go { flex-shrink: 0; color: var(--rb-text-muted); }
 </style>

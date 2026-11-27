@@ -11,7 +11,12 @@
       </PageHeader>
 
       <!-- WHAT TO LOOK FOR -->
-      <section class="panel ba-search" aria-label="Search blood centers">
+      <section class="panel ba-search-panel" aria-labelledby="ba-search-title">
+        <h2 id="ba-search-title" class="ba-search-title">
+          <span class="ba-search-icon" aria-hidden="true"><AssetIcon name="search" :size="15" /></span>
+          What do you need?
+        </h2>
+        <div class="ba-search">
         <div class="field">
           <label for="ba-type" class="field-label">Blood type</label>
           <SelectField
@@ -34,7 +39,8 @@
         </div>
         <div class="field">
           <label for="ba-quantity" class="field-label">Units needed <span class="field-optional">optional</span></label>
-          <input id="ba-quantity" v-model.number="filters.quantity" type="number" min="1" max="100" class="input">
+          <input id="ba-quantity" v-model.number="filters.quantity" type="number" min="1" max="100" class="input" placeholder="Any">
+        </div>
         </div>
       </section>
 
@@ -75,13 +81,19 @@
 
         <section v-else class="panel panel--flush" :class="{ 'panel--busy': searching }">
           <header class="ba-result-head">
-            <div>
-              <h2 class="ba-result-title">{{ resultLabel }}</h2>
-              <p class="ba-result-sub">
-                {{ result.totals.units_available }} unit{{ result.totals.units_available === 1 ? '' : 's' }}
-                at {{ result.totals.facilities_with_stock }} blood center{{ result.totals.facilities_with_stock === 1 ? '' : 's' }}
-              </p>
+            <div class="ba-result-main">
+              <span class="ba-result-type">{{ result.criteria.blood_type.code }}</span>
+              <div>
+                <h2 class="ba-result-title">{{ result.criteria.component.name }}</h2>
+                <p class="ba-result-sub">
+                  <strong>{{ result.totals.units_available }}</strong> unit{{ result.totals.units_available === 1 ? '' : 's' }}
+                  at {{ result.totals.facilities_with_stock }} blood center{{ result.totals.facilities_with_stock === 1 ? '' : 's' }}
+                </p>
+              </div>
             </div>
+            <span v-if="result.criteria.quantity" class="ba-result-need">
+              You need <strong>{{ result.criteria.quantity }}</strong>
+            </span>
           </header>
 
           <div class="ba-scroll">
@@ -89,7 +101,7 @@
               <thead>
                 <tr>
                   <th scope="col">Blood center</th>
-                  <th scope="col" class="num">Available</th>
+                  <th scope="col" class="list__avail-head">Available</th>
                   <th scope="col">Earliest expiry</th>
                   <th v-if="result.criteria.quantity" scope="col">For {{ result.criteria.quantity }} unit{{ result.criteria.quantity === 1 ? '' : 's' }}</th>
                 </tr>
@@ -100,10 +112,17 @@
                     <span class="list__name">{{ holding.facility.name }}</span>
                     <span v-if="holding.facility.address" class="list__sub">{{ holding.facility.address }}</span>
                   </td>
-                  <td class="num list__units">{{ holding.available }}</td>
+                  <!-- The figure, and a bar against the center that holds the most (2026-11-27). -->
+                  <td class="list__avail">
+                    <span class="avail">
+                      <span class="avail__track" aria-hidden="true"><span class="avail__fill" :style="{ width: `${Math.max(4, (holding.available / topAvailable) * 100)}%` }" /></span>
+                      <strong class="avail__value">{{ holding.available }}</strong>
+                    </span>
+                  </td>
                   <td class="nowrap">{{ formatDate(holding.earliest_expiry) }}</td>
                   <td v-if="result.criteria.quantity">
                     <span class="cover" :class="holding.covers_request ? 'cover--ok' : 'cover--part'">
+                      <AssetIcon :name="holding.covers_request ? 'check' : 'circle-alert'" :size="13" />
                       {{ holding.covers_request ? 'Covers it' : `Only ${holding.can_fulfil}` }}
                     </span>
                   </td>
@@ -163,6 +182,9 @@ const wantedUnits = computed(() => {
   const units = Number(filters.quantity)
   return Number.isInteger(units) && units >= 1 && units <= 100 ? units : null
 })
+
+// The most any center holds, for the bars in the Available column.
+const topAvailable = computed(() => Math.max(1, ...(result.value?.facilities ?? []).map((holding) => holding.available || 0)))
 
 const resultLabel = computed(() => (result.value
   ? `${result.value.criteria.blood_type.code} ${result.value.criteria.component.name}`
@@ -256,6 +278,9 @@ onUnmounted(() => clearTimeout(typingTimer))
 .panel--flush { padding: 0; overflow: hidden; }
 .panel--busy { opacity: 0.6; transition: opacity 0.15s ease; }
 
+.ba-search-panel { display: flex; flex-direction: column; gap: 14px; }
+.ba-search-title { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.ba-search-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
 .ba-search { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
@@ -273,9 +298,17 @@ onUnmounted(() => clearTimeout(typingTimer))
 }
 .banner .ui-btn { margin-left: auto; }
 
-.ba-result-head { padding: 16px 20px 14px; border-bottom: 1px solid var(--rb-border); }
-.ba-result-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.ba-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid var(--rb-border); }
+.ba-result-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.ba-result-type {
+  display: grid; place-items: center; min-width: 52px; height: 44px; padding: 0 10px; border-radius: 12px;
+  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); font-size: 17px; font-weight: 800;
+}
+.ba-result-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
 .ba-result-sub { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.ba-result-sub strong { color: var(--rb-text-primary); font-weight: 800; }
+.ba-result-need { padding: 4px 12px; border-radius: 999px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border); font-size: 12.5px; color: var(--rb-text-secondary); }
+.ba-result-need strong { color: var(--rb-text-primary); }
 .ba-scroll { overflow-x: auto; }
 
 .list { width: 100%; border-collapse: collapse; font-size: 13.5px; color: var(--rb-text-primary); }
@@ -286,9 +319,15 @@ onUnmounted(() => clearTimeout(typingTimer))
 .list__name { display: block; font-weight: 700; }
 .list__sub { display: block; margin-top: 1px; font-size: 12.5px; color: var(--rb-text-secondary); }
 .list__units { font-size: 15px; font-weight: 800; }
+.list__avail-head { width: 34%; }
+/* Available: a bar against the most any center holds, the figure after it. */
+.avail { display: flex; align-items: center; gap: 12px; }
+.avail__track { flex: 1; height: 8px; overflow: hidden; border-radius: 999px; background: var(--rb-surface-alt); }
+.avail__fill { display: block; height: 100%; border-radius: inherit; background: var(--rb-primary); }
+.avail__value { min-width: 28px; font-size: 15px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
 
-.cover { display: inline-flex; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.cover { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .cover--ok { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
 .cover--part { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
 

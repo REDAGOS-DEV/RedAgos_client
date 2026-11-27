@@ -97,6 +97,16 @@ export interface WeeklyRequest {
    * only on the detail view.
    */
   requests: BloodRequest[]
+  /** Only on the list (2026-11-26): when each step last happened, from the history. */
+  step_times?: WeeklyStepTimes
+}
+
+/** Sent, confirmed by the center, dispatched, received: the latest time each happened, or null. */
+export interface WeeklyStepTimes {
+  submitted: string | null
+  confirmed: string | null
+  released: string | null
+  received: string | null
 }
 
 /** One line of a weekly request: no indication, a weekly request has no patient to certify one for. */
