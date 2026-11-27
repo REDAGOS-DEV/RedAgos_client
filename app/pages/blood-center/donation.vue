@@ -385,7 +385,7 @@
           class="btn btn--primary"
           :disabled="busy || !vitalsComplete || (needsQuestionnaire && !dhqOnPaper)"
           :title="missingVitalsHint"
-          @click="submitScreening('accepted')"
+          @click="acceptScreening"
         >
           {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accepted — continue' }}
         </button>
@@ -632,6 +632,54 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Accepted over a reading out of range: the physician says why (project owner, 2026-11-27). -->
+    <Transition name="modal">
+      <div v-if="acceptingOutOfRange" class="modal-overlay" @click.self="cancelAccept">
+        <div
+          v-focus-trap
+          class="modal-card"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="accept-title"
+          aria-describedby="accept-findings"
+          @dialog-escape="cancelAccept"
+        >
+          <div class="modal-card__header">
+            <h2 id="accept-title" class="modal-card__title">
+              <AssetIcon name="triangle-alert" :size="17" />
+              Accept with readings out of range?
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" :disabled="busy" @click="cancelAccept">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+          <div class="modal-card__body">
+            <ul id="accept-findings" class="modal-findings">
+              <li v-for="finding in findings" :key="finding.field">{{ findingText(finding, vitalRanges[finding.field]) }}</li>
+            </ul>
+            <label class="field">
+              <span class="field__label">Reason for accepting</span>
+              <textarea
+                ref="acceptReasonInput"
+                v-model="screeningForm.out_of_range_reason"
+                class="field__input"
+                rows="3"
+                maxlength="255"
+                placeholder="e.g. Trained athlete; resting pulse 54"
+              />
+            </label>
+            <p v-if="error" class="modal-error" role="alert">{{ error }}</p>
+          </div>
+          <div class="modal-card__footer">
+            <button type="button" class="btn" :disabled="busy" @click="cancelAccept">Back</button>
+            <button type="button" class="btn btn--primary" :disabled="busy || !screeningForm.out_of_range_reason.trim()" @click="confirmAccept">
+              {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accept donor' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -819,6 +867,8 @@ const screeningForm = reactive({
   other_reason: '',
   // A temporary deferral's last day, from the deferral form.
   deferred_until: '',
+  // Why the physician accepted over a reading out of range (2026-11-27).
+  out_of_range_reason: '',
 })
 
 /* ---------- the six vital signs (project owner, 2026-10-24) ---------- */
@@ -863,6 +913,31 @@ const dialogDonor = computed(() => (donor.value ? {
   bloodType: donor.value.blood_type || '',
   phone: formatPhone(donor.value.phone),
 } : null))
+
+/* ---------- Accepted: over a reading out of range, with the reason ---------- */
+
+// The physician may accept a donor with a reading out of range, but says why
+// (project owner, 2026-11-27); the server refuses an acceptance without it.
+const acceptingOutOfRange = ref(false)
+const acceptReasonInput = ref(null)
+
+function acceptScreening() {
+  if (!findings.value.length) return submitScreening('accepted')
+
+  acceptingOutOfRange.value = true
+  // A task later: v-focus-trap focuses the first button on its own nextTick.
+  setTimeout(() => acceptReasonInput.value?.focus())
+}
+
+function cancelAccept() {
+  if (busy.value) return
+  acceptingOutOfRange.value = false
+}
+
+async function confirmAccept() {
+  if (!screeningForm.out_of_range_reason.trim()) return
+  await submitScreening('accepted')
+}
 
 /** What the form chose, recorded as this visit's screening. */
 async function confirmDeferral(choice) {
@@ -1044,6 +1119,11 @@ async function submitScreening(outcome) {
   if (outcome !== 'accepted') Object.assign(payload, deferralChoicePayload(screeningForm.deferral_code, screeningForm.other_reason))
   if (outcome === 'temporarily_deferred') payload.deferred_until = screeningForm.deferred_until
 
+  // Only an acceptance over a reading out of range carries a reason.
+  if (outcome === 'accepted' && findings.value.length && screeningForm.out_of_range_reason.trim()) {
+    payload.out_of_range_reason = screeningForm.out_of_range_reason.trim()
+  }
+
   // The donor answered the printed DHQ: recorded on the screening.
   if (needsQuestionnaire.value && dhqOnPaper.value) payload.dhq_on_paper = true
 
@@ -1059,11 +1139,15 @@ async function submitScreening(outcome) {
 
     correction.value = { subject: 'screening', changes: payload, previous: saved }
     deferring.value = false
+    acceptingOutOfRange.value = false
     return
   }
 
-  // A refused save keeps the deferral form open, with the server's message in it.
-  if (await recordScreening(payload)) deferring.value = false
+  // A refused save keeps the deferral or reason dialog open, with the server's message in it.
+  if (await recordScreening(payload)) {
+    deferring.value = false
+    acceptingOutOfRange.value = false
+  }
 }
 
 async function submitCollection() {
@@ -1208,7 +1292,7 @@ function finishVisit() {
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
     fingerprick_blood_type_id: null,
-    notes: '', deferral_code: '', other_reason: '', deferred_until: '',
+    notes: '', deferral_code: '', other_reason: '', deferred_until: '', out_of_range_reason: '',
   })
   Object.assign(collectionForm, blankCollection())
   collectionAttempted.value = false
@@ -1850,6 +1934,17 @@ function finishVisit() {
 }
 
 .modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--rb-text-primary); }
+
+.modal-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--rb-text-primary);
+}
 
 .modal-error {
   margin: 0;
