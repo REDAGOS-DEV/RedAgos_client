@@ -52,6 +52,7 @@
         <thead>
           <tr>
             <th>Component</th>
+            <th>Code</th>
             <th>Charging</th>
             <th>Price per unit</th>
           </tr>
@@ -59,13 +60,14 @@
         <tbody>
           <template v-if="busy && !rows.length">
             <tr v-for="n in 4" :key="`sk-${n}`">
-              <td><span class="skeleton skeleton--name" /><span class="skeleton skeleton--code" /></td>
+              <td><span class="skeleton skeleton--name" /></td>
+              <td><span class="skeleton skeleton--code" /></td>
               <td><span class="skeleton skeleton--seg" /></td>
               <td><span class="skeleton skeleton--input" /></td>
             </tr>
           </template>
           <tr v-else-if="!visibleRows.length">
-            <td colspan="3" class="empty-filter">
+            <td colspan="4" class="empty-filter">
               Nothing left here.
               <button type="button" class="link-btn" @click="filter = ''">Show all components</button>
             </td>
@@ -76,10 +78,9 @@
             :key="row.id"
             :class="{ 'row--dirty': isDirty(row), 'row--invalid': errors[row.id] }"
           >
-            <td>
-              <span class="name">{{ row.name }}</span>
-              <span class="code">{{ row.code }}</span>
-            </td>
+            <!-- One value a column (project owner, 2026-11-27). -->
+            <td class="name">{{ row.name }}</td>
+            <td class="code">{{ row.code || '—' }}</td>
             <td>
               <!-- One choice per component: charge for it, or not (was a No charge checkbox). -->
               <div class="seg" role="radiogroup" :aria-label="`Charging for ${row.name}`">
@@ -610,16 +611,8 @@ onPageReturn(() => {
 .prices tbody tr.row--invalid { background: rgba(var(--rb-accent-rgb), 0.05); }
 
 .name { font-weight: 600; }
-.code {
-  display: inline-block;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--rb-surface-alt);
-  border: 1px solid var(--rb-border);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
+/* Plain text, not a chip (project owner, 2026-11-27). */
+.code { font-family: var(--rb-font-mono); font-size: 12.5px; color: var(--rb-text-primary); white-space: nowrap; }
 .empty { padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
 
 .input-group {
@@ -779,13 +772,12 @@ onPageReturn(() => {
 
 /* The rows. */
 .prices td { padding: 12px 16px; }
-.prices th:first-child, .prices td:first-child { width: 36%; }
-.prices th:nth-child(2), .prices td:nth-child(2) { width: 28%; }
+.prices th:first-child, .prices td:first-child { width: 30%; }
+.prices th:nth-child(2), .prices td:nth-child(2) { width: 14%; }
+.prices th:nth-child(3), .prices td:nth-child(3) { width: 26%; }
 .prices tbody tr.row--dirty { box-shadow: inset 3px 0 0 var(--rb-primary); }
 .prices tbody tr.row--invalid { box-shadow: inset 3px 0 0 var(--rb-accent); }
-.name { display: block; font-size: 13.5px; }
-.code { margin-top: 4px; }
-.skeleton--name { margin-bottom: 6px; }
+.name { font-size: 13.5px; }
 .skeleton--seg { width: 172px; height: 34px; border-radius: 10px; }
 
 /* Charge | No charge. */

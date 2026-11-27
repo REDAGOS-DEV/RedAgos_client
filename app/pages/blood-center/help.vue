@@ -50,6 +50,7 @@
         </nav>
 
         <div class="guides">
+          <SkeletonList v-if="!ready" :rows="5" class="guides__loading" />
           <details
             v-for="guide in departmentGuides"
             :id="`guide-${guide.id}`"
@@ -99,9 +100,10 @@
 
       <!-- QUESTIONS AND TERMS, side by side -->
       <div class="hc-lower">
-        <section v-if="topQuestions.length" class="card" aria-labelledby="hc-faq">
+        <section v-if="!ready || topQuestions.length" class="card" aria-labelledby="hc-faq">
           <h2 id="hc-faq" class="card__title">Common questions</h2>
-          <div class="faq">
+          <SkeletonList v-if="!ready" :rows="4" />
+          <div v-else class="faq">
             <details v-for="item in topQuestions" :key="item.q" class="faq__item">
               <summary>
                 <span>{{ item.q }}</span>
@@ -150,6 +152,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import KeyCombo from '~/components/BloodCenter/KeyCombo.vue'
 import { HELP_GLOSSARY, HELP_GUIDES, ROLE_HELP, guideVisible } from '~/utils/bloodCenterHelp'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 
 definePageMeta({
   middleware: 'auth',
@@ -159,19 +162,28 @@ definePageMeta({
 
 const route = useRoute()
 const router = useRouter()
-const { navGroups, searchablePages, labelForPath, sectionForPath } = useBloodCenterNav()
+const { navGroups, searchablePages, sectionForPath } = useBloodCenterNav()
 const { user, can } = useUser()
+
+// In the browser only. The server renders this page before it knows who is
+// signed in, so its guides were another account's: hydrating them kept the
+// server's links (every "Go to" pointing at Settings after a reload). Until
+// mounted, the account's parts render as nothing on both sides, then fill in.
+const ready = ref(false)
 
 // Only guides for pages this account can open; the sidebar's own rule. Each
 // guide sits in the sidebar group of its page, so the two never disagree
 // (the guides' own department names fell behind when the sidebar was split).
-const allowedPaths = computed(() => new Set(searchablePages.value.map((item) => item.path.split('?')[0])))
+// A link's other tabs count as its page (Payments: Receipts, Transactions).
+const allowedPaths = computed(() => new Set(!ready.value ? [] : searchablePages.value
+  .flatMap((item) => [item.path, ...(item.alsoActiveOn ?? [])])
+  .map((path) => path.split('?')[0])))
 const guides = computed(() => HELP_GUIDES
   .filter((guide) => guideVisible(guide, allowedPaths.value, can))
   .map((guide) => ({ ...guide, department: sectionForPath(guide.via?.path ?? guide.path) || guide.department })))
 
 /* FOR YOUR ROLE: the staff role, or the Admin's or Supervisor's level */
-const roleKey = computed(() => user.value?.management_level || user.value?.staff_role || '')
+const roleKey = computed(() => (ready.value && (user.value?.management_level || user.value?.staff_role)) || '')
 const roleHelp = computed(() => ROLE_HELP[roleKey.value] ?? null)
 const roleName = computed(() => user.value?.management_level_label || user.value?.staff_role_label || user.value?.role_label || 'Your role')
 const startGuides = computed(() => (roleHelp.value?.start ?? [])
@@ -186,8 +198,11 @@ const departments = computed(() => navGroups.value
 const department = ref('')
 const departmentGuides = computed(() => guides.value.filter((g) => g.department === department.value))
 
+// The sidebar link a guide's page sits under, its tabs included (labelForPath
+// went with the breadcrumbs and left this page failing to load).
 function pageLabel(path) {
-  return labelForPath(path) || 'the page'
+  const base = path.split('?')[0]
+  return searchablePages.value.find((item) => item.path.split('?')[0] === base || item.alsoActiveOn?.includes(base))?.label || 'the page'
 }
 
 // Opens on the department of the role's first guide, else the first listed.
@@ -217,6 +232,7 @@ async function openGuide(id) {
 // Watched, not read once: a guide picked from the top bar search while
 // already on this page changes only the query.
 onMounted(() => {
+  ready.value = true
   watch(() => route.query.guide, (id) => {
     if (typeof id !== 'string' || !id) return
     openGuide(id)
@@ -265,6 +281,7 @@ const topQuestions = computed(() => {
 .depts__note { margin: auto 8px 0; padding-top: 14px; font-size: 11.5px; line-height: 1.45; color: var(--rb-text-muted); }
 
 .guides { display: flex; flex-direction: column; min-width: 0; }
+.guides__loading { padding: 18px; }
 .guide + .guide { border-top: 1px solid var(--rb-border); }
 .guide { scroll-margin-top: 88px; }
 .guide__summary { display: flex; align-items: center; gap: 14px; padding: 16px 20px; cursor: pointer; list-style: none; }

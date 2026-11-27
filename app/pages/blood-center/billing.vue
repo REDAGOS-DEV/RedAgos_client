@@ -113,6 +113,7 @@
             <thead>
               <tr>
                 <th scope="col">Invoice</th>
+                <th scope="col">Billed on</th>
                 <th scope="col">Request</th>
                 <th scope="col">{{ category === 'weekly' ? 'Hospital' : 'Patient' }}</th>
                 <th scope="col">Components</th>
@@ -125,47 +126,23 @@
               </tr>
             </thead>
             <tbody>
+              <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
               <tr v-for="s in statements" :key="s.id" class="row" @click="open(s)">
-                <td>
+                <td class="nowrap">
                   <NuxtLink v-if="s.invoice_number" :to="`/blood-center/invoice/${requestIdOf(s)}`" class="link mono" @click.stop>{{ s.invoice_number }}</NuxtLink>
-                  <span v-else class="muted">Not issued</span>
-                  <span class="sub">{{ day(s.billing_date) }}</span>
+                  <template v-else>Not issued</template>
                 </td>
-                <td>
-                  <span class="mono">{{ s.request?.reference_number || '—' }}</span>
-                  <BillingBadge v-if="s.request?.is_emergency" tone="danger">STAT</BillingBadge>
-                </td>
-                <td>
-                  <template v-if="category === 'weekly'">{{ s.request?.requesting_facility || '—' }}</template>
-                  <div v-else class="who">
-                    <span class="who-avatar" aria-hidden="true">{{ initialsOf(s.request?.patient_name) }}</span>
-                    <div>
-                      {{ s.request?.patient_name || 'Patient' }}
-                      <span class="sub">{{ s.request?.requesting_facility || '—' }}</span>
-                    </div>
-                  </div>
-                </td>
-                <td class="components">
-                  <span v-if="s.request?.blood_type" class="type">{{ s.request.blood_type }}</span>
-                  {{ (s.request?.components || []).join(', ') || '—' }}
-                </td>
-                <td class="num strong">{{ pesos(s.total_amount) }}</td>
-                <td v-if="category === 'patient'" class="num" :class="{ owing: balanceOf(s) > 0 }">{{ balanceOf(s) > 0 ? pesos(balanceOf(s)) : '—' }}</td>
-                <td><BillingBadge :tone="statementStamp(s.status).tone">{{ s.status_label }}</BillingBadge></td>
-                <td v-if="category === 'patient'">
-                  <span class="gate" :class="s.clears_release ? 'gate--ok' : 'gate--held'">
-                    <AssetIcon :name="s.clears_release ? 'check' : 'x'" :size="12" />
-                    {{ s.is_payment_deferred ? 'Deferred' : s.clears_release ? 'Cleared' : 'Held' }}
-                  </span>
-                </td>
-                <td v-else class="nowrap">
-                  <template v-if="s.settlement">
-                    {{ day(s.settlement.settled_at) }}
-                    <span class="sub mono">{{ s.settlement.reference }}</span>
-                  </template>
-                  <span v-else class="muted">Awaiting the hospital</span>
-                </td>
+                <td class="nowrap">{{ day(s.billing_date) }}</td>
+                <td class="mono nowrap">{{ s.request?.reference_number || '—' }}</td>
+                <td>{{ (category === 'weekly' ? s.request?.requesting_facility : s.request?.patient_name) || '—' }}</td>
+                <td class="components">{{ (s.request?.components || []).join(', ') || '—' }}</td>
+                <td class="num">{{ pesos(s.total_amount) }}</td>
+                <td v-if="category === 'patient'" class="num">{{ balanceOf(s) > 0 ? pesos(balanceOf(s)) : '—' }}</td>
+                <td class="nowrap">{{ s.status_label || '—' }}</td>
+                <td v-if="category === 'patient'" class="nowrap">{{ releaseOf(s) }}</td>
+                <td v-else class="nowrap">{{ s.settlement ? day(s.settlement.settled_at) : 'Awaiting the hospital' }}</td>
                 <td class="row-actions" @click.stop>
+                  <RowViewButton :label="`View ${s.invoice_number || s.request?.reference_number || 'invoice'}`" @view="viewing = s" />
                   <!-- Write actions only for whoever may record money; billing.view alone reads. -->
                   <NuxtLink v-if="canSeePayments && takesPayment(s)" :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="ui-btn ui-btn--primary ui-btn--sm">
                     Record payment
@@ -184,6 +161,16 @@
         </footer>
       </section>
     </div>
+
+    <!-- Everything about the invoice the row names, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.invoice_number || 'Invoice'" eyebrow="Invoice" :sections="viewSections" @close="viewing = null">
+      <template v-if="viewing" #actions>
+        <NuxtLink v-if="canSeePayments && takesPayment(viewing)" :to="`/blood-center/pos?request=${requestIdOf(viewing)}`" class="ui-btn ui-btn--primary" @click="viewing = null">
+          Record payment
+        </NuxtLink>
+        <NuxtLink :to="`/blood-center/invoice/${requestIdOf(viewing)}`" class="ui-btn" @click="viewing = null">Open invoice</NuxtLink>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -198,9 +185,10 @@
  */
 import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { pesos, statementStamp, takesPayment } from '~/utils/billing'
+import { pesos, takesPayment } from '~/utils/billing'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
 
@@ -263,9 +251,60 @@ function balanceOf(statement) {
   return Math.max(Math.round((Number(statement.total_amount) - Number(statement.collected)) * 100), 0) / 100
 }
 
-function initialsOf(name) {
-  return (name || 'P').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+// Whether the units may go out yet, as the Release column says it.
+function releaseOf(statement) {
+  if (statement.is_payment_deferred) return 'Deferred'
+  return statement.clears_release ? 'Cleared' : 'Held'
 }
+
+const words = (value) => (value ? String(value).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '')
+
+/* VIEW: the row's eye opens everything the list leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const s = viewing.value
+  if (!s) return []
+  const r = s.request ?? {}
+  const weekly = s.is_statement_only || s.is_settled_outside || Boolean(r.weekly_request)
+  const discount = s.discount
+  return [
+    { title: 'Invoice', rows: [
+      { label: 'Invoice number', value: s.invoice_number || 'Not issued', mono: true },
+      { label: 'Billed on', value: s.billing_date ? day(s.billing_date) : '' },
+      { label: 'Category', value: weekly ? 'Hospital invoice' : 'Patient invoice' },
+      { label: 'Status', value: s.status_label },
+      { label: 'Release', value: weekly ? '' : releaseOf(s) },
+    ] },
+    { title: 'Request', rows: [
+      { label: 'Reference', value: r.reference_number, mono: true },
+      { label: 'Weekly order', value: r.weekly_request?.reference_number, mono: true },
+      { label: 'Request date', value: r.request_date ? day(r.request_date) : '' },
+      { label: 'Request status', value: r.status_label },
+      { label: 'Patient', value: r.patient_name },
+      { label: 'Hospital', value: r.requesting_facility },
+      { label: 'Blood type', value: r.blood_type || (r.blood_types || []).join(', ') },
+      { label: 'Units', value: r.quantity },
+      { label: 'Components', value: (r.components || []).join(', '), wide: true },
+      { label: 'Purpose', value: words(r.request_purpose) },
+      { label: 'Urgency', value: r.is_emergency ? 'STAT' : words(r.urgency_level) },
+    ] },
+    { title: 'Amounts', rows: [
+      { label: 'Subtotal', value: s.subtotal !== undefined && s.subtotal !== null ? pesos(s.subtotal) : '' },
+      { label: 'Discount', value: discount ? `${discount.name} (${pesos(discount.amount)})` : '' },
+      { label: 'Discount note', value: discount?.note, wide: true },
+      { label: 'Total', value: pesos(s.total_amount) },
+      { label: 'Collected', value: s.collects_payment ? pesos(s.collected) : '' },
+      { label: 'Balance', value: s.collects_payment ? pesos(balanceOf(s)) : '' },
+      { label: 'Government subsidy', value: s.is_subsidised ? 'Applied' : '' },
+      { label: 'Payment', value: s.is_payment_deferred ? 'Deferred' : '' },
+    ] },
+    { title: 'Settlement', rows: [
+      { label: 'Settled on', value: s.settlement?.settled_at ? day(s.settlement.settled_at) : '' },
+      { label: 'Reference', value: s.settlement?.reference, mono: true },
+      { label: 'Note', value: s.settlement?.note, wide: true },
+    ] },
+  ]
+})
 
 // ── The invoices at a glance, each a filter ──
 const overviewCards = computed(() => {
@@ -491,16 +530,10 @@ onPageReturn(() => {
 .bl-table tbody tr:last-child td { border-bottom: 0; }
 .row { cursor: pointer; transition: background-color .12s var(--rb-ease-out); }
 .row:hover td { background: var(--rb-surface-hover); }
-.sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); margin-top: 1px; }
 .components { max-width: 280px; }
-.type { display: inline-block; margin-right: 4px; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
-.owing { color: var(--rb-accent-text); font-weight: 700; }
-.gate { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.gate--ok { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .1); }
-.gate--held { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
-.who { display: flex; align-items: center; gap: 10px; }
-.who-avatar { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1); }
 .row-actions { text-align: right; white-space: nowrap; }
+.row-actions > * { vertical-align: middle; }
+.row-actions > * + * { margin-left: 6px; }
 /* The buttons are ui-btn: the old .btn rule never reached them, so they touched. */
 .row-actions .btn + .btn,
 .row-actions .ui-btn + .ui-btn { margin-left: 8px; }
