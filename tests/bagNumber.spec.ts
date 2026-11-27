@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bagMatchesCode, isSticker, parseBagNumber } from '../app/utils/bagNumber'
+import { bagMatchesCode, isSticker, parseBagNumber, stickerMatches } from '../app/utils/bagNumber'
 
 // [centre]-[barcode]-[component], and -2 for a second bag of a component
 // (project owner, 2026-11-13). Mirrors the server's BagNumbers.
@@ -29,5 +29,22 @@ describe('bag numbers', () => {
     expect(bagMatchesCode('SNBC-21627990-FFP', 'SNBC-21627990-PRBC')).toBe(false)
     expect(bagMatchesCode('21627990', 'DD-4')).toBe(false)
     expect(bagMatchesCode('', 'SNBC-21627990-PRBC')).toBe(false)
+  })
+
+  // The last six digits of a sticker find it (project owner, 2026-11-28).
+  it('finds a sticker by its last six digits or more, never fewer', () => {
+    expect(stickerMatches('627990', '21627990')).toBe(true)
+    expect(stickerMatches(' 1627990\n', '21627990')).toBe(true)
+    expect(stickerMatches('21627990', '21627990')).toBe(true)
+    expect(stickerMatches('27990', '21627990')).toBe(false)
+    expect(stickerMatches('216279', '21627990')).toBe(false)
+    expect(stickerMatches('627990', '')).toBe(false)
+    expect(stickerMatches('PRBC', '21627990')).toBe(false)
+    // A short sticker is found only whole.
+    expect(stickerMatches('1234', '1234')).toBe(true)
+
+    expect(bagMatchesCode('627990', 'SNBC-21627990-PRBC-2')).toBe(true)
+    expect(bagMatchesCode('27990', 'SNBC-21627990-PRBC')).toBe(false)
+    expect(bagMatchesCode('627991', 'SNBC-21627990-PRBC')).toBe(false)
   })
 })

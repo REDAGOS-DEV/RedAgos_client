@@ -68,7 +68,7 @@
                 <th scope="col">Blood center</th>
                 <th scope="col">Request days</th>
                 <th scope="col">Changed</th>
-                <th v-if="canManage" scope="col" class="c-actions">Actions</th>
+                <th scope="col" class="c-actions">Actions</th>
               </tr>
             </thead>
 
@@ -98,50 +98,34 @@
             </tbody>
 
             <tbody v-else>
+              <!-- One plain value a column (project owner, 2026-11-28); the eye shows the address and who changed it. -->
               <tr v-for="schedule in pageItems" :key="schedule.id" class="list-row">
-                <td>
-                  <div class="cell">
-                    <span class="cell__main">{{ schedule.target_facility?.name || 'Blood center' }}</span>
-                    <span v-if="schedule.target_facility?.address" class="cell__sub">{{ schedule.target_facility.address }}</span>
-                  </div>
-                </td>
-                <td>
-                  <div class="days" :aria-label="`Request days: ${schedule.days_label}`">
-                    <span
-                      v-for="day in WEEKDAYS"
-                      :key="day"
-                      class="day-chip"
-                      :class="{ 'day-chip--on': schedule.days_of_week.includes(day) }"
-                      aria-hidden="true"
-                    >{{ WEEKDAY_LABELS[day] }}</span>
-                  </div>
-                </td>
-                <td>
-                  <div class="cell">
-                    <span class="nowrap">{{ schedule.updated_at ? formatDate(schedule.updated_at) : '—' }}</span>
-                    <span v-if="schedule.updated_by" class="cell__sub">by {{ schedule.updated_by }}</span>
-                  </div>
-                </td>
-                <td v-if="canManage" class="c-actions">
+                <td>{{ schedule.target_facility?.name || 'Blood center' }}</td>
+                <td>{{ schedule.days_label || '—' }}</td>
+                <td class="nowrap">{{ schedule.updated_at ? formatDate(schedule.updated_at) : '—' }}</td>
+                <td class="c-actions">
                   <div class="row-actions">
-                    <button
-                      type="button"
-                      class="icon-btn"
-                      :aria-label="`Edit the request days for ${schedule.target_facility?.name}`"
-                      title="Edit days"
-                      @click="openEdit(schedule)"
-                    >
-                      <AssetIcon name="pencil" :size="15" />
-                    </button>
-                    <button
-                      type="button"
-                      class="icon-btn icon-btn--danger"
-                      :aria-label="`Remove ${schedule.target_facility?.name}`"
-                      title="Remove center"
-                      @click="askRemove(schedule)"
-                    >
-                      <AssetIcon name="trash-2" :size="15" />
-                    </button>
+                    <RowViewButton :label="`View ${schedule.target_facility?.name || 'this blood center'}`" @view="viewing = schedule" />
+                    <template v-if="canManage">
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        :aria-label="`Edit the request days for ${schedule.target_facility?.name}`"
+                        title="Edit days"
+                        @click="openEdit(schedule)"
+                      >
+                        <AssetIcon name="pencil" :size="15" />
+                      </button>
+                      <button
+                        type="button"
+                        class="icon-btn icon-btn--danger"
+                        :aria-label="`Remove ${schedule.target_facility?.name}`"
+                        title="Remove center"
+                        @click="askRemove(schedule)"
+                      >
+                        <AssetIcon name="trash-2" :size="15" />
+                      </button>
+                    </template>
                   </div>
                 </td>
               </tr>
@@ -152,6 +136,9 @@
         <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" @go="go" />
       </section>
     </div>
+
+    <!-- One blood center's request days, read only, from its eye. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.target_facility?.name || 'Blood center'" :sections="viewSections" @close="viewing = null" />
 
     <!-- ADD / EDIT: one dialog, the center chosen only when adding -->
     <div v-if="dialog" class="dialog-backdrop" @click.self="closeDialog">
@@ -239,11 +226,13 @@ import PageHeader from '~/components/ui/PageHeader.vue'
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import HospitalWeekdayPicker from '~/components/Hospital/WeekdayPicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useListPager } from '~/composables/useListPager'
-import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS } from '~/types/receiving'
+import { RECEIVING_REFUSAL_MESSAGES } from '~/types/receiving'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn } from '~/composables/useKeptAlive'
 
@@ -253,7 +242,22 @@ useHead({ title: 'Request Days · RedAgos' })
 
 const { can } = useUser()
 const canManage = computed(() => can('hospital.schedules.manage'))
-const columnCount = computed(() => (canManage.value ? 4 : 3))
+const columnCount = 4
+
+/* VIEW: one blood center's request days, read only (2026-11-28). */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const schedule = viewing.value
+  if (!schedule) return []
+
+  return [{ rows: [
+    { label: 'Blood center', value: schedule.target_facility?.name },
+    { label: 'Address', value: schedule.target_facility?.address, wide: true },
+    { label: 'Request days', value: schedule.days_label, wide: true },
+    { label: 'Changed', value: schedule.updated_at ? formatDate(schedule.updated_at) : '' },
+    { label: 'Changed by', value: schedule.updated_by },
+  ] }]
+})
 
 const schedules = ref([])
 const loading = ref(true)
@@ -428,12 +432,6 @@ function formatDate(value) {
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-.days { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.day-chip {
-  min-width: 38px; padding: 3px 0; text-align: center; border-radius: 7px;
-  font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); background: var(--rb-surface-alt);
-}
-.day-chip--on { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text); }
 
 .btn-primary--danger { background: var(--rb-accent); border-color: var(--rb-accent); }
 .btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }

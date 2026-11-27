@@ -49,6 +49,7 @@
           <kbd v-if="!scanQuery" class="scan__kbd" aria-hidden="true">/</kbd>
         </form>
         <p v-if="scanMiss" class="scan__miss" role="status">No unit with barcode {{ scanMiss }}.</p>
+        <p v-else-if="scanMany" class="scan__miss" role="status">More than one unit's barcode ends in {{ scanMany }}. Type more of it.</p>
 
         <!-- The status filter as chips, each with how many units it holds: the
              work to do first, then what is done, apart as History. -->
@@ -611,6 +612,8 @@ function startReject() {
 // ── Scan or search the queue (2026-10-28) ──
 const scanQuery = ref('')
 const scanMiss = ref('')
+// The last six digits of a barcode find it (2026-11-28); two barcodes may share them.
+const scanMany = ref('')
 const scanInput = ref(null)
 
 const shownQueue = computed(() => {
@@ -623,17 +626,20 @@ const shownQueue = computed(() => {
 async function scanOpen() {
   const q = scanQuery.value
   scanMiss.value = ''
+  scanMany.value = ''
   if (!q) return
   if (shownQueue.value.length === 1) {
     await openDonation(shownQueue.value[0].id)
     scanQuery.value = ''
     return
   }
-  const res = await run(() => service.laboratoryQueue({ barcode: q, per_page: 1 }))
-  const hit = res?.data?.[0]
-  if (hit) {
-    await openDonation(hit.id)
+  const res = await run(() => service.laboratoryQueue({ barcode: q, per_page: 2 }))
+  const hits = res?.data ?? []
+  if (hits.length === 1) {
+    await openDonation(hits[0].id)
     scanQuery.value = ''
+  } else if (hits.length > 1) {
+    scanMany.value = q
   } else if (res) {
     scanMiss.value = q
   }

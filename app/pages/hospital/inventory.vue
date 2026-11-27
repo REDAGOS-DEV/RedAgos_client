@@ -231,45 +231,26 @@
                   v-for="(row, index) in unitRows"
                   :key="row.id"
                   class="unit-row"
-                  :class="rowClass(row)"
                   tabindex="0"
                   :aria-label="`${bagLabel(row)}, ${row.blood_type?.code} ${row.component?.name}, ${row.tag.label}. Open details`"
                   @click="openDetails(row)"
                   @keydown.enter.self="openDetails(row)"
                 >
-                  <td>
-                    <span class="mono" :title="row.received_at ? `Received ${formatDay(row.received_at)}` : undefined">{{ bagLabel(row) }}</span>
-                    <span v-if="row.source?.transfusion_reference" class="cell-sub">for {{ row.source.transfusion_reference }}</span>
-                    <span v-else-if="row.source?.direct_distribution" class="cell-sub">from {{ row.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
-                  </td>
-                  <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type?.code) }}</span></td>
+                  <!--
+                    One plain value a column (project owner, 2026-11-28), as the
+                    centre's Blood Inventory: the row or its eye opens the bag's
+                    details, which hold where it came from, the days left, the
+                    patient a tag holds it for and the tag's deadline.
+                  -->
+                  <td class="mono nowrap">{{ bagLabel(row) }}</td>
+                  <td class="nowrap">{{ displayType(row.blood_type?.code) }}</td>
                   <td class="wrap-cell">{{ row.component?.name || '—' }}</td>
-                  <!-- The date, and under it how long is left (2026-11-26: one column, not two). -->
-                  <td class="expires-cell">
-                    <span class="num expires-cell__date" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</span>
-                    <span class="days" :class="[`tone--${row.remaining.tone}`, { 'days--pill': row.remaining.tone === 'warning' || row.remaining.tone === 'danger' }]">{{ row.remaining.label }}</span>
-                  </td>
+                  <td class="num nowrap">{{ row.expiry_date || '—' }}</td>
                   <td class="wrap-cell" :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</td>
-                  <!-- The status, and under it the patient a tag holds the bag for, with its deadline. -->
-                  <td class="status-cell">
-                    <span class="status-pill" :class="`tone--${row.tag.tone}`">{{ row.tag.label }}</span>
-                    <template v-if="row.active_tag">
-                      <span class="patient">{{ row.active_tag.patient.full_name }}</span>
-                      <span
-                        class="countdown"
-                        :class="`tone--${countdownTone(row)}`"
-                        :aria-label="`${formatRemaining(remainingFor(row))} left until the ${row.active_tag.status === 'tag_assigned' ? 'crossmatch' : 'transfusion'} deadline`"
-                      >
-                        <AssetIcon name="clock" :size="12" />
-                        {{ remainingFor(row) > 0 ? formatRemaining(remainingFor(row)) : 'Deadline passed — releasing' }}
-                      </span>
-                    </template>
-                    <span v-else-if="row.last_tag && row.status === 'pending_return'" class="patient cell-muted">
-                      Was {{ row.last_tag.patient.full_name }}
-                    </span>
-                  </td>
+                  <td class="wrap-cell">{{ row.tag.label }}</td>
                   <td class="actions-col" @click.stop>
                     <div class="row-menu" @focusout="onRowMenuFocusOut">
+                      <RowViewButton :label="`View bag ${bagLabel(row)}`" @view="openDetails(row)" />
                       <button
                         type="button"
                         class="row-menu__trigger"
@@ -874,6 +855,7 @@
  * explained and the list reloaded, since it means the bag moved on.
  */
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 
 import { resolveComponent } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -1237,16 +1219,6 @@ function tierFor(unit) {
 function countdownTone(unit) {
   const tier = tierFor(unit)
   return tier === 'critical' || tier === 'overdue' ? 'danger' : tier === 'soon' ? 'warning' : 'neutral'
-}
-
-// The left edge marks urgency, never colour alone: the countdown says it in words.
-function rowClass(unit) {
-  if (unit.active_tag) {
-    const tier = tierFor(unit)
-    return tier === 'critical' || tier === 'overdue' ? 'row--critical' : tier === 'soon' ? 'row--soon' : ''
-  }
-
-  return ''
 }
 
 /** Whether any tag on screen has passed its deadline. */
@@ -1649,14 +1621,6 @@ function formatCount(value) {
   return Number(value).toLocaleString('en-US')
 }
 
-// Dates as the blood bank keeps them: its own calendar day, year first.
-function formatDay(value) {
-  if (!value) return '—'
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-}
-
 function formatLongDate(value) {
   if (!value) return '—'
   const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00+08:00`) : new Date(value)
@@ -1882,7 +1846,7 @@ onBeforeUnmount(() => {
   .page-head__meta { flex-wrap: wrap; justify-content: flex-start; }
 }
 .live-note { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--inv-muted); }
-.live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok-fill); box-shadow: 0 0 0 3px color-mix(in srgb, var(--inv-ok-fill) 22%, transparent); }
+.live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok-fill); }
 
 .spin-icon { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1902,10 +1866,9 @@ onBeforeUnmount(() => {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2;
   color: #fff; background: var(--inv-action); border: 1px solid var(--inv-action);
-  box-shadow: 0 1px 2px rgba(var(--rb-primary-rgb), 0.25);
   cursor: pointer; text-decoration: none; font-family: inherit; transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.btn-primary:hover:not(:disabled) { background: var(--inv-action-hover); border-color: var(--inv-action-hover); box-shadow: 0 4px 12px rgba(var(--rb-primary-rgb), 0.28); }
+.btn-primary:hover:not(:disabled) { background: var(--inv-action-hover); border-color: var(--inv-action-hover); }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -2064,14 +2027,13 @@ onBeforeUnmount(() => {
 }
 .unit-table th:first-child, .unit-table td:first-child { padding-left: 18px; }
 .unit-table tbody td { padding: 10px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); white-space: nowrap; vertical-align: middle; }
-.unit-table .wrap-cell { white-space: normal; min-width: 120px; }
+.unit-table .wrap-cell { white-space: normal; min-width: 92px; }
 .unit-row { cursor: pointer; transition: background 0.12s ease; }
 .unit-row:hover { background: var(--inv-hover); }
 .unit-row:focus-visible { outline-offset: -2px; }
-/* A tag near its deadline is marked along the row's edge; the countdown says it in words. */
-.row--critical td:first-child { box-shadow: inset 3px 0 0 var(--inv-crit-fill); }
-.row--soon td:first-child { box-shadow: inset 3px 0 0 var(--inv-warn-fill); }
-.actions-col { width: 44px; text-align: right; }
+/* The eye, then the menu (2026-11-28). A tag near its deadline is said in the bag's details, not as an edge stripe. */
+.actions-col { width: 84px; text-align: right; }
+.unit-table .nowrap { white-space: nowrap; }
 .mono { font-family: var(--rb-font-mono); font-size: 11.5px; }
 .num { font-variant-numeric: tabular-nums; }
 .cell-sub { display: block; margin-top: 3px; font-size: 11.5px; color: var(--inv-muted); }
@@ -2153,7 +2115,7 @@ onBeforeUnmount(() => {
 .th-sort:focus-visible { border-radius: 4px; }
 
 /* Row action menu */
-.row-menu { position: relative; display: inline-flex; }
+.row-menu { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .row-menu__trigger {
   width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--inv-muted);
   display: flex; align-items: center; justify-content: center; cursor: pointer;

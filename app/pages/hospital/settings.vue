@@ -740,10 +740,7 @@ onMounted(async () => {
   overflow: hidden;
   border: 1px solid var(--card-border);
   border-radius: 24px;
-  background:
-    radial-gradient(70% 140% at 100% 0%, rgba(var(--rb-primary-rgb), 0.14), transparent 60%),
-    var(--rb-surface);
-  box-shadow: var(--rb-shadow-sm);
+  background: var(--rb-surface);
 }
 .id-banner__avatar-wrap { position: relative; flex-shrink: 0; }
 .id-banner__avatar {
@@ -758,7 +755,6 @@ onMounted(async () => {
   color: #fff;
   font-size: 24px;
   font-weight: 800;
-  box-shadow: 0 0 0 4px var(--rb-surface), 0 10px 24px -12px rgba(var(--rb-shadow-rgb, 15, 23, 42), 0.5);
 }
 .id-banner__avatar img { width: 100%; height: 100%; object-fit: cover; }
 .id-banner__camera {
@@ -843,7 +839,6 @@ onMounted(async () => {
 .tab--active {
   background: var(--rb-primary);
   color: #fff;
-  box-shadow: 0 6px 14px -8px rgba(var(--rb-primary-rgb), 0.8);
 }
 
 /* ── Cards ── */
@@ -1058,7 +1053,7 @@ onMounted(async () => {
 }
 .mini__logo { width: 20px; height: 20px; border-radius: 6px; background: var(--rb-primary); }
 .mini__icon { width: 14px; height: 14px; border-radius: 4px; background: var(--rb-border-strong); }
-.mini__icon--on { width: 20px; height: 20px; border-radius: 6px; background: var(--rb-primary); box-shadow: 0 3px 8px -3px rgba(var(--rb-primary-rgb), 0.8); }
+.mini__icon--on { width: 20px; height: 20px; border-radius: 6px; background: var(--rb-primary); }
 .mini__body { display: flex; flex: 1; flex-direction: column; gap: 8px; min-width: 0; }
 .mini__hero {
   display: flex;
@@ -1067,7 +1062,7 @@ onMounted(async () => {
   gap: 6px;
   padding: 12px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--rb-grad-from, #E3F2FD), var(--rb-grad-to, #BBDEFB));
+  background: rgba(var(--rb-primary-rgb), 0.14);
 }
 .mini__line { width: 72%; height: 7px; border-radius: 999px; background: rgba(15, 23, 42, 0.5); }
 .mini__line--sm { width: 42%; height: 5px; background: rgba(15, 23, 42, 0.22); }
@@ -1273,9 +1268,6 @@ onMounted(async () => {
 :global(.dark .scope-hospital-settings .mini__line) { background: rgba(241, 245, 249, 0.7); }
 :global(.dark .scope-hospital-settings .mini__line--sm) { background: rgba(241, 245, 249, 0.35); }
 :global(.dark .scope-hospital-settings .mini__hero) {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, #1E293B), color-mix(in srgb, var(--rb-primary) 18%, #1E293B));
-}
-:global(.dark .scope-hospital-settings .id-banner) {
-  background: radial-gradient(70% 140% at 100% 0%, color-mix(in srgb, var(--rb-primary-text) 14%, transparent), transparent 60%), var(--rb-surface);
+  background: color-mix(in srgb, var(--rb-primary) 28%, #1E293B);
 }
 </style>

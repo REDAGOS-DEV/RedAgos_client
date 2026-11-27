@@ -443,7 +443,7 @@
 
       <div class="vitals">
         <label class="field">
-          <span class="field__label">Donation barcode (sticker)</span>
+          <span class="field__label">Barcode Number</span>
           <!--
             The pre-printed sticker that goes on the form, every bag and tube,
             and the CUE slip. A barcode scanner types the number and presses
@@ -460,7 +460,7 @@
             autocomplete="off"
             spellcheck="false"
             maxlength="30"
-            placeholder="Scan the sticker"
+            placeholder="Enter barcode number"
             @keydown.enter.prevent="startedInput?.focus()"
           >
         </label>

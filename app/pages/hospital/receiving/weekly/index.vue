@@ -245,45 +245,26 @@
             </tbody>
 
             <tbody v-else>
+              <!--
+                One plain value a column (project owner, 2026-11-28): the row or
+                its eye opens the weekly request, which holds its blood types,
+                the units still to receive and when the center will supply them.
+              -->
               <tr v-for="weekly in weeklyRequests" :key="weekly.id" class="list-row list-row--link" @click="openWeekly(weekly)">
-                <td>
-                  <div class="cell">
-                    <NuxtLink :to="`/hospital/receiving/weekly/${weekly.id}`" class="code" @click.stop>{{ weekly.reference_number }}</NuxtLink>
-                    <span class="cell__sub">{{ bloodTypesOf(weekly) }}</span>
-                  </div>
-                </td>
+                <td class="mono nowrap">{{ weekly.reference_number }}</td>
                 <td class="nowrap">{{ formatDay(weekly.request_day, true) }}</td>
                 <td>{{ weekly.target_facility?.name || '—' }}</td>
-                <td>
-                  <div class="supply" :aria-label="`${weekly.totals.fulfilled} of ${weekly.totals.requested} units supplied`">
-                    <span class="supply__figure"><strong>{{ weekly.totals.fulfilled }}</strong> of {{ weekly.totals.requested }}</span>
-                    <span class="supply__track" aria-hidden="true"><span class="supply__fill" :style="{ width: `${supplyPercent(weekly)}%` }" /></span>
-                  </div>
-                </td>
-                <td class="num">
-                  <div class="cell cell--end">
-                    <span>{{ weekly.totals.received }}</span>
-                    <span v-if="weekly.totals.awaiting_receipt" class="cell__sub cell__sub--alert">{{ weekly.totals.awaiting_receipt }} to receive</span>
-                  </div>
-                </td>
-                <td class="num" :class="{ 'cell--short': weekly.totals.not_supplied }">{{ weekly.totals.not_supplied }}</td>
-                <td>
-                  <div class="cell">
-                    <span class="badge" :class="badgeClass(WEEKLY_STATUS_TONES[weekly.status])">
-                      <span class="badge__dot" aria-hidden="true" />
-                      {{ weekly.status_label }}
-                    </span>
-                    <!-- When it arrives, once the center confirmed it. -->
-                    <span v-if="weekly.is_open && planOf(weekly)" class="cell__sub">{{ supplyPlanSummary(planOf(weekly)) }}</span>
-                  </div>
-                </td>
+                <td class="nowrap">{{ weekly.totals.fulfilled }} of {{ weekly.totals.requested }}</td>
+                <td class="num">{{ weekly.totals.received }}</td>
+                <td class="num">{{ weekly.totals.not_supplied }}</td>
+                <td class="nowrap">{{ weekly.status_label }}</td>
                 <td class="c-actions">
                   <div class="row-actions" @click.stop>
                     <!-- Dispatched or picked up: the whole delivery into Stock Intake from here (project owner, 2026-10-30). -->
                     <button
                       v-if="canReceive && weekly.totals.awaiting_receipt"
                       type="button"
-                      class="btn-primary btn-receive"
+                      class="btn-outline btn-outline--sm"
                       :aria-label="`Receive ${weekly.totals.awaiting_receipt} unit${weekly.totals.awaiting_receipt === 1 ? '' : 's'} for ${weekly.reference_number}`"
                       @click="receiving = weekly"
                     >
@@ -347,8 +328,6 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
 import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { bloodTypeCodes, supplyPlanSummary } from '~/types/bloodRequest'
-import { WEEKLY_STATUS_TONES } from '~/types/receiving'
 import { badgeClass } from '~/utils/listBadge'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -431,11 +410,6 @@ const nextDayHint = computed(() => (statusLoading.value
 
 function openWeekly(weekly) {
   navigateTo(`/hospital/receiving/weekly/${weekly.id}`)
-}
-
-function supplyPercent(weekly) {
-  const requested = Number(weekly.totals.requested) || 0
-  return requested ? Math.min(100, Math.round(((Number(weekly.totals.fulfilled) || 0) / requested) * 100)) : 0
 }
 
 const updatedAtLabel = computed(() => (updatedAt.value
@@ -545,18 +519,6 @@ function noteOf(entry) {
   return { tone: 'quiet', icon: 'calendar', text: entry.next_request_day ? `First request day: ${formatDay(entry.next_request_day, true)}` : 'No request days yet' }
 }
 
-/** The blood types a weekly request asked for, as one line. Its one request may restock several. */
-function bloodTypesOf(weekly) {
-  const codes = [...new Set((weekly.requests ?? []).flatMap((request) => bloodTypeCodes(request)))]
-
-  return codes.length ? codes.join(' · ') : '—'
-}
-
-/** The center's hand-over for a weekly request, once it confirmed it. */
-function planOf(weekly) {
-  return (weekly.requests ?? []).find((request) => request.supply_plan)?.supply_plan ?? null
-}
-
 /** A Y-m-d request day, read as a calendar date: "Mon, Oct 5". */
 function formatDay(value, withWeekday = false) {
   if (!value) return '—'
@@ -577,16 +539,7 @@ function formatDay(value, withWeekday = false) {
 .panel-date { font-weight: 600; color: var(--rb-text-secondary); }
 .banner--inset { margin: 12px 16px 0; }
 
-.cell--end { align-items: flex-end; }
-.cell__sub--alert { color: var(--rb-warning-text); font-weight: 600; }
-.cell--short { color: var(--rb-accent-text); font-weight: 700; }
-
-/* Receive stands out from the row's other icons while units are on their way. */
-.btn-receive { height: 32px; padding: 0 12px; font-size: 12.5px; border-radius: 9px; }
 .row-actions { align-items: center; justify-content: flex-end; }
-
-/* A .cell is a column, which would stretch the badge across it. */
-.cell > .badge { align-self: flex-start; }
 
 /* Today: a card per center. */
 .today { display: flex; flex-direction: column; gap: 10px; }
@@ -594,31 +547,25 @@ function formatDay(value, withWeekday = false) {
 .today__rule { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .centers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 /* ── A center's card (2026-11-26) ──
-   An edge in its state's colour: amber due, green sent, none when quiet. */
+   Its state is its badge; a due card's border is amber (no edge stripe or glow, 2026-11-28). */
 .center {
-  --edge: transparent;
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 18px 20px 16px 22px;
+  padding: 18px 20px 16px;
   overflow: hidden;
   border: 1px solid var(--rb-border);
   border-radius: var(--rb-radius-lg);
   background: var(--rb-surface);
-  box-shadow: var(--rb-shadow-sm);
 }
-.center::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--edge); }
-.center--due { --edge: var(--rb-warning); border-color: rgba(var(--rb-warning-rgb), 0.45); background: linear-gradient(180deg, rgba(var(--rb-warning-rgb), 0.05), var(--rb-surface) 55%); }
-.center--sent { --edge: var(--rb-success); }
+.center--due { border-color: rgba(var(--rb-warning-rgb), 0.45); }
 .center__top { display: flex; align-items: flex-start; gap: 12px; }
 .center__icon {
   display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+  border: 1px solid var(--rb-border); background: var(--rb-surface-alt); color: var(--rb-text-secondary);
 }
-.center--due .center__icon { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
-.center--sent .center__icon { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
 .center__who { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .center__name { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
 .center__meta { font-size: 12.5px; color: var(--rb-text-secondary); }
@@ -642,7 +589,6 @@ function formatDay(value, withWeekday = false) {
 .center__note--warn { color: var(--rb-warning-text); }
 .center__note--good { color: var(--rb-success-text); }
 .center__note--quiet { font-weight: 500; }
-.center__send { box-shadow: 0 4px 12px -4px rgba(var(--rb-primary-rgb), 0.55); }
 .center__sk-name { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 38px; }
 .center__sk-empty { min-height: 271px; }
 .center__sk-none { display: flex; align-items: center; min-height: 19px; }
@@ -663,10 +609,4 @@ function formatDay(value, withWeekday = false) {
 /* The loading cards: a chip's shape. */
 .day__sk { width: 72px; height: 26px; border-radius: 999px; }
 
-/* Supplied, of what was asked. */
-.supply { display: inline-flex; flex-direction: column; gap: 5px; min-width: 88px; }
-.supply__figure { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--rb-text-secondary); }
-.supply__figure strong { color: var(--rb-text-primary); }
-.supply__track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--rb-border); }
-.supply__fill { display: block; height: 100%; border-radius: inherit; background: var(--rb-success); }
 </style>

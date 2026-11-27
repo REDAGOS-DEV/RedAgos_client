@@ -173,20 +173,22 @@
               <tr>
                 <th scope="col" class="c-ref">Reference</th>
                 <th scope="col" class="c-patient">Patient</th>
-                <th scope="col" class="c-need">Needed</th>
+                <th scope="col" class="c-type">Blood Type</th>
+                <th scope="col" class="c-comp">Component</th>
+                <th scope="col" class="c-units num">Units</th>
                 <th scope="col" class="c-date">Requested</th>
-                <th scope="col" class="c-progress">Progress</th>
+                <th scope="col" class="c-status">Status</th>
                 <th scope="col" class="c-actions" :style="{ width: `${actionsWidth}px` }">Actions</th>
               </tr>
             </thead>
 
             <tbody v-if="loading">
-              <SkeletonRows :columns="6" :rows="6" />
+              <SkeletonRows :columns="8" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!pageItems.length">
               <tr>
-                <td colspan="6" class="empty-cell">
+                <td colspan="8" class="empty-cell">
                   <div class="empty-state">
                     <span class="empty-state__icon"><AssetIcon :name="hasActiveFilters ? 'search-x' : 'droplets'" :size="20" /></span>
                     <p class="empty-state__title">{{ hasActiveFilters ? 'No requests match' : 'No blood requests yet' }}</p>
@@ -202,105 +204,34 @@
             </tbody>
 
             <tbody v-else>
+              <!--
+                One plain value a column (project owner, 2026-11-28): the row or
+                its eye opens the quick view, which holds how it came in, what is
+                still unallocated, the progress and its times, Full Details and
+                Cancel. An open STAT is a tint on the row, as at the centre.
+              -->
               <tr v-for="req in pageItems" :key="req.id" class="list-row list-row--link" :class="{ 'list-row--stat': isOpenStat(req) }" @click="openDrawer(req)">
-                <td>
-                  <!-- One line: the number, then STAT. An open STAT also marks the row's edge. -->
-                  <div class="cell">
-                    <div class="ref">
-                      <button type="button" class="code code-btn" :title="`Quick view of ${req.reference_number}`" @click="openDrawer(req)">{{ req.reference_number }}</button>
-                      <span v-if="req.priority === 'emergency'" class="tag tag--stat">STAT</span>
-                    </div>
-                    <span v-if="req.needs_allocation" class="tag tag--alert" title="Some units have not been asked of any facility">{{ req.unallocated }} unallocated</span>
-                  </div>
-                </td>
-                <td>
-                  <div class="cell">
-                    <span class="cell__main">{{ req.patient || 'Not recorded' }}</span>
-                    <!-- How it came in, beside what it is for, instead of a tag under the reference. -->
-                    <span v-if="req.purpose || req.is_walk_in" class="cell__sub">
-                      {{ req.purpose }}<template v-if="req.purpose && req.is_walk_in"> · </template><span
-                        v-if="req.is_walk_in"
-                        title="Brought to the blood center by a watcher and confirmed by your blood bank by phone"
-                      >Walk-in</span>
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div class="need">
-                    <span v-if="req.blood_type" class="blood">{{ req.blood_type }}</span>
-                    <span v-else class="muted">—</span>
-                    <div class="cell">
-                      <span class="cell__main">{{ req.component || '—' }}</span>
-                      <span class="cell__sub">{{ req.units }} unit{{ req.units === 1 ? '' : 's' }}</span>
-                    </div>
-                  </div>
-                </td>
+                <td class="mono nowrap">{{ req.reference_number }}</td>
+                <td class="c-patient">{{ req.patient || 'Not recorded' }}</td>
+                <td class="nowrap">{{ req.blood_type || '—' }}</td>
+                <td class="c-comp">{{ req.component || '—' }}</td>
+                <td class="num">{{ req.units }}</td>
                 <td class="nowrap">{{ formatDate(req.request_date) }}</td>
-                <td>
-                  <!-- The step by name; the bar shows where it sits among the four. -->
-                  <div class="progress" :aria-label="`Progress: ${progressLabel(req)}. ${rowProgress(req).text}`">
-                    <span class="badge" :class="badgeClass(rowProgress(req).tone)" aria-hidden="true">
-                      <span class="badge__dot" />
-                      {{ rowProgress(req).text }}
-                    </span>
-                    <span class="progress__track">
-                      <span class="progress__bar" aria-hidden="true">
-                        <span
-                          v-for="(step, i) in progressSteps"
-                          :key="step"
-                          class="progress__step"
-                          :title="`${step}${rowStepIndex(req) > i ? ' — done' : rowStepIndex(req) === i ? ' — now' : ''}`"
-                          :class="{
-                            'progress__step--done': rowStepIndex(req) > i,
-                            'progress__step--current': rowStepIndex(req) === i && !isHalted(req.status),
-                            'progress__step--action': rowStepIndex(req) === i && req.awaiting_receipt > 0,
-                            'progress__step--halted': isHalted(req.status)
-                          }"
-                        />
-                      </span>
-                      <!-- How long it has sat at this step, so a stuck request shows. -->
-                      <time
-                        v-if="rowStepTime(req)"
-                        class="progress__time"
-                        :class="{ 'progress__time--stale': isStale(req) }"
-                        :datetime="rowStepTime(req).at"
-                        :title="`${rowStepTime(req).label} ${formatDate(rowStepTime(req).at, true)}`"
-                      >{{ sinceStep(rowStepTime(req).at) }}</time>
-                    </span>
-                  </div>
-                </td>
+                <td class="c-status">{{ rowProgress(req).text }}</td>
                 <td class="c-actions">
                   <div class="row-actions" @click.stop>
                     <!-- Dispatched or picked up: the whole delivery into Stock Intake from here (project owner, 2026-10-30). -->
                     <button
                       v-if="canReceive && req.awaiting_receipt"
                       type="button"
-                      class="btn-primary btn-receive"
+                      class="btn-outline btn-outline--sm"
                       :aria-label="`Receive ${req.awaiting_receipt} unit${req.awaiting_receipt === 1 ? '' : 's'} for ${req.reference_number}`"
                       @click="receiving = req"
                     >
                       <AssetIcon name="package-check" :size="14" />
                       Receive
                     </button>
-                    <button type="button" class="icon-btn" :aria-label="`Quick view of ${req.reference_number}`" title="Quick view" @click="openDrawer(req)">
-                      <AssetIcon name="eye" :size="15" />
-                    </button>
-                    <button type="button" class="icon-btn" :aria-label="`Full details and fulfilment of ${req.reference_number}`" title="Full details & fulfilment" @click="viewDetails(req)">
-                      <AssetIcon name="file-text" :size="15" />
-                    </button>
-                    <button type="button" class="icon-btn" :aria-label="`Track ${req.reference_number}`" title="Track request" @click="trackRequest(req)">
-                      <AssetIcon name="route" :size="15" />
-                    </button>
-                    <button
-                      v-if="canCancel(req)"
-                      type="button"
-                      class="icon-btn icon-btn--danger"
-                      :aria-label="`Cancel ${req.reference_number}`"
-                      title="Cancel request"
-                      @click="askCancel(req)"
-                    >
-                      <AssetIcon name="circle-x" :size="15" />
-                    </button>
+                    <RowViewButton :label="`View ${req.reference_number}`" @view="openDrawer(req)" />
                   </div>
                 </td>
               </tr>
@@ -459,6 +390,9 @@
           >
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
+          <button type="button" class="ui-btn" @click="trackRequest(selectedRequest)">
+            <AssetIcon name="route" :size="15" /> Track
+          </button>
           <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="askCancel(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
@@ -507,11 +441,11 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
 import StatusBadge from '~/components/ui/StatusBadge.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { useListPager } from '~/composables/useListPager'
-import { badgeClass } from '~/utils/listBadge'
 import { componentSummary, requestStatusLabel } from '~/types/bloodRequest'
 import { ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -522,7 +456,7 @@ import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDelivery
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn } from '~/composables/useKeptAlive'
 import HospitalTransfusionStepper from '~/components/Hospital/TransfusionStepper.vue'
-import { TRANSFUSION_STEPS, isHaltedStatus, sinceShort, transfusionStepIndex } from '~/utils/transfusionSteps'
+import { isHaltedStatus, sinceShort } from '~/utils/transfusionSteps'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view', keepalive: true })
 
@@ -582,47 +516,12 @@ function priorityOf(priority) {
   return priorityMap[priority] ?? priorityMap.routine
 }
 
-// The four steps, shared with the quick view and full details (utils/transfusionSteps).
-const progressSteps = TRANSFUSION_STEPS
+// Shared with the quick view and full details (utils/transfusionSteps).
 const isHalted = isHaltedStatus
-/** The step a row is on; progressSteps.length once nothing is left to do. */
-function rowStepIndex(req) {
-  // The row's own status: a cancel shows at once, before the server answers.
-  return transfusionStepIndex({ ...req.raw, status: req.status })
-}
-function progressLabel(req) {
-  if (isHalted(req.status)) return statusOf(req.status).label
-  const i = rowStepIndex(req)
-  return i >= progressSteps.length ? 'Complete' : `Step ${i + 1} of ${progressSteps.length}, ${progressSteps[i]}`
-}
-/**
- * When the row reached the step it is on (step_times, from the list API), or
- * when it finished or stopped. Awaiting receipt dates from the release.
- */
-function rowStepTime(req) {
-  const times = req.step_times ?? {}
-  const pick = (label, at) => (at ? { label, at } : null)
-  if (req.status === 'cancelled') return pick('Cancelled', req.raw?.cancelled_at)
-  if (req.status === 'rejected') return pick('Rejected', req.raw?.closed_at)
-  const i = rowStepIndex(req)
-  if (i >= progressSteps.length) return pick('Completed', times.received ?? req.raw?.fulfilled_at ?? req.raw?.closed_at)
-  if (i >= 2) return pick('Released', times.released)
-  if (i === 1) return pick('Approved', times.approved)
-  // Still at Submitted: the Requested column already says when.
-  return null
-}
 
-/** How long ago, as a span: a date would only repeat the Requested column. */
+/** How long ago, as a span. */
 function sinceStep(iso) {
   return sinceShort(iso, now.value)
-}
-
-// Sitting at one step this long reads amber: a STAT after two hours, else a day.
-const STALE_MS = { emergency: 2 * 60 * 60 * 1000, routine: 24 * 60 * 60 * 1000 }
-function isStale(req) {
-  const t = rowStepTime(req)
-  if (!t || isHalted(req.status) || rowStepIndex(req) >= progressSteps.length) return false
-  return now.value - new Date(t.at).getTime() > (STALE_MS[req.priority] ?? STALE_MS.routine)
 }
 
 // "5 min ago" moves on while the page is open.
@@ -649,16 +548,13 @@ function rowProgress(req) {
   return { text: req.status_text, tone: statusOf(req.status).tone }
 }
 /**
- * The actions column, as wide as the busiest row on this page (2026-11-26):
- * three icons always, Receive and Cancel only where a row shows them, so no
- * room is kept for a button no row has.
+ * The actions column, as wide as the busiest row on this page: the eye
+ * always, Receive only where a row shows it.
  */
 const actionsWidth = computed(() => Math.max(...pageItems.value.map((req) => {
   const receive = canReceive.value && req.awaiting_receipt > 0
-  const icons = 3 + (canCancel(req) ? 1 : 0)
-  const buttons = icons + (receive ? 1 : 0)
-  return 26 + icons * 32 + (receive ? 104 : 0) + (buttons - 1) * 6
-}), 140))
+  return 32 + 32 + (receive ? 98 : 0)
+}), 80))
 
 function canCancel(req) {
   return req.kind === 'transfusion' ? canCancelTransfusion(req.raw) : req.status === 'pending'
@@ -1066,15 +962,6 @@ onPageReturn(refresh)
 @media (prefers-reduced-motion: reduce) { .fade-in, .skeleton { animation: none !important; } }
 
 
-/* The reference opens the quick view, as the eye does. */
-.code-btn { align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer; }
-.code-btn:hover { text-decoration: underline; }
-.code-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
-
-/* Receive: the row's one call to action, while units are on their way. */
-.btn-receive { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06); }
-.btn-receive:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.12); }
-
 .step-dots { display: inline-flex; align-items: center; gap: 3px; }
 .step-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--rb-border-strong); transition: background 0.2s ease, transform 0.2s ease; }
 .step-dot--done { background: var(--success); }
@@ -1171,48 +1058,24 @@ onPageReturn(refresh)
 .quick--stat.quick--on .quick__count { background: var(--rb-accent); }
 .quick-clear { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
 
-/* Column widths (2026-11-26): each a share of the table with a floor its
-   content fits in, so spare room spreads across the row instead of pooling
-   before the actions; the patient takes what is left. */
-.req-table { table-layout: fixed; }
-.req-table .c-ref { width: max(150px, 13%); }
-.req-table .c-need { width: max(200px, 19%); }
-.req-table .c-date { width: max(120px, 11%); }
-.req-table .c-progress { width: max(250px, 23%); }
-.req-table tbody td { overflow: hidden; }
+/* Column widths: each a share of the table, the patient taking what is
+   left, and the table scrolls below 900px. Plain percentages: a table column
+   ignores a max() that mixes px and %. One plain line a cell (2026-11-28). */
+.req-table { table-layout: fixed; min-width: 900px; }
+.req-table .c-ref { width: 11%; }
+.req-table .c-type { width: 10%; }
+.req-table .c-comp { width: 12%; }
+.req-table .c-units { width: 6%; }
+.req-table .c-date { width: 11%; }
+.req-table .c-status { width: 19%; }
+.req-table tbody td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-table thead th.num { text-align: right; }
 
-/* The row: who, what, how far. */
+/* The STAT tag in the quick view's header. */
 .tag--stat { margin: 0; border-color: transparent; background: var(--rb-accent); font-weight: 700; color: #FFFFFF; }
-.ref { display: flex; align-items: center; gap: 6px; }
-.ref .code-btn { align-self: auto; }
-/* An open STAT: a red edge on the row, seen while scanning without a taller row. */
-.list-row--stat td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
-
-.need { display: flex; align-items: center; gap: 10px; min-width: 0; }
-/* One width for every type, so the component names line up down the column. */
-.need .blood {
-  flex-shrink: 0;
-  width: 42px;
-  min-width: 0;
-  padding: 2px 0;
-  border-color: rgba(var(--rb-accent-rgb), 0.35);
-  background: rgba(var(--rb-accent-rgb), 0.07);
-  color: var(--rb-accent-text);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.need > .muted { width: 42px; flex-shrink: 0; text-align: center; }
-
-.progress { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-.progress__track { display: inline-flex; align-items: center; gap: 8px; }
-.progress__bar { display: grid; grid-template-columns: repeat(4, 22px); gap: 3px; }
-.progress__time { font-size: 11px; color: var(--rb-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.progress__time--stale { font-weight: 600; color: var(--rb-warning-text); }
-.progress__step { height: 4px; border-radius: 999px; background-color: var(--rb-border); }
-.progress__step--done { background-color: var(--rb-success); }
-.progress__step--current { background-color: var(--rb-primary); }
-.progress__step--action { background-color: var(--rb-warning); }
-.progress__step--halted { background-color: var(--rb-border-hover); }
+/* An open STAT: a tint on the row, as Incoming Requests marks it, never an edge stripe. */
+.list-row--stat td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.list-row--stat:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
 
 /* Quick view: its fields beside its timeline. */
 /* The dialog sits on the body, outside .requests-page and the tokens it sets. */

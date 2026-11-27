@@ -1082,10 +1082,6 @@ function scrollToTimeline() {
   padding: 24px;
   box-shadow: var(--rb-shadow-sm);
   margin-bottom: 20px;
-  transition: box-shadow 0.2s ease;
-}
-.card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .summary-card {
@@ -1263,7 +1259,6 @@ function scrollToTimeline() {
 .timeline-step--current .timeline-marker {
   background: var(--rb-primary);
   color: #fff;
-  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.15);
 }
 .timeline-body {
   display: flex;

@@ -209,7 +209,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { isSticker, normalizeBagCode, parseBagNumber } from '~/utils/bagNumber'
+import { isSticker, normalizeBagCode, parseBagNumber, stickerMatches } from '~/utils/bagNumber'
 
 const props = defineProps({
   /** The list's row for the request: id, code, hospital, patient. */
@@ -318,9 +318,9 @@ function note(line, tone, text) {
 
 /**
  * The units a typed or scanned number names in one line: the exact bag
- * number (SNBC-21627990-PRBC), or, for a bare donation sticker, that
- * donation's bags of this line's component (a second bag of the same
- * component ends -2).
+ * number (SNBC-21627990-PRBC), or, for a bare donation sticker (or its last
+ * six digits), that donation's bags of this line's component (a second bag of
+ * the same component ends -2).
  */
 function matchesIn(line, term) {
   const exact = line.units.filter((unit) => normalizeBagCode(unit.id) === term)
@@ -331,7 +331,7 @@ function matchesIn(line, term) {
   const code = (line.component.code ?? '').toUpperCase()
   return line.units.filter((unit) => {
     const bag = parseBagNumber(unit.id)
-    return bag?.sticker === term && (!code || bag.component === code)
+    return Boolean(bag) && stickerMatches(term, bag.sticker) && (!code || bag.component === code)
   })
 }
 

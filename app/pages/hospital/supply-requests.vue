@@ -52,13 +52,10 @@
             <thead>
               <tr>
                 <th scope="col">Request</th>
-                <th scope="col">Received</th>
                 <th scope="col">Hospital</th>
                 <th scope="col">Blood Type</th>
-                <th scope="col" class="num">Needed</th>
-                <th scope="col" class="num">Unallocated</th>
+                <th scope="col" class="num">Still Needed</th>
                 <th scope="col" class="num">You Can Send</th>
-                <th scope="col">Status</th>
                 <th scope="col" class="c-actions"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -90,21 +87,19 @@
                 @click="viewRow(row)"
                 @keydown.enter.self="viewRow(row)"
               >
+                <!-- One plain value a column (2026-11-28): the row or its eye holds the dates, status, components and suppliers. -->
                 <td class="mono nowrap">{{ row.reference_number }}</td>
-                <td class="nowrap">{{ row.request_date ? formatWhen(row.request_date) : '—' }}</td>
                 <td>{{ row.hospital?.name || 'Not recorded' }}</td>
                 <td class="nowrap">{{ row.blood_type?.code || '—' }}</td>
-                <td class="num">{{ total(row, 'required') }}</td>
                 <td class="num">{{ row.unallocated_quantity }}</td>
                 <td class="num">{{ row.sendable_quantity }}</td>
-                <td class="nowrap">{{ row.status_label }}</td>
                 <td class="c-actions nowrap" @click.stop>
                   <div class="row-actions">
                     <RowViewButton :label="`View ${row.reference_number}`" @view="viewRow(row)" />
                     <button
                       v-if="row.can_supply && canSupply"
                       type="button"
-                      class="supply-send"
+                      class="btn-outline btn-outline--sm"
                       :aria-label="`Send bags to ${row.reference_number}`"
                       @click="openSend(row)"
                     >
@@ -173,7 +168,6 @@
                   <th scope="col" class="c-pick"><span class="sr-only">Send</span></th>
                   <th scope="col">Bag</th>
                   <th scope="col">Expires</th>
-                  <th scope="col" class="num">Days Left</th>
                   <th scope="col">Location</th>
                 </tr>
               </thead>
@@ -191,7 +185,6 @@
                   </td>
                   <td class="mono nowrap">{{ unit.bag_number }}</td>
                   <td class="nowrap">{{ unit.expiry_date ? formatDate(unit.expiry_date) : '—' }}</td>
-                  <td class="num">{{ unit.days_remaining ?? '—' }}</td>
                   <td>{{ unit.storage_location || '—' }}</td>
                 </tr>
               </tbody>
@@ -238,7 +231,7 @@ definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashb
 
 useHead({ title: "Other Hospitals' Requests · RedAgos" })
 
-const COLUMN_COUNT = 9
+const COLUMN_COUNT = 6
 
 const { can } = useUser()
 // Sending is the inventory staff's and the Head's.
@@ -328,6 +321,7 @@ function viewRow(row) {
         { label: 'Urgency', value: row.is_emergency ? 'STAT' : 'Routine' },
         { label: 'Received', value: row.request_date ? formatWhen(row.request_date) : '' },
         { label: 'Needed by', value: row.needed_by ? formatWhen(row.needed_by) : '' },
+        { label: 'Units needed', value: total(row, 'required') },
       ] },
       ...(row.lines ?? []).map((line) => ({ title: line.component?.name || 'Component', rows: [
         { label: 'Needed', value: line.required },
@@ -443,7 +437,7 @@ useLiveRefresh(() => load(meta.value.current_page, { quiet: true }), {
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-.supply-table { min-width: 940px; }
+.supply-table { min-width: 720px; }
 .list-table thead th.c-actions { text-align: right; }
 
 /* An open STAT request, as Incoming Requests marks it: a tint, not a chip. */
@@ -451,21 +445,13 @@ useLiveRefresh(() => load(meta.value.current_page, { quiet: true }), {
 .supply-row--stat:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
 .list-row--link:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
 
-.supply-send {
-  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
-  color: var(--rb-primary-text); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer;
-  transition: background 0.12s ease;
-}
-.supply-send:hover { background: rgba(var(--rb-primary-rgb), 0.12); }
-.supply-send:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 .send-loading { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13px; color: var(--rb-text-secondary); }
 .send-line + .send-line { margin-top: 16px; }
 .send-line__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .send-line__name { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 .send-line__count { font-size: 12.5px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
-.send-none { margin: 0; padding: 12px; border: 1px dashed var(--rb-border-strong); border-radius: 10px; font-size: 13px; color: var(--rb-text-secondary); }
+.send-none { margin: 0; font-size: 13px; color: var(--rb-text-secondary); }
 .send-table-wrap { border: 1px solid var(--rb-border); border-radius: 10px; }
 .send-table .c-pick { width: 44px; }
 .send-check { width: 16px; height: 16px; accent-color: var(--rb-primary); cursor: pointer; }
@@ -474,7 +460,4 @@ useLiveRefresh(() => load(meta.value.current_page, { quiet: true }), {
 .send-note { margin: 16px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 .send-error { margin: 12px 0 0; font-size: 12.5px; color: var(--rb-accent-text); }
 
-@media (prefers-reduced-motion: reduce) {
-  .supply-send { transition: none; }
-}
 </style>

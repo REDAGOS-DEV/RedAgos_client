@@ -64,6 +64,7 @@
             <thead>
               <tr>
                 <th scope="col">Name</th>
+                <th scope="col">Email</th>
                 <th scope="col">Role</th>
                 <th scope="col">Title</th>
                 <th scope="col">Account</th>
@@ -72,12 +73,12 @@
             </thead>
 
             <tbody v-if="loading">
-              <SkeletonRows :columns="5" :rows="4" />
+              <SkeletonRows :columns="6" :rows="4" />
             </tbody>
 
             <tbody v-else-if="!visible.length">
               <tr>
-                <td colspan="5" class="empty-cell">
+                <td colspan="6" class="empty-cell">
                   <div class="empty-state">
                     <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'users'" :size="20" /></span>
                     <p class="empty-state__title">{{ hasFilters ? 'No staff match' : 'No staff yet' }}</p>
@@ -96,31 +97,15 @@
 
             <tbody v-else>
               <tr v-for="member in pageItems" :key="member.uuid" class="list-row" :class="{ 'row--removed': member.deleted_at }">
-                <td>
-                  <div class="cell">
-                    <span class="cell__main">
-                      {{ member.full_name }}
-                      <span v-if="member.is_you" class="tag">You</span>
-                    </span>
-                    <span class="cell__sub">{{ member.email }}</span>
-                  </div>
-                </td>
-                <td class="nowrap">
-                  <span v-if="member.hospital_role_label" class="role-pill" :class="`role-pill--${member.hospital_role}`">
-                    <AssetIcon :name="ROLE_ICONS[member.hospital_role] || 'user-circle'" :size="13" />
-                    {{ member.hospital_role_label }}
-                  </span>
-                  <span v-else>—</span>
-                </td>
+                <!-- One plain value a column (project owner, 2026-11-28); the eye shows the whole account. -->
+                <td>{{ member.full_name }}</td>
+                <td class="c-email">{{ member.email }}</td>
+                <td class="nowrap">{{ member.hospital_role_label || '—' }}</td>
                 <td>{{ member.position || '—' }}</td>
-                <td>
-                  <span class="badge" :class="accountBadge(member)">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ accountLabel(member) }}
-                  </span>
-                </td>
+                <td class="nowrap">{{ accountLabel(member) }}</td>
                 <td class="c-actions">
                   <div class="row-actions">
+                    <RowViewButton :label="`View ${member.full_name}`" @view="viewing = member" />
                     <button
                       v-if="member.deleted_at"
                       type="button"
@@ -164,6 +149,16 @@
         <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" @go="go" />
       </section>
     </div>
+
+    <!-- One account, read only, from its eye. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.full_name || 'Staff'" :sections="viewSections" @close="viewing = null">
+      <template #actions>
+        <button v-if="viewing && !viewing.deleted_at" type="button" class="ui-btn ui-btn--primary" @click="openEdit(viewing); viewing = null">
+          <AssetIcon name="pencil" :size="15" />
+          Edit
+        </button>
+      </template>
+    </RecordDialog>
 
     <!-- ADD STAFF -->
     <div v-if="adding" class="dialog-backdrop" @click.self="closeAdd">
@@ -315,6 +310,8 @@ import PageHeader from '~/components/ui/PageHeader.vue'
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -421,9 +418,23 @@ function accountLabel(member) {
   return { removed: 'Removed', unverified: 'Awaiting email verification', active: 'Active' }[accountKey(member)]
 }
 
-function accountBadge(member) {
-  return { removed: 'badge--neutral', unverified: 'badge--warn', active: 'badge--ok' }[accountKey(member)]
-}
+/* VIEW: everything about one account, read only (2026-11-28). */
+const viewing = ref(null)
+
+const viewSections = computed(() => {
+  const member = viewing.value
+  if (!member) return []
+
+  return [{ rows: [
+    { label: 'Name', value: member.full_name + (member.is_you ? ' (you)' : '') },
+    { label: 'Email', value: member.email },
+    { label: 'Phone', value: member.phone },
+    { label: 'Role', value: member.hospital_role_label },
+    { label: 'Title', value: member.position },
+    { label: 'Account', value: accountLabel(member) },
+    { label: 'Added', value: member.created_at ? new Date(member.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '' },
+  ] }]
+})
 
 // ── Role icons, and how many active people each role has, for the role filter ──
 const ROLE_ICONS = {
@@ -598,21 +609,13 @@ onPageReturn(refresh)
 <style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
-/* Role colours, each apart from the others and from the green You (2026-11-27): Head purple, inventory amber, requesting teal. */
-.role-pill--head, .role-option--head { --role: var(--rb-purple); --role-rgb: var(--rb-purple-rgb); --role-text: var(--rb-purple-text); }
-.role-pill--inventory_staff, .role-option--inventory_staff { --role: var(--rb-warning); --role-rgb: var(--rb-warning-rgb); --role-text: var(--rb-warning-text); }
-.role-pill--requesting_staff, .role-option--requesting_staff { --role: var(--rb-teal); --role-rgb: var(--rb-teal-rgb); --role-text: var(--rb-teal-text); }
+/* Role colours in the role picker, each apart from the others (2026-11-27): Head purple, inventory amber, requesting teal. */
+.role-option--head { --role: var(--rb-purple); --role-rgb: var(--rb-purple-rgb); --role-text: var(--rb-purple-text); }
+.role-option--inventory_staff { --role: var(--rb-warning); --role-rgb: var(--rb-warning-rgb); --role-text: var(--rb-warning-text); }
+.role-option--requesting_staff { --role: var(--rb-teal); --role-rgb: var(--rb-teal-rgb); --role-text: var(--rb-teal-text); }
 
-/* The roster: the role as a pill in its colour. */
-.cell__main { display: flex; align-items: center; gap: 6px; }
-/* You: your own row, in green, apart from the blue of Requesting staff (2026-11-27). */
-.cell__main .tag { margin: 0; border-color: rgba(var(--rb-success-rgb), .35); background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); font-weight: 700; }
-.role-pill {
-  --role: var(--rb-primary); --role-rgb: var(--rb-primary-rgb); --role-text: var(--rb-primary-text);
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
-  background: rgba(var(--role-rgb), .1); color: var(--role-text); font-size: 12px; font-weight: 700;
-}
-.row--removed .role-pill { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
+/* The roster: one plain value a column (2026-11-28). */
+.c-email { white-space: nowrap; color: var(--rb-text-secondary); }
 
 .edit-who {
   display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;

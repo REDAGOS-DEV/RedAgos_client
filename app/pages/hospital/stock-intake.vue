@@ -122,7 +122,7 @@
                 <th scope="col">Expires</th>
                 <th scope="col">Arrived</th>
                 <th scope="col">Storage location</th>
-                <th v-if="canDiscard" scope="col" class="c-actions">Actions</th>
+                <th scope="col" class="c-actions">Actions</th>
               </tr>
             </thead>
 
@@ -159,28 +159,14 @@
                     :aria-label="`Tick ${bagLabel(unit)}`"
                   />
                 </td>
-                <td>
-                  <div class="cell">
-                    <span class="code">
-                      <AssetIcon v-if="ticked.includes(unit.unit_id)" name="check" :size="13" class="scanned-mark" />
-                      {{ bagLabel(unit) }}
-                    </span>
-                    <span v-if="unit.source?.reference_number" class="cell__sub">from {{ unit.source.reference_number }}</span>
-                    <span v-else-if="unit.source?.direct_distribution" class="cell__sub">from {{ unit.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
-                  </div>
+                <!-- One plain value a column (project owner, 2026-11-28); the eye holds where it came from, its volume and the days left. -->
+                <td class="mono nowrap">
+                  <AssetIcon v-if="ticked.includes(unit.unit_id)" name="check" :size="13" class="scanned-mark" />
+                  {{ bagLabel(unit) }}
                 </td>
-                <td><span class="blood">{{ displayType(unit.blood_type?.code) }}</span></td>
-                <td>
-                  <div class="cell">
-                    <span>{{ unit.component?.name || '—' }}</span>
-                    <span v-if="unit.volume_ml" class="cell__sub">{{ unit.volume_ml }} mL</span>
-                  </div>
-                </td>
-                <!-- The date over how long is left (2026-11-27: one column). -->
-                <td class="expires-cell">
-                  <span class="expires-cell__date" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</span>
-                  <span class="days-pill" :class="`tone--${remaining(unit).tone}`">{{ remaining(unit).label }}</span>
-                </td>
+                <td class="nowrap">{{ displayType(unit.blood_type?.code) }}</td>
+                <td>{{ unit.component?.name || '—' }}</td>
+                <td class="nowrap" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</td>
                 <td class="nowrap">{{ formatDateTime(unit.received_at) }}</td>
                 <td>
                   <!-- Every bag goes onto a shelf, picked from the list as at the centre's Stock Intake (project owner, 2026-10-30). -->
@@ -196,9 +182,11 @@
                   </div>
                   <span v-else class="ink-danger">Past its date — discard it</span>
                 </td>
-                <td v-if="canDiscard" class="c-actions">
+                <td class="c-actions">
                   <div class="row-actions">
+                    <RowViewButton :label="`View ${bagLabel(unit)}`" @view="viewing = unit" />
                     <button
+                      v-if="canDiscard"
                       type="button"
                       class="icon-btn icon-btn--danger"
                       :disabled="dialogBusy"
@@ -231,6 +219,9 @@
         </footer>
       </section>
     </div>
+
+    <!-- One arrived bag, read only, from its eye. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing ? bagLabel(viewing) : 'Bag'" :sections="viewSections" @close="viewing = null" />
 
     <HospitalUnitReasonDialog
       v-if="discardTarget"
@@ -274,6 +265,8 @@
  * owner, 2026-10-28), as the centre's Stock Intake is.
  */
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 
 import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -298,7 +291,7 @@ const { can } = useUser()
 const canDiscard = computed(() => can('hospital.inventory.discard'))
 // Adding a bag is a direct-distribution receipt on the server, so it needs that ability.
 const canAdd = computed(() => can('hospital.receiving.direct'))
-const columnCount = computed(() => (canDiscard.value ? 8 : 7))
+const columnCount = 8
 
 const loading = ref(true)
 const loadError = ref('')
@@ -533,6 +526,24 @@ watch(notice, (message) => {
 const bagLabel = (unit) => unit.bag_number || unit.unit_id
 const remaining = (unit) => hospitalRemainingDaysTag(unit.status, unit.days_remaining)
 
+/* VIEW: one arrived bag, read only (2026-11-28). */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const unit = viewing.value
+  if (!unit) return []
+
+  return [{ rows: [
+    { label: 'Bag', value: bagLabel(unit), mono: true },
+    { label: 'Blood type', value: displayType(unit.blood_type?.code) },
+    { label: 'Component', value: unit.component?.name },
+    { label: 'Volume', value: unit.volume_ml ? `${unit.volume_ml} mL` : '' },
+    { label: 'Expires', value: unit.expiry_date },
+    { label: 'Days left', value: remaining(unit).label },
+    { label: 'Arrived', value: formatDateTime(unit.received_at) },
+    { label: 'From', value: unit.source?.reference_number || (unit.source?.direct_distribution ? (unit.source.direct_distribution.source_name || 'outside RedAgos') : '') },
+  ] }]
+})
+
 function displayType(code) {
   // A true minus sign, which reads as "minus" aloud and lines up with the plus.
   return code ? String(code).replace('-', '−') : '—'
@@ -665,13 +676,6 @@ onBeforeUnmount(() => {
 .list-head__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 .list-head__count { min-width: 22px; padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; text-align: center; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 
-/* Expires: the date over how long is left. */
-.expires-cell { white-space: nowrap; }
-.expires-cell__date { display: block; font-size: 13px; }
-.days-pill {
-  display: inline-flex; margin-top: 3px; padding: 1px 8px; border-radius: 999px;
-  background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone); font-size: 11.5px; font-weight: 700;
-}
 .scanned-mark { margin-right: 4px; vertical-align: -2px; color: var(--inv-ok); }
 
 /* The scanned bags' location, beside the scan field. */
@@ -681,10 +685,8 @@ onBeforeUnmount(() => {
 .check-col { width: 36px; }
 .location-cell { width: 200px; }
 .ink-danger { color: var(--rb-accent-text) !important; font-weight: 600; }
-/* A scanned bag is marked along its edge; one past its date in red. */
-.row--scanned td:first-child { box-shadow: inset 3px 0 0 var(--inv-ok-fill); }
+/* A scanned bag is ticked and lightly tinted; one past its date reads red. No edge stripes (2026-11-28). */
 .row--scanned { background: color-mix(in srgb, var(--inv-ok-fill) 6%, transparent); }
-.row--expired td:first-child { box-shadow: inset 3px 0 0 var(--inv-crit-fill); }
 
 /* Where the pager sits on the donors page: what stops the stock-in, and the button. */
 .list-foot {

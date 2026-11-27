@@ -1563,7 +1563,7 @@ function startAnother() {
 .stock-table .num { text-align: center; font-variant-numeric: tabular-nums; }
 .stock-table thead .stock-table__on { color: var(--rb-primary-text); box-shadow: inset 0 -2px 0 var(--rb-primary); }
 .stock-table__row--on { background: rgba(var(--rb-primary-rgb), 0.05); }
-.stock-table__row--on th { box-shadow: inset 3px 0 0 var(--rb-primary); }
+.stock-table__row--on th { color: var(--rb-primary-text); }
 .stock-table__this {
   margin-left: 8px; padding: 1px 7px; border-radius: 999px;
   background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text);

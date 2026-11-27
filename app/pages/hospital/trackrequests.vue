@@ -89,7 +89,6 @@
             :aria-pressed="listStatus === tab.value"
             @click="setListStatus(tab.value)"
           >
-            <span class="status-tab__dot" aria-hidden="true" />
             {{ tab.label }}
           </button>
         </div>
@@ -106,7 +105,8 @@
           <thead>
             <tr>
               <th scope="col">Reference</th>
-              <th scope="col">Blood</th>
+              <th scope="col">Blood Type</th>
+              <th scope="col">Component</th>
               <th scope="col" class="num">Units</th>
               <th scope="col">Blood center</th>
               <th scope="col">Submitted</th>
@@ -116,12 +116,12 @@
           </thead>
           <tbody v-if="listLoading && !listRows.length">
             <tr v-for="n in 6" :key="n" aria-hidden="true">
-              <td v-for="c in 7" :key="c"><span class="sk sk--line" :style="{ width: c === 7 ? '40px' : '70%' }" /></td>
+              <td v-for="c in 8" :key="c"><span class="sk sk--line" :style="{ width: c === 8 ? '40px' : '70%' }" /></td>
             </tr>
           </tbody>
           <tbody v-else-if="!listRows.length">
             <tr>
-              <td colspan="7">
+              <td colspan="8">
                 <EmptyState
                   :icon="referenceInput.trim() || listStatus ? 'search-x' : 'package-search'"
                   :title="referenceInput.trim() || listStatus ? 'No requests match' : 'No requests yet'"
@@ -136,28 +136,20 @@
               v-for="item in listRows"
               :key="item.reference_number"
               class="all-row"
-              :class="{ 'all-row--stat': item.urgency_level === 'emergency' }"
+              :class="{ 'all-row--stat': item.urgency_level === 'emergency' && ['pending', 'processing', 'partial'].includes(item.status) }"
               tabindex="0"
               :aria-label="`Track ${item.reference_number}`"
               @click="handleSelectRecent(item.reference_number)"
               @keydown.enter.self="handleSelectRecent(item.reference_number)"
             >
-              <td>
-                <span class="all-ref mono">{{ item.reference_number }}</span>
-                <span v-if="item.urgency_level === 'emergency'" class="all-stat">STAT</span>
-              </td>
-              <td>
-                <span class="all-blood">
-                  <span class="all-type">{{ bloodTypeSummary(item) }}</span>
-                  <span class="all-comp">{{ componentSummary(item) || '—' }}</span>
-                </span>
-              </td>
+              <!-- One plain value a column (2026-11-28); the row opens the request's tracking. An open STAT is a tint. -->
+              <td class="mono nowrap">{{ item.reference_number }}</td>
+              <td class="nowrap">{{ bloodTypeSummary(item) }}</td>
+              <td class="nowrap">{{ componentSummary(item) || '—' }}</td>
               <td class="num">{{ item.quantity ?? '—' }}</td>
-              <td class="all-center">{{ item.target_facility?.name || '—' }}</td>
-              <td class="all-date">{{ formatDate(item.request_date) }}</td>
-              <td>
-                <span class="status-badge status-badge--sm" :class="`badge--${TONE_BADGES[REQUEST_STATUS_TONES[item.status]] ?? 'neutral'}`">{{ requestStatusLabel(item) }}</span>
-              </td>
+              <td class="nowrap">{{ item.target_facility?.name || '—' }}</td>
+              <td class="nowrap">{{ formatDate(item.request_date) }}</td>
+              <td class="nowrap">{{ requestStatusLabel(item) }}</td>
               <td class="all-go"><span>Track</span><AssetIcon name="arrow-right" :size="14" /></td>
             </tr>
           </tbody>
@@ -757,9 +749,7 @@ function contactBloodCenter() {
   margin-bottom: 20px;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
-.card:hover {
-  box-shadow: var(--rb-shadow-sm);
-}
+
 .section-title {
   font-size: 18px;
   font-weight: 700;
@@ -916,7 +906,7 @@ function contactBloodCenter() {
 
 /* ---------- Hero card ---------- */
 .hero-card {
-  background: linear-gradient(135deg, var(--rb-surface) 0%, rgba(var(--rb-primary-rgb), 0.06) 100%);
+  background: var(--rb-surface);
 }
 .hero-ref {
   font-variant-numeric: tabular-nums;
@@ -1011,8 +1001,6 @@ function contactBloodCenter() {
 .stepper-step--current .stepper-marker {
   background: var(--rb-primary);
   color: #fff;
-  transform: scale(1.15);
-  box-shadow: 0 0 0 5px rgba(21, 101, 192, 0.15);
 }
 .stepper-label {
   font-size: 12px;
@@ -1097,7 +1085,6 @@ function contactBloodCenter() {
 .v-timeline-step--current .v-timeline-marker {
   background: var(--rb-primary);
   color: #fff;
-  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.15);
 }
 .v-timeline-body { display: flex; flex-direction: column; gap: 3px; padding-top: 1px; }
 .v-timeline-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1324,14 +1311,9 @@ function contactBloodCenter() {
   border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface);
   font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer;
 }
-.status-tab--info { --tab: var(--rb-primary); }
-.status-tab--progress { --tab: var(--rb-purple, #7C3AED); }
-.status-tab--warning { --tab: var(--rb-warning); }
-.status-tab--success { --tab: var(--rb-success); }
-.status-tab--danger { --tab: var(--rb-accent); }
-.status-tab__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--tab); }
 .status-tab:hover { color: var(--rb-text-primary); border-color: var(--rb-border-strong); }
-.status-tab--on { border-color: color-mix(in srgb, var(--tab) 55%, transparent); background: color-mix(in srgb, var(--tab) 9%, var(--rb-surface)); color: var(--rb-text-primary); }
+/* The filter on: one colour for every status, so the tabs read as a filter, not a legend. */
+.status-tab--on { border-color: rgba(var(--rb-primary-rgb), 0.55); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
 .status-tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 .all-wrap { overflow-x: auto; border: 1px solid var(--rb-border); border-radius: 12px; transition: opacity .15s ease; }
@@ -1347,13 +1329,11 @@ function contactBloodCenter() {
 .all-row { cursor: pointer; transition: background-color .12s ease; }
 .all-row:hover { background: rgba(var(--rb-primary-rgb), .05); }
 .all-row:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
-.all-row--stat td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
-.all-ref { font-weight: 700; color: var(--rb-primary-text); white-space: nowrap; }
-.all-stat { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--rb-accent); color: #FFFFFF; font-size: 10.5px; font-weight: 700; }
-.all-blood { display: flex; align-items: center; gap: 8px; }
-.all-type { flex: none; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(var(--rb-accent-rgb), .35); background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); font-size: 12px; font-weight: 700; }
-.all-comp { white-space: nowrap; }
-.all-center, .all-date { white-space: nowrap; color: var(--rb-text-secondary); }
+/* An open STAT: a tint on the row, never an edge stripe; a finished one is plain. */
+.all-row--stat td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.all-row--stat:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
+.all-table .mono { font-family: var(--rb-font-mono); font-size: 12.5px; }
+.all-table .nowrap { white-space: nowrap; }
 .all-go { display: flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--rb-text-muted); }
 .all-row:hover .all-go { color: var(--rb-primary-text); }
 
@@ -1372,7 +1352,7 @@ function contactBloodCenter() {
   font: inherit; text-align: left; color: var(--rb-text-primary); cursor: pointer;
   transition: border-color .15s ease, background-color .15s ease, box-shadow .2s ease;
 }
-.recent-card:hover { border-color: rgba(var(--rb-primary-rgb), .45); background: var(--rb-surface); box-shadow: 0 8px 20px -12px rgba(15, 23, 42, .25); }
+.recent-card:hover { border-color: rgba(var(--rb-primary-rgb), .45); background: var(--rb-surface); }
 .recent-card:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .recent-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .recent-card__ref { font-size: 13px; font-weight: 700; color: var(--rb-primary-text); }

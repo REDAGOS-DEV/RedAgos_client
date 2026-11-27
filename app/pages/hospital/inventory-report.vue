@@ -365,23 +365,12 @@
 
           <tbody v-else>
             <tr v-for="item in reports" :key="item.id">
-              <td>
-                <span class="reports__date">
-                  {{ formatDate(item.generated_at) }}
-                  <span v-if="item.id === current?.id" class="reports__new">Just generated</span>
-                </span>
-                <span class="reports__sub">{{ formatTime(item.generated_at) }}</span>
-              </td>
+              <!-- One plain value a column (project owner, 2026-11-28); the report itself, from the eye, holds the blood types and the crossmatched count. -->
+              <td class="reports__nowrap">{{ formatDate(item.generated_at) }}, {{ formatTime(item.generated_at) }}</td>
               <td>{{ item.generated_by || '—' }}</td>
-              <td class="reports__covers">
-                <span>{{ coverLabel(item.components, componentOptions.length) }}</span>
-                <span class="reports__sub">{{ coverLabel(item.blood_types.map(displayType), typeOptions.length, 'blood types') }}</span>
-              </td>
+              <td class="reports__covers">{{ coverLabel(item.components, componentOptions.length) }}</td>
               <td>{{ item.layout === 'type' ? 'One per type' : 'All on one' }}</td>
-              <td class="num">
-                <span class="reports__date">{{ reportBags(item) }}</span>
-                <span class="reports__sub">{{ item.totals?.crossmatched ?? 0 }} crossmatched</span>
-              </td>
+              <td class="num">{{ reportBags(item) }}</td>
               <td class="num">{{ item.pages }}</td>
               <td class="reports__actions">
                 <div class="row-actions">
@@ -1088,9 +1077,7 @@ function formatTime(value) {
 .reports tbody tr:last-child td { border-bottom: 0; }
 .reports tbody tr { transition: background 0.12s ease; }
 .reports tbody tr:hover { background: var(--rb-surface-hover); }
-.reports__date { display: block; font-weight: 700; white-space: nowrap; }
-.reports__new { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
-.reports__sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
+.reports__nowrap { white-space: nowrap; }
 .reports__covers { min-width: 180px; }
 .reports .reports__actions { text-align: right; white-space: nowrap; }
 .reports .num { text-align: right; font-variant-numeric: tabular-nums; }

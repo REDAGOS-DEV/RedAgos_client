@@ -52,8 +52,27 @@ export function isSticker(code: string | null | undefined): boolean {
 }
 
 /**
+ * The last this many digits of a sticker find it on their own (project
+ * owner, 2026-11-28): 627990 finds 21627990. Fewer must be the whole sticker.
+ * Mirrors the server's BagNumbers::SHORT_STICKER_DIGITS.
+ */
+export const SHORT_STICKER_DIGITS = 6
+
+/** Whether a scanned or typed sticker names this one: all of it, or at least its last six digits. */
+export function stickerMatches(code: string | null | undefined, sticker: string | null | undefined): boolean {
+  const wanted = normalizeBagCode(code)
+  const own = normalizeBagCode(sticker)
+
+  if (!own || !isSticker(wanted)) return false
+  if (wanted === own) return true
+
+  return wanted.length >= SHORT_STICKER_DIGITS && own.endsWith(wanted)
+}
+
+/**
  * Whether a scanned or typed code names this bag: its full number in any
- * case, or the sticker of the donation it came from.
+ * case, or the sticker of the donation it came from (all of it, or its last
+ * six digits).
  */
 export function bagMatchesCode(code: string | null | undefined, bagNumber: string | null | undefined): boolean {
   const wanted = normalizeBagCode(code)
@@ -62,5 +81,5 @@ export function bagMatchesCode(code: string | null | undefined, bagNumber: strin
   if (!wanted || !bag) return false
   if (wanted === bag) return true
 
-  return isSticker(wanted) && parseBagNumber(bag)?.sticker === wanted
+  return stickerMatches(wanted, parseBagNumber(bag)?.sticker)
 }

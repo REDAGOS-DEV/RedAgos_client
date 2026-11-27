@@ -204,7 +204,6 @@ defineExpose({ clear })
 }
 .receive__table tbody td { padding: 10px 12px; border-top: 1px solid var(--rb-surface-alt); color: var(--rb-text-primary); white-space: nowrap; }
 .row--on td { background: rgba(var(--rb-success-rgb), 0.07); }
-.row--on td:first-child { box-shadow: inset 3px 0 0 var(--rb-success); }
 .pick { width: 36px; }
 
 .receive__actions { display: flex; gap: 10px; flex-wrap: wrap; }
