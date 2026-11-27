@@ -1,7 +1,9 @@
 <template>
   <div class="pos">
 
-    <PageHeader class="pos-head" title="Billing Counter" />
+    <!-- Payments, the Billing Counter tab (project owner, 2026-11-27). -->
+    <PageHeader class="pos-head" title="Payments" />
+    <BloodCenterPaymentsTabs class="pos-tabs" />
 
     <!-- SHIFT BAR: only when the counter works in cash shifts (off by default) -->
     <section v-if="shiftsEnabled" class="shift-bar" :class="{ 'shift-bar--open': shift }" aria-label="Cash shift">
@@ -104,7 +106,7 @@
         </form>
         <p v-if="searchError" class="field-error">{{ searchError }}</p>
 
-        <div class="queue-list" role="listbox" :aria-label="listHeading">
+        <div class="queue-list" role="region" :aria-label="listHeading">
           <template v-if="listLoading">
             <div v-for="n in 4" :key="n" class="sk-card"><span class="sk sk--line" style="width: 62%" /><span class="sk sk--line" style="width: 84%" /><span class="sk sk--line" style="width: 40%" /></div>
           </template>
@@ -128,49 +130,43 @@
               </NuxtLink>
             </div>
           </div>
-          <button
-            v-for="b in listRows"
-            v-else
-            :key="b.request_id"
-            type="button"
-            role="option"
-            class="q-row"
-            :class="{ 'q-row--on': bill?.request_id === b.request_id }"
-            :aria-selected="bill?.request_id === b.request_id"
-            @click="selectBill(b.request_id)"
-          >
-            <span class="q-row__avatar" aria-hidden="true"><AssetIcon :name="category === 'patient' ? 'user' : 'building-2'" :size="16" /></span>
-            <span class="q-row__top">
-              <span class="q-row__ref">
-                <span class="mono strong">{{ b.reference_number }}</span>
-                <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
-              </span>
-              <span class="q-row__date">
-                <template v-if="b.date">{{ formatShortDay(b.date) }}</template>
-                <span v-if="b.walkIn" class="q-row__tag">Walk-in</span>
-              </span>
-            </span>
-            <span class="q-row__who">
-              <span class="q-row__name">{{ b.name || b.who }}</span>
-              <span v-if="b.place" class="q-row__place">{{ b.place }}</span>
-            </span>
-            <span class="q-row__what">
-              <span v-for="code in b.bloodTypes" :key="code" class="q-row__blood">{{ code }}</span>
-              <span v-if="b.purpose" class="q-row__purpose">{{ b.purpose }}</span>
-            </span>
-            <span class="q-row__status">
-              <span v-if="b.status_label" class="q-row__pill" :class="{ 'q-row__pill--clear': !b.owing }">{{ b.status_label }}</span>
-            </span>
-            <span class="q-row__amount" :class="{ 'q-row__amount--clear': !b.owing }">
-              {{ b.owing ? pesos(b.amount) : '—' }}
-              <small v-if="b.owing && b.paid > 0">{{ pesos(b.paid) }} paid of {{ pesos(b.total) }}</small>
-              <small v-else-if="b.owing">{{ b.amountWord }}</small>
-            </span>
-            <span class="q-row__open" aria-hidden="true">
-              Open
-              <AssetIcon name="arrow-right" :size="14" />
-            </span>
-          </button>
+          <!--
+            One plain value a column (project owner, 2026-11-27; the rows were
+            cards). A row opens its bill; the eye shows everything about it.
+          -->
+          <table v-else class="q-table">
+            <thead>
+              <tr>
+                <th scope="col">Reference</th>
+                <th scope="col">Date</th>
+                <th scope="col">{{ category === 'patient' ? 'Patient' : 'Hospital' }}</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="num">{{ category === 'patient' ? 'Amount due' : 'Billed' }}</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="b in listRows"
+                :key="b.request_id"
+                class="q-tr"
+                :class="{ 'q-tr--on': bill?.request_id === b.request_id }"
+                @click="selectBill(b.request_id)"
+              >
+                <td class="mono nowrap">{{ b.reference_number }}</td>
+                <td class="nowrap">{{ formatShortDay(b.date) || '—' }}</td>
+                <td class="q-name">{{ b.name || '—' }}</td>
+                <td class="nowrap">{{ b.status_label || '—' }}</td>
+                <td class="num">{{ b.owing ? pesos(b.amount) : '—' }}</td>
+                <td class="q-actions" @click.stop>
+                  <RowViewButton :label="`View ${b.reference_number}`" @view="viewingRow = b" />
+                  <button type="button" class="btn btn-outline btn-sm" :aria-label="`Open ${b.reference_number}`" @click="selectBill(b.request_id)">
+                    Open
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -761,6 +757,13 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Everything about a waiting bill, read only; Open bill takes it up. -->
+    <RecordDialog :open="Boolean(viewingRow)" :title="viewingRow?.reference_number || 'Bill'" :eyebrow="category === 'patient' ? 'Patient bill' : 'Hospital invoice'" :sections="viewRowSections" @close="viewingRow = null">
+      <template v-if="viewingRow" #actions>
+        <button type="button" class="btn btn-primary" @click="openViewed">Open bill</button>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -784,6 +787,8 @@
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
@@ -941,6 +946,7 @@ function fromCounter(b) {
     amountWord: b.is_payment_deferred ? 'deferred' : 'due',
     owing: b.takes_payment,
     status_label: b.billing_status_label,
+    raw: b,
   }
 }
 
@@ -962,7 +968,49 @@ function fromStatement(s) {
     amountWord: 'billed',
     owing: s.status === 'statement_only',
     status_label: s.status_label,
+    raw: s,
   }
+}
+
+/* VIEW: a waiting row's eye opens everything the table leaves out (project owner, 2026-11-27) */
+const viewingRow = ref(null)
+const viewRowSections = computed(() => {
+  const b = viewingRow.value
+  if (!b) return []
+  const raw = b.raw ?? {}
+  const request = raw.request ?? {}
+  const hospital = category.value !== 'patient'
+  return [
+    { title: 'Request', rows: [
+      { label: 'Reference', value: b.reference_number, mono: true },
+      { label: 'Weekly order', value: request.weekly_request?.reference_number, mono: true },
+      { label: 'Transfusion request', value: raw.transfusion_reference, mono: true },
+      { label: 'Presented reference', value: raw.presented_reference, mono: true },
+      { label: 'Request date', value: b.date ? new Date(b.date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '' },
+      { label: 'Source', value: hospital ? '' : (b.walkIn ? 'Walk-in' : 'Hospital request') },
+      { label: 'Urgency', value: raw.urgency_label || (b.is_emergency ? 'STAT' : '') },
+      { label: 'Purpose', value: b.purpose },
+      { label: hospital ? 'Hospital' : 'Patient', value: b.name },
+      { label: 'Hospital', value: hospital ? '' : b.place },
+      { label: 'Attending physician', value: raw.attending_physician },
+      { label: 'Blood type', value: (b.bloodTypes || []).join(', ') },
+      { label: 'Components', value: (request.components || []).join(', '), wide: true },
+    ] },
+    { title: 'Bill', rows: [
+      { label: 'Status', value: b.status_label },
+      { label: 'Total', value: pesos(b.total) },
+      { label: 'Paid', value: b.paid > 0 ? pesos(b.paid) : '' },
+      { label: hospital ? 'Billed' : 'Amount due', value: b.owing ? pesos(b.amount) : '' },
+      { label: 'Payment', value: raw.is_payment_deferred ? 'Deferred' : '' },
+      { label: 'Release', value: hospital || raw.clears_release === undefined ? '' : (raw.clears_release ? 'Cleared' : 'Held') },
+    ] },
+  ]
+})
+
+function openViewed() {
+  const id = viewingRow.value?.request_id
+  viewingRow.value = null
+  if (id) selectBill(id)
 }
 
 // The Waiting column: the queue, or the results once two letters are typed.
@@ -1731,7 +1779,8 @@ onPageReturn(async () => {
 function onCounterKeys(e) {
   // The void dialog has the keys while it is open; its Escape closes only it,
   // and reaches here after the dialog has already closed.
-  if (voidTarget.value || e.target?.closest?.('.modal-overlay')) return
+  // So does a row's view (2026-11-27).
+  if (voidTarget.value || viewingRow.value || e.target?.closest?.('.modal-overlay, [role="dialog"]')) return
 
   const typingInField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
   if ((e.key === '/' && !typingInField) || e.key === 'F2') {
@@ -1787,7 +1836,10 @@ onBeforeUnmount(() => {
   --pos-ctl: 36px;
 
   font-family: var(--rb-font-sans);
-  padding: 14px 18px;
+  /* The title and the Payments tabs where Receipts and Transactions put them,
+     so they do not jump between the tabs (2026-11-27). */
+  width: 100%; max-width: calc(var(--rb-content-max, 1600px) + 2 * var(--rb-gutter, 24px)); margin: 0 auto;
+  padding: 24px var(--rb-gutter, 24px) 14px;
   display: flex; flex-direction: column; gap: 12px;
   color: var(--rb-text-primary);
 }
@@ -1847,21 +1899,6 @@ onBeforeUnmount(() => {
 .queue-list { flex: 1 1 auto; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0 -4px; padding: 0 4px; }
 .queue-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: auto 0; padding: 20px 8px; text-align: center; font-size: 12.5px; color: var(--rb-text-secondary); }
 
-.q-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top amount" "who amount";
-  align-items: center; gap: 2px 10px; width: 100%; padding: 10px 12px; text-align: left;
-  border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); cursor: pointer;
-  font-family: inherit; color: var(--rb-text-primary);
-  transition: border-color .15s var(--rb-ease-out), background-color .15s var(--rb-ease-out);
-}
-.q-row:hover { border-color: rgba(var(--rb-primary-rgb), .4); }
-.q-row:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
-.q-row--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .07); }
-.q-row__top { grid-area: top; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
-.q-row__who { grid-area: who; overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.q-row__amount { grid-area: amount; display: flex; flex-direction: column; align-items: flex-end; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.q-row__amount small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-secondary); }
-.q-row__amount--clear { color: var(--rb-success-text); font-size: 12px; }
 
 /* ── 2. The bill ── */
 .bill-loading { display: flex; flex-direction: column; gap: 10px; }
@@ -2193,24 +2230,27 @@ onBeforeUnmount(() => {
     display: grid;
     height: max(calc(100dvh - 4rem), 588px);
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto minmax(440px, 1fr);
-    grid-template-areas: "head" "shift" "steps" "main";
+    /* 390px, not 440px, since the tabs took a row: a 1366×657 laptop still
+       fits the counter without the page scrolling. */
+    grid-template-rows: auto auto auto auto minmax(390px, 1fr);
+    grid-template-areas: "head" "tabs" "shift" "steps" "main";
   }
   /* No shift bar (the usual case): no empty first row. */
   .pos:not(:has(> .shift-bar)) {
-    grid-template-rows: auto auto minmax(440px, 1fr);
-    grid-template-areas: "head" "steps" "main";
+    grid-template-rows: auto auto auto minmax(390px, 1fr);
+    grid-template-areas: "head" "tabs" "steps" "main";
   }
   .counter { display: contents; }
   .shift-bar { grid-area: shift; }
   .steps { grid-area: steps; }
   .pos-head { grid-area: head; }
+  .pos-tabs { grid-area: tabs; }
   .queue, .billcard, .pay { grid-area: main; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-  .toast-enter-active, .toast-leave-active, .btn, .method, .q-row, .seg-btn { transition: none; }
+  .toast-enter-active, .toast-leave-active, .btn, .method, .q-tr td, .seg-btn { transition: none; }
 }
 
 /* Below desktop the page scrolls as one column, with touch-sized controls. */
@@ -2274,6 +2314,8 @@ onBeforeUnmount(() => {
 .steps__num { width: 26px; height: 26px; font-size: 12.5px; }
 .steps__label { font-size: 13px; }
 .pos-head { margin-bottom: 4px; }
+/* The Payments tabs sit at their own width, under the title, as on Receipts. */
+.pos-tabs { align-self: flex-start; justify-self: start; }
 
 @media (max-width: 760px) {
   .steps__btn { padding: 8px; gap: 8px; }
@@ -2351,47 +2393,27 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .modal-enter-active, .modal-leave-active, .void-btn { transition: none; }
 }
-/* ---------- Waiting: one full row per bill (2026-11-11) ---------- */
+/* ---------- Waiting: a table, one plain value a column (2026-11-27) ---------- */
+.q-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.q-table th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 10px 14px; border-bottom: 1px solid var(--rb-border); background: var(--rb-surface-alt);
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; color: var(--rb-text-secondary);
+}
+.q-table td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.q-table tbody tr:last-child td { border-bottom: 0; }
+.q-tr { cursor: pointer; }
+.q-tr td { transition: background-color .12s var(--rb-ease-out); }
+.q-tr:hover td { background: var(--rb-surface-hover); }
+.q-tr--on td { background: rgba(var(--rb-primary-rgb), .07); }
+.q-name { text-transform: capitalize; }
+.q-actions { width: 1%; text-align: right; white-space: nowrap; }
+.q-actions > * { vertical-align: middle; }
+.q-actions > * + * { margin-left: 6px; }
+.nowrap { white-space: nowrap; }
+.counter--step-1 .queue-list { gap: 0; margin: 6px 0 0; padding: 0; border: 1px solid var(--rb-border); border-radius: 12px; }
+.counter--step-1 .queue-list:has(> .queue-empty) { border: 0; }
 .queue-total { display: inline-flex; align-items: baseline; gap: 6px; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 .queue-total small { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
-.counter--step-1 .q-row {
-  /* Fixed tracks, so every row's columns line up. */
-  grid-template-columns: 40px 180px minmax(0, 1.4fr) minmax(0, 1fr) 150px 170px 86px;
-  grid-template-areas: "avatar top who what status amount open";
-  gap: 0 18px; min-height: 64px; padding: 12px 16px; border-radius: 14px;
-}
-.q-row__avatar {
-  grid-area: avatar; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
-}
-.counter--step-1 .q-row__top { font-size: 14px; }
-.counter--step-1 .q-row__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; white-space: normal; }
-.q-row__name { overflow: hidden; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
-.q-row__place { overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.q-row__status { grid-area: status; }
-.q-row__pill {
-  display: inline-flex; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(var(--rb-warning-rgb), 0.4);
-  background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); font-size: 11.5px; font-weight: 700; white-space: nowrap;
-}
-.q-row__pill--clear { border-color: rgba(var(--rb-success-rgb), 0.4); background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
-.counter--step-1 .q-row__amount { font-size: 15px; }
-.q-row__open {
-  grid-area: open; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 9px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.06);
-  color: var(--rb-primary-text); font-size: 12.5px; font-weight: 700; white-space: nowrap;
-}
-.q-row:hover .q-row__open { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 
-/* The reference over its date; blood types and purpose in the middle. */
-.counter--step-1 .q-row__top { flex-direction: column; align-items: flex-start; gap: 3px; }
-.q-row__ref { display: inline-flex; align-items: center; gap: 6px; }
-.q-row__date { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); }
-.q-row__tag { padding: 0 7px; border-radius: 999px; background: rgba(var(--rb-purple-rgb), 0.12); color: var(--rb-purple-text); font-size: 10.5px; font-weight: 700; }
-.q-row__what { grid-area: what; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.q-row__blood {
-  display: inline-flex; justify-content: center; min-width: 38px; padding: 2px 8px; border-radius: 999px;
-  background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); font-size: 12px; font-weight: 700;
-}
-.q-row__purpose { font-size: 12px; color: var(--rb-text-secondary); white-space: nowrap; }
-.counter--step-1 .q-row__amount small { white-space: nowrap; }
 </style>

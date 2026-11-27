@@ -67,21 +67,22 @@
               <tr>
                 <th scope="col" class="c-id">ID</th>
                 <th scope="col" class="c-donor">Donor</th>
+                <th scope="col" class="c-group">Group</th>
                 <th scope="col" class="c-date">Date</th>
                 <th scope="col" class="c-slot">Slot</th>
                 <th scope="col" class="c-place">Drive / Center</th>
                 <th scope="col" class="c-status">Status</th>
-                <th scope="col" class="c-actions">Actions</th>
+                <th scope="col" class="c-actions" :style="{ width: `${actionsWidth}px` }">Actions</th>
               </tr>
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <SkeletonRows :columns="7" :rows="6" :cell-classes="['c-id', 'c-donor', 'c-date', 'c-slot', 'c-place', 'c-status', 'c-actions']" />
+              <SkeletonRows :columns="8" :rows="6" :cell-classes="['c-id', 'c-donor', 'c-group', 'c-date', 'c-slot', 'c-place', 'c-status', 'c-actions']" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
               <tr>
-                <td colspan="7" class="empty-cell">
+                <td colspan="8" class="empty-cell">
                   <div class="empty-state">
                     <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'calendar'" :size="20" /></span>
                     <p class="empty-state__title">{{ hasFilters ? 'No appointments match' : 'No appointments yet' }}</p>
@@ -111,33 +112,21 @@
                 @click="detail = row"
                 @keydown.enter.self="detail = row"
               >
-                <td class="c-id"><span class="code">{{ row.code }}</span></td>
+                <!-- One plain value per column, as on Donations (project owner,
+                     2026-11-26): no avatar, pill, tag or badge. Who booked it
+                     and the note are in the record. -->
+                <td class="c-id">{{ row.code }}</td>
                 <td class="c-donor">
-                  <div class="person">
-                    <PersonAvatar :name="row.donor?.full_name" />
-                    <div class="person__text">
-                      <div class="donor">
-                        <span class="donor__name">{{ row.donor?.full_name || 'Unknown donor' }}</span>
-                        <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
-                      </div>
-                      <span v-if="row.booked_by" class="sub" :title="row.notes || undefined">
-                        Booked by {{ row.booked_by }}<template v-if="row.notes"> · has a note</template>
-                      </span>
-                    </div>
-                  </div>
+                  <span v-if="row.donor?.full_name" class="donor-name">{{ row.donor.full_name }}</span>
+                  <span v-else class="muted">Unknown donor</span>
                 </td>
-                <td class="c-date nowrap">
-                  {{ formatShortDate(row.date) }}
-                  <span v-if="row.date === todayIso" class="today-tag">Today</span>
+                <td class="c-group" :title="row.donor?.blood_type ? undefined : 'Not typed yet'">{{ row.donor?.blood_type || '—' }}</td>
+                <td class="c-date" :title="row.date === todayIso ? formatShortDate(row.date) : undefined">
+                  {{ row.date === todayIso ? 'Today' : formatShortDate(row.date) }}
                 </td>
-                <td class="c-slot nowrap">{{ row.slot_start }} - {{ row.slot_end }}</td>
-                <td class="c-place">{{ row.place }}</td>
-                <td class="c-status">
-                  <span class="badge" :class="`badge--${appointmentTone(row.status, row.status_label)}`">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ row.status_label }}
-                  </span>
-                </td>
+                <td class="c-slot">{{ row.slot_start }} - {{ row.slot_end }}</td>
+                <td class="c-place" :title="row.place || undefined">{{ row.place }}</td>
+                <td class="c-status">{{ row.status_label }}</td>
                 <td class="c-actions" @click.stop>
                   <!-- A scheduled row always shows its four actions, as the
                        mock-up does; one that does not apply yet is greyed out
@@ -476,6 +465,22 @@ function collectHint(row) {
   return 'Can be marked collected on the appointment day'
 }
 const canOpenCounter = computed(() => can(COLLECTION_ABILITIES))
+
+/**
+ * The actions column, as wide as the busiest row on this page needs (as on
+ * Donations, 2026-11-26): a page of finished bookings has just the eye, so no
+ * empty room is kept for buttons none of its rows shows.
+ */
+const actionsWidth = computed(() => Math.max(72, ...rows.value.map((row) => {
+  const open = row.status === 'scheduled' || row.status === 'confirmed'
+  const icons = 1
+    + (canVerify.value && open ? 2 : 0)
+    + (canManage.value && row.status === 'scheduled' ? 1 : 0)
+    + (canDelete.value && row.status !== 'confirmed' ? 1 : 0)
+  const cont = Boolean(row.can?.open_counter && canOpenCounter.value)
+  const buttons = icons + (cont ? 1 : 0)
+  return 34 + icons * 30 + (cont ? 94 : 0) + Math.max(0, buttons - 1) * 6
+})))
 
 /**
  * API SHAPE (/api/blood-center/appointments)
@@ -1119,11 +1124,28 @@ onPageReturn(() => load(pager.page))
 }
 .c-date .today-tag { display: table; }
 
-.c-id { width: 128px; }
-.c-date { width: 118px; }
-.c-slot { width: 118px; }
-.c-status { width: 124px; }
-.c-actions { width: 220px; }
+/* As on Donations (2026-11-26): each column grows with the table from a floor
+   its longest value fits in, so spare room spreads evenly; the donor and the
+   place share what is left. The actions column is sized in the template. */
+.c-id { width: max(128px, 11%); }
+.c-group { width: max(76px, 7%); }
+.c-date { width: max(118px, 11%); }
+.c-slot { width: max(128px, 12%); }
+.c-status { width: max(120px, 11%); }
+.appt-table thead th.c-actions { text-align: right; }
+
+/* Plain text, one line each, as on Donations; the donor's name may wrap. */
+.appt-table tbody td.c-id,
+.appt-table tbody td.c-group,
+.appt-table tbody td.c-date,
+.appt-table tbody td.c-slot,
+.appt-table tbody td.c-place,
+.appt-table tbody td.c-status {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.donor-name { text-transform: capitalize; overflow-wrap: anywhere; }
+.muted { color: var(--rb-text-secondary); }
 
 /* Too narrow for both names: the place goes, the donor stays. */
 @container (max-width: 860px) {
@@ -1472,7 +1494,7 @@ onPageReturn(() => load(pager.page))
 .modal-card__footer { padding: 14px 24px; }
 
 /* Loading rows as tall as the real ones (measured at 1366px), so nothing jumps. */
-.appt-table tbody :deep(tr[aria-hidden="true"] td) { height: 65px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+.appt-table tbody :deep(tr[aria-hidden="true"] td) { height: 53px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
 .appt-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 </style>
 

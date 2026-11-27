@@ -1,11 +1,6 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <NuxtLink to="/hospital/receiving/weekly" class="back-link back-link--narrow">
-        <AssetIcon name="arrow-left" :size="14" />
-        Weekly Request
-      </NuxtLink>
-
       <div v-if="loading" class="panel list-state" aria-busy="true">
         <div class="skeleton" style="width:40%" />
         <div class="skeleton" style="width:75%" />
@@ -20,7 +15,9 @@
 
       <template v-else-if="weekly">
         <header class="page-header">
-          <div>
+          <div class="title-lead">
+            <BackButton to="/hospital/receiving/weekly" label="Weekly Request" />
+            <div>
             <h1 class="page-title">
               <span class="mono">{{ weekly.reference_number }}</span>
               <span class="pill" :class="`tone--${WEEKLY_STATUS_TONES[weekly.status] || 'muted'}`">
@@ -32,6 +29,7 @@
               Weekly request to <strong>{{ weekly.target_facility?.name || 'the blood center' }}</strong>
               for {{ formatDay(weekly.request_day) }}<template v-if="weekly.requester_name">, sent by {{ weekly.requester_name }}</template>.
             </p>
+            </div>
           </div>
           <button type="button" class="ui-btn" :disabled="refreshing" @click="refresh">
             <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
@@ -174,6 +172,7 @@
  * go straight onto the blood bank's shelf.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import HospitalScanReceivePanel from '~/components/Hospital/ScanReceivePanel.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeSummary, handoverWhen, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
@@ -335,8 +334,8 @@ function formatDay(value) {
 .rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.back-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; }
-.back-link:hover { text-decoration: underline; }
+/* The way back (ui/BackButton) beside the title. */
+.title-lead { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 6px 0 0; }

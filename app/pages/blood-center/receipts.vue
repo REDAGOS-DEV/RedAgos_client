@@ -71,30 +71,20 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in receipts" :key="r.id" class="row" :class="{ 'row--voided': r.voided }" @click="open(r)">
-                <td>
+              <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
+              <tr v-for="r in receipts" :key="r.id" class="row" @click="open(r)">
+                <td class="nowrap">
                   <NuxtLink :to="`/blood-center/receipt/${r.id}`" class="link mono" @click.stop>{{ r.receipt_number }}</NuxtLink>
                 </td>
                 <td class="nowrap">{{ when(r.issued_at) }}</td>
-                <td>
-                  {{ r.payer_name || r.request?.patient_name || '—' }}
-                  <span v-if="r.payer_name && r.request?.patient_name" class="sub">For {{ r.request.patient_name }}</span>
-                </td>
-                <td class="mono">{{ r.request?.reference_number || '—' }}</td>
-                <td>
-                  <span class="method-chip" :class="`method-chip--${methodKey(r)}`">
-                    <AssetIcon :name="methodIcon(r)" :size="13" />
-                    {{ r.payment?.method_label || r.payment_method_label || '—' }}
-                  </span>
-                </td>
-                <td class="num strong">{{ pesos(r.amount_paid) }}</td>
-                <td class="num" :class="{ 'settled': !(Number(r.balance_after) > 0) }">{{ Number(r.balance_after) > 0 ? pesos(r.balance_after) : 'Settled' }}</td>
-                <td>
-                  <BillingBadge v-if="r.voided" tone="muted">Voided</BillingBadge>
-                  <BillingBadge v-else-if="r.is_partial" tone="warning">Part payment</BillingBadge>
-                  <BillingBadge v-else tone="success">Paid in full</BillingBadge>
-                </td>
+                <td>{{ r.payer_name || r.request?.patient_name || '—' }}</td>
+                <td class="mono nowrap">{{ r.request?.reference_number || '—' }}</td>
+                <td class="nowrap">{{ methodOf(r) }}</td>
+                <td class="num">{{ pesos(r.amount_paid) }}</td>
+                <td class="num">{{ Number(r.balance_after) > 0 ? pesos(r.balance_after) : 'Settled' }}</td>
+                <td class="nowrap">{{ statusOf(r) }}</td>
                 <td class="row-actions" @click.stop>
+                  <RowViewButton :label="`View ${r.receipt_number}`" @view="viewing = r" />
                   <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="r.voided" :aria-label="`Print ${r.receipt_number} on the 80mm printer`" @click="printThermal(r)">
                     <AssetIcon name="printer" :size="14" />
                   </button>
@@ -123,6 +113,13 @@
         </footer>
       </section>
     </div>
+
+    <!-- Everything about the receipt the row names, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.receipt_number || 'Receipt'" eyebrow="Receipt" :sections="viewSections" @close="viewing = null">
+      <template v-if="viewing" #actions>
+        <NuxtLink :to="`/blood-center/receipt/${viewing.id}`" class="ui-btn" @click="viewing = null">Open receipt</NuxtLink>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -134,8 +131,10 @@
  * record payments, as the payments list does.
  */
 import SkeletonList from '~/components/ui/SkeletonList.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import DatePicker from '~/components/common/DatePicker.vue'
@@ -209,14 +208,64 @@ function clearFilters() {
   load()
 }
 
-// The method, by its icon and colour.
-const METHOD_ICONS = { cash: 'philippine-peso', gcash: 'smartphone', card: 'credit-card', bank_transfer: 'building-2', check: 'file-text' }
-// The API gives the label only ("Cash", "GCash", "Bank transfer").
-const methodKey = (r) => {
-  const label = r.payment?.method_label || r.payment_method_label || ''
-  return label.toLowerCase().trim().replace(/\s+/g, '_') || 'other'
+// The API gives the label only ("Cash", "GCash", "Bank transfer"); a split names each part.
+function methodOf(r) {
+  const parts = (r.tenders ?? []).map((t) => t.method_label).filter(Boolean)
+  if (parts.length > 1) return [...new Set(parts)].join(' + ')
+  return r.payment?.method_label || r.payment_method_label || '—'
 }
-const methodIcon = r => METHOD_ICONS[methodKey(r)] ?? 'receipt'
+
+function statusOf(r) {
+  if (r.voided) return 'Voided'
+  return r.is_partial ? 'Part payment' : 'Paid in full'
+}
+
+/* VIEW: the row's eye opens everything the list leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const money = (value) => (value === null || value === undefined || value === '' ? '' : pesos(value))
+const viewSections = computed(() => {
+  const r = viewing.value
+  if (!r) return []
+  const pay = r.payment ?? {}
+  const bill = r.statement ?? {}
+  const tenders = r.tenders ?? []
+  return [
+    { title: 'Receipt', rows: [
+      { label: 'Receipt number', value: r.receipt_number, mono: true },
+      { label: 'Issued', value: when(r.issued_at) },
+      { label: 'Status', value: statusOf(r) },
+      { label: 'Received by', value: r.received_by },
+      { label: 'Replaces receipt', value: r.replaces_receipt_number, mono: true },
+      { label: 'Void reason', value: r.void_reason, wide: true },
+      { label: 'Issued by', value: r.issuing_facility?.name },
+    ] },
+    { title: 'Received from', rows: [
+      { label: 'Payer', value: r.payer_name },
+      { label: 'Patient', value: r.request?.patient_name },
+      { label: 'Hospital', value: r.request?.requesting_facility },
+      { label: 'Request', value: r.request?.reference_number, mono: true },
+    ] },
+    { title: 'Payment', rows: [
+      { label: 'Method', value: methodOf(r) },
+      { label: 'Paid at', value: pay.paid_at ? when(pay.paid_at) : '' },
+      { label: 'Balance before', value: money(r.balance_before) },
+      { label: 'Amount paid', value: money(r.amount_paid) },
+      { label: 'Balance after', value: money(r.balance_after) },
+      { label: 'Amount tendered', value: tenders.length > 1 ? '' : money(pay.amount_tendered) },
+      { label: 'Change given', value: tenders.length > 1 ? '' : money(pay.change_given) },
+      { label: 'Cash shift', value: pay.cash_session_number, mono: true },
+      { label: 'Split', value: tenders.length > 1 ? tenders.map((t) => `${t.method_label}: ${pesos(t.amount_paid)}${Number(t.change_given) > 0 ? ` (tendered ${pesos(t.amount_tendered)}, change ${pesos(t.change_given)})` : ''}`).join('\n') : '', wide: true },
+    ] },
+    { title: 'Bill', rows: [
+      { label: 'Invoice', value: bill.document_number || r.statement_document_number, mono: true },
+      { label: 'Revision', value: bill.revision_number > 1 ? bill.revision_number : '' },
+      { label: 'Total', value: money(bill.total_amount) },
+      { label: 'Discount', value: bill.discount_name ? `${bill.discount_name} (${pesos(bill.discount_amount)})` : '' },
+      { label: 'Amount due', value: money(bill.amount_due) },
+      { label: 'Items', value: (r.lines ?? []).map((l) => `${l.component_name} × ${l.quantity} at ${pesos(l.unit_price)} = ${pesos(l.line_total)}`).join('\n'), wide: true },
+    ] },
+  ]
+})
 
 let searchTimer = null
 function onSearch() {
@@ -279,10 +328,9 @@ onPageReturn(() => load(meta.current_page, { quiet: true }))
 .rl-table tbody tr:last-child td { border-bottom: 0; }
 .row { cursor: pointer; transition: background-color .12s var(--rb-ease-out); }
 .row:hover td { background: var(--rb-surface-hover); }
-.row--voided td { color: var(--rb-text-muted); }
-.row--voided .strong { text-decoration: line-through; }
-.sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
 .row-actions { text-align: right; white-space: nowrap; }
+.row-actions > * { vertical-align: middle; }
+.row-actions > * + * { margin-left: 4px; }
 .num { text-align: right !important; white-space: nowrap; }
 .nowrap { white-space: nowrap; }
 .strong { font-weight: 700; }
@@ -364,18 +412,7 @@ onPageReturn(() => load(meta.current_page, { quiet: true }))
 
 .rl-table td { padding: 13px 14px; }
 .rl-table td.num.strong { font-size: 14px; }
-.settled { font-weight: 700; color: var(--rb-success-text); }
 
-.method-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--rb-text-primary); }
-.method-chip :deep(.asset-icon) { color: var(--rb-text-secondary); }
-.method-chip--cash { background: rgba(var(--rb-success-rgb), 0.1); }
-.method-chip--cash :deep(.asset-icon) { color: var(--rb-success-text); }
-.method-chip--gcash { background: rgba(var(--rb-primary-rgb), 0.09); }
-.method-chip--gcash :deep(.asset-icon) { color: var(--rb-primary-text); }
-.method-chip--card { background: rgba(var(--rb-purple-rgb, 124, 58, 237), 0.1); }
-.method-chip--card :deep(.asset-icon) { color: var(--rb-purple-text, #6D28D9); }
-.method-chip--bank_transfer { background: rgba(var(--rb-warning-rgb), 0.12); }
-.method-chip--bank_transfer :deep(.asset-icon) { color: var(--rb-warning-text); }
 
 .pager { justify-content: space-between; padding: 12px 16px; }
 .pager__count { font-weight: 600; color: var(--rb-text-secondary); }

@@ -58,13 +58,7 @@
             <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="reset">Clear all</button>
           </div>
         </div>
-        <div v-if="loading" class="skeleton-wrap">
-          <div v-for="n in 6" :key="n" class="skeleton-row">
-            <span class="skeleton skeleton--dot" />
-            <div class="skeleton-lines"><span class="skeleton skeleton--line" /><span class="skeleton skeleton--line skeleton--short" /></div>
-            <span class="skeleton skeleton--amount" />
-          </div>
-        </div>
+        <div v-if="loading" class="skeleton-wrap"><SkeletonList :rows="6" /></div>
 
         <div v-else-if="!rows.length" class="pay-empty">
           <span class="pay-empty__icon" aria-hidden="true"><AssetIcon :name="activeChips.length || filters.search ? 'search-x' : 'list'" :size="24" /></span>
@@ -80,47 +74,45 @@
           </button>
         </div>
 
-        <!-- THE LEDGER: newest first, grouped by day, two lines a row -->
-        <div v-else class="ledger">
-          <section v-for="group in groups" :key="group.key" class="day" :aria-label="group.label">
-            <h2 class="day-head">{{ group.label }}</h2>
-            <ol class="day-rows">
-              <li v-for="row in group.rows" :key="row.id" class="tx" :class="{ 'tx--reversal': row.reverses_transaction_number }">
-                <span class="tx-dot" :class="`dot--${transactionTone(row.type)}`" aria-hidden="true" />
-                <div class="tx-main">
-                  <div class="tx-line">
-                    <span class="chip" :class="`tone--${transactionTone(row.type)}`">{{ row.type_label }}</span>
-                    <span class="mono tx-no">{{ row.transaction_number }}</span>
-                    <template v-if="row.request">
-                      <NuxtLink :to="`/blood-center/invoice/${row.request.id}`" class="mono doc-link">{{ row.request.reference_number }}</NuxtLink>
-                      <span v-if="row.request.patient_name || row.request.requesting_facility" class="tx-who">{{ row.request.patient_name || row.request.requesting_facility }}</span>
-                    </template>
-                    <span v-else class="mono muted">—</span>
-                  </div>
-                  <div class="tx-meta">
-                    <span>{{ time(row.occurred_at) }}</span>
-                    <span>{{ row.category_label }}</span>
-                    <span>{{ row.channel_label }}<template v-if="row.payment_method_label"> · {{ row.payment_method_label }}</template></span>
-                    <span>{{ row.recorded_by || (row.channel === 'gateway' ? 'Provider' : 'System') }}</span>
-                    <span v-if="row.reverses_transaction_number" class="tx-reverses">Reverses <span class="mono">{{ row.reverses_transaction_number }}</span></span>
-                  </div>
-                  <p v-if="row.note" class="tx-note">{{ row.note }}</p>
-                  <div v-if="row.receipt || row.statement || row.cash_session || row.reference" class="tx-docs">
-                    <NuxtLink v-if="row.receipt" :to="`/blood-center/receipt/${row.receipt.id}`" class="doc-pill doc-pill--link mono">
-                      <AssetIcon name="receipt" :size="12" />{{ row.receipt.receipt_number }}
-                    </NuxtLink>
-                    <span v-if="row.statement" class="doc-pill mono"><AssetIcon name="file-text" :size="12" />{{ row.statement.document_number }}</span>
-                    <span v-if="row.cash_session" class="doc-pill mono"><AssetIcon name="clock" :size="12" />{{ row.cash_session.session_number }}</span>
-                    <span v-if="row.reference" class="doc-pill mono">Ref {{ row.reference }}</span>
-                  </div>
-                </div>
-                <div class="tx-money">
-                  <strong class="amount" :class="`amount--${row.direction}`">{{ journalAmount(row) }}</strong>
-                  <span class="tx-balance">Balance {{ pesos(row.balance_after) }}</span>
-                </div>
-              </li>
-            </ol>
-          </section>
+        <!--
+          THE JOURNAL, newest first: one plain value a column (project owner,
+          2026-11-27; it was a ledger grouped by day, two lines a row). The
+          eye shows everything else the entry holds.
+        -->
+        <div v-else class="table-scroll">
+          <table class="tx-table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Transaction</th>
+                <th scope="col">Type</th>
+                <th scope="col">Request</th>
+                <th scope="col">Billed to</th>
+                <th scope="col">Method</th>
+                <th scope="col" class="num">Amount</th>
+                <th scope="col" class="num">Balance after</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.id" class="row" @click="viewing = row">
+                <td class="nowrap">{{ when(row.occurred_at) }}</td>
+                <td class="mono nowrap">{{ row.transaction_number }}</td>
+                <td class="nowrap">{{ row.type_label }}</td>
+                <td class="nowrap">
+                  <NuxtLink v-if="row.request" :to="`/blood-center/invoice/${row.request.id}`" class="mono doc-link" @click.stop>{{ row.request.reference_number }}</NuxtLink>
+                  <template v-else>—</template>
+                </td>
+                <td>{{ row.request?.patient_name || row.request?.requesting_facility || '—' }}</td>
+                <td class="nowrap">{{ row.payment_method_label || '—' }}</td>
+                <td class="num">{{ journalAmount(row) }}</td>
+                <td class="num">{{ pesos(row.balance_after) }}</td>
+                <td class="row-actions" @click.stop>
+                  <RowViewButton :label="`View ${row.transaction_number}`" @view="viewing = row" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <footer v-if="meta.last_page > 1" class="pager">
@@ -130,6 +122,9 @@
         </footer>
       </div>
     </div>
+
+    <!-- Everything about the journal entry the row names, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.transaction_number || 'Transaction'" eyebrow="Transaction" :sections="viewSections" @close="viewing = null" />
   </div>
 </template>
 
@@ -140,15 +135,19 @@
  * Read only. Every row was written in the same transaction as the change it
  * records, and the database refuses to change or delete one.
  *
- * Laid out (2026-10-14) as a ledger grouped by day, two lines a row; the
- * less-used filters fold away. The money-flow strip above it was removed
- * (project owner, 2026-10-25): the page shows the transactions only.
+ * A table, one plain value a column, with each entry's eye showing the rest
+ * (project owner, 2026-11-27; it was a ledger grouped by day, two lines a
+ * row). The less-used filters fold away. The money-flow strip above it was
+ * removed (project owner, 2026-10-25): the page shows the transactions only.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { RECORDED_METHODS, journalAmount, pesos, saveBlob, transactionTone } from '~/utils/billing'
+import { RECORDED_METHODS, journalAmount, pesos, saveBlob } from '~/utils/billing'
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
 
@@ -202,8 +201,8 @@ function params() {
   return Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''))
 }
 
-function time(iso) {
-  return iso ? new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' }) : '—'
+function when(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 }
 
 /* FILTERS: Category, Channel and Method fold away; every active one shows as a chip. */
@@ -228,37 +227,39 @@ const activeChips = computed(() => [
   filters.search && { key: 'search', label: `“${filters.search}”` },
 ].filter(Boolean))
 
-/* THE LEDGER: the page's rows, kept in the server's order, under a heading per day */
-function dayKey(iso) {
-  if (!iso) return 'none'
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
-
-function dayLabel(iso) {
-  if (!iso) return 'Undated'
-  const d = new Date(iso)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-  const date = d.toLocaleDateString(undefined, { dateStyle: 'medium' })
-  if (dayKey(iso) === dayKey(today.toISOString())) return `Today · ${date}`
-  if (dayKey(iso) === dayKey(yesterday.toISOString())) return `Yesterday · ${date}`
-  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-const groups = computed(() => {
-  const list = []
-  for (const row of rows.value) {
-    const key = dayKey(row.occurred_at)
-    let group = list[list.length - 1]
-    if (!group || group.key !== key) {
-      group = { key, label: dayLabel(row.occurred_at), rows: [] }
-      list.push(group)
-    }
-    group.rows.push(row)
-  }
-  return list
+/* VIEW: the row's eye opens everything the table leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const row = viewing.value
+  if (!row) return []
+  const request = row.request
+  return [
+    { title: 'Transaction', rows: [
+      { label: 'Transaction number', value: row.transaction_number, mono: true },
+      { label: 'Date', value: when(row.occurred_at) },
+      { label: 'Type', value: row.type_label },
+      { label: 'Category', value: row.category_label },
+      { label: 'Channel', value: row.channel_label },
+      { label: 'Method', value: row.payment_method_label },
+      { label: 'Recorded by', value: row.recorded_by || (row.channel === 'gateway' ? 'Provider' : 'System') },
+      { label: 'Reverses', value: row.reverses_transaction_number, mono: true },
+      { label: 'Note', value: row.note, wide: true },
+    ] },
+    { title: 'Amount', rows: [
+      { label: 'Amount', value: journalAmount(row) },
+      { label: 'Entry', value: row.direction === 'debit' ? 'Charge (adds to the balance)' : row.direction === 'credit' ? 'Credit (takes off the balance)' : '' },
+      { label: 'Balance after', value: pesos(row.balance_after) },
+    ] },
+    { title: 'Bill', rows: [
+      { label: 'Request', value: request?.reference_number, mono: true, to: request ? `/blood-center/invoice/${request.id}` : '' },
+      { label: 'Patient', value: request?.patient_name },
+      { label: 'Hospital', value: request?.requesting_facility },
+      { label: 'Invoice', value: row.statement?.document_number, mono: true },
+      { label: 'Receipt', value: row.receipt?.receipt_number, mono: true, to: row.receipt ? `/blood-center/receipt/${row.receipt.id}` : '' },
+      { label: 'Cash shift', value: row.cash_session?.session_number, mono: true },
+      { label: 'Reference', value: row.reference, mono: true },
+    ] },
+  ]
 })
 
 // `quiet`, on return to this kept-alive page: no skeleton over the rows on screen.
@@ -360,58 +361,25 @@ onPageReturn(() => load(meta.current_page, { quiet: true }))
 .chip-filter button:hover { background: rgba(var(--rb-primary-rgb), .15); }
 .chip-filter button:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
-/* The ledger */
+/* The journal */
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden; }
-.day + .day { border-top: 1px solid var(--rb-border); }
-.day-head {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: 9px 20px;
-  font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--rb-text-secondary);
-  background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border);
-}
-.day-rows { list-style: none; margin: 0; padding: 0; }
-.tx { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 20px; }
-.tx + .tx { border-top: 1px solid var(--rb-border); }
-.tx:hover { background: var(--rb-surface-hover); }
-.tx-dot { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; }
-.dot--success { background: var(--rb-success, #2E7D32); }
-.dot--warning { background: rgb(var(--rb-warning-rgb)); }
-.dot--danger { background: var(--rb-accent); }
-.dot--info { background: rgb(var(--rb-purple-rgb)); }
-.dot--muted { background: var(--rb-border-strong); }
-.tx-main { min-width: 0; }
-.tx-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13.5px; }
-.tx-no { color: var(--rb-text-secondary); }
-.tx-who { font-weight: 600; color: var(--rb-text-primary); }
-.tx-meta { display: flex; flex-wrap: wrap; gap: 2px 0; margin-top: 4px; font-size: 12px; color: var(--rb-text-secondary); }
-.tx-meta > span + span::before { content: '·'; margin: 0 7px; color: var(--rb-text-muted); }
-.tx-reverses { color: var(--rb-accent-text); font-weight: 600; }
-.tx-note { margin: 5px 0 0; font-size: 12px; color: var(--rb-text-secondary); font-style: italic; }
-.tx-docs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.doc-pill {
-  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 7px;
-  font-size: 11.5px; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border);
-}
-.doc-pill--link { color: var(--rb-primary-text); text-decoration: none; font-weight: 600; }
-.doc-pill--link:hover { border-color: rgba(var(--rb-primary-rgb), .4); }
-.tx-money { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; white-space: nowrap; }
-.amount { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.amount--debit { color: var(--rb-text-primary); }
-.amount--credit { color: var(--rb-success-text); }
-.amount--none { color: var(--rb-text-muted); }
-.tx-balance { font-size: 11.5px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
-.tx--reversal .amount { color: var(--rb-accent-text); }
+.table-scroll { overflow-x: auto; }
+.tx-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tx-table th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rb-text-secondary); background: var(--rb-surface-alt); padding: 10px 14px; border-bottom: 1px solid var(--rb-border); white-space: nowrap; }
+.tx-table td { padding: 13px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.tx-table tbody tr:last-child td { border-bottom: 0; }
+.row { cursor: pointer; transition: background-color .12s var(--rb-ease-out); }
+.row:hover td { background: var(--rb-surface-hover); }
+.num { text-align: right !important; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+.row-actions { text-align: right; white-space: nowrap; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .mono { font-family: var(--rb-font-mono); font-size: 12px; }
 .muted { color: var(--rb-text-muted); }
 .doc-link { color: var(--rb-primary-text); font-weight: 700; text-decoration: none; }
 .doc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.tone--success { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
-.tone--warning { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
-.tone--danger { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
-.tone--info { background: rgba(var(--rb-purple-rgb), .1); color: var(--rb-purple-text); }
-.tone--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
 
 .pager { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; font-size: 12.5px; color: var(--rb-text-secondary); border-top: 1px solid var(--rb-border); }
 
@@ -439,25 +407,17 @@ onPageReturn(() => load(meta.current_page, { quiet: true }))
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 
-/* Loading rows shaped like the ledger's */
-.skeleton-wrap { padding: 6px 20px; }
-.skeleton-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 110px; gap: 14px; align-items: center; padding: 12px 0; }
-.skeleton-row + .skeleton-row { border-top: 1px solid var(--rb-border); }
-.skeleton-lines { display: flex; flex-direction: column; gap: 7px; }
+.skeleton-wrap { padding: 14px; }
 .skeleton {
   display: block; border-radius: 6px;
   background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 50%, var(--rb-skeleton-a) 75%);
   background-size: 200% 100%; animation: shimmer 1.4s infinite;
 }
-.skeleton--dot { width: 10px; height: 10px; border-radius: 50%; }
-.skeleton--line { height: 13px; width: 60%; }
-.skeleton--short { width: 38%; }
-.skeleton--amount { height: 18px; }
 @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-  .btn { transition: none; }
+  .btn, .row { transition: none; }
 }
 
 @media (max-width: 960px) {

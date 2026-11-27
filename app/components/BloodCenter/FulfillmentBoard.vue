@@ -299,6 +299,7 @@
                   <th scope="col">State</th>
                   <th v-if="hasReleased(request)" scope="col">Dispatched</th>
                   <th v-if="hasReleased(request) && canCorrectDispatch" scope="col"><span class="sr-only">Correct</span></th>
+                  <th scope="col" class="view-col"><span class="sr-only">View</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -318,19 +319,9 @@
                     {{ allocation.expiry_date || 'Not set' }}
                   </td>
                   <td :class="{ muted: !allocation.storage_location }">{{ allocation.storage_location || 'Not set' }}</td>
-                  <td>
-                    <span class="alloc" :class="`alloc--${allocation.status}`">
-                      <span class="dot" :class="`dot--${allocation.received_at ? 'received' : allocation.status}`" />
-                      {{ allocation.received_at ? 'Received' : allocation.status_label }}
-                    </span>
-                  </td>
-                  <td v-if="hasReleased(request)" :class="{ muted: allocation.status !== 'released' }">
-                    <template v-if="allocation.status === 'released'">
-                      {{ formatWhen(allocation.released_at) }}
-                      <span v-if="allocation.handed_to" class="handed-to">to {{ allocation.handed_to }}</span>
-                    </template>
-                    <template v-else>—</template>
-                  </td>
+                  <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
+                  <td>{{ allocation.received_at ? 'Received' : allocation.status_label }}</td>
+                  <td v-if="hasReleased(request)">{{ allocation.status === 'released' ? formatWhen(allocation.released_at) : '—' }}</td>
                   <td v-if="hasReleased(request) && canCorrectDispatch">
                     <button
                       v-if="allocation.status === 'released'"
@@ -341,6 +332,9 @@
                     >
                       Correct
                     </button>
+                  </td>
+                  <td class="view-col">
+                    <RowViewButton :label="`View unit ${allocation.unit_id}`" @view="viewUnit(request, allocation)" />
                   </td>
                 </tr>
               </tbody>
@@ -590,6 +584,9 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Everything about a unit on a request, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.title || 'Unit'" eyebrow="Unit" :sections="viewing?.sections || []" @close="viewing = null" />
   </div>
 </template>
 
@@ -606,6 +603,8 @@ import { pesos } from '~/utils/billing'
 import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
@@ -1300,6 +1299,33 @@ function formatWhen(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 }
 
+/* VIEW: a unit's eye opens everything the units table leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+function viewUnit(request, allocation) {
+  viewing.value = {
+    title: allocation.unit_id || 'Unit',
+    sections: [
+      { title: 'Unit', rows: [
+        { label: 'Unit ID', value: allocation.unit_id, mono: true },
+        { label: 'Component', value: componentFor(request, allocation) },
+        { label: 'Expires', value: allocation.expiry_date || 'Not set' },
+        { label: 'Storage', value: allocation.storage_location || 'Not set' },
+        { label: 'State', value: allocation.received_at ? 'Received' : allocation.status_label },
+      ] },
+      { title: 'Movement', rows: [
+        { label: 'Tagged', value: allocation.allocated_at ? formatWhen(allocation.allocated_at) : '' },
+        { label: 'Dispatched', value: allocation.released_at ? formatWhen(allocation.released_at) : '' },
+        { label: 'Handed to', value: allocation.handed_to },
+        { label: 'Received by the hospital', value: allocation.received_at ? formatWhen(allocation.received_at) : '' },
+      ] },
+      { title: 'Request', rows: [
+        { label: 'Reference', value: request.reference_number, mono: true },
+        { label: 'Hospital', value: request.requesting_facility?.name },
+      ] },
+    ],
+  }
+}
+
 // datetime-local wants the local wall time, to the minute.
 function toLocalInput(iso) {
   if (!iso) return ''
@@ -1534,11 +1560,6 @@ useLiveRefresh(refreshQuietly, {
 .tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .tab__count { min-width: 20px; padding: 0 7px; border-radius: 999px; background: #fff; color: var(--rb-primary); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 
-.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dot--allocated { background: var(--rb-warning); }
-.dot--released { background: var(--rb-primary); }
-.dot--received { background: var(--rb-success); }
-.dot--cancelled { background: var(--rb-text-muted); }
 
 .banner { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; }
 .banner--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .25); }
@@ -1609,17 +1630,13 @@ useLiveRefresh(refreshQuietly, {
 }
 .units-table td { padding: 8px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); }
 .units-table td.muted { color: var(--rb-text-secondary); }
-.handed-to { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
+.units-table .view-col { width: 1%; padding-block: 4px; text-align: right; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .units-table tr:last-child td { border-bottom: none; }
 .units-table .pick { width: 30px; }
 .units-empty { font-size: 12.5px; color: var(--rb-text-muted); margin: 0; }
 .expiring { color: var(--rb-warning-text); font-weight: 600; }
 
-.alloc { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; }
-.alloc--allocated { color: var(--rb-warning-text); }
-.alloc--released { color: var(--rb-primary-text); }
-.alloc--cancelled { color: var(--rb-text-muted); }
 
 .request-actions { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rb-border); flex-wrap: wrap; }
 .selection-note { flex: 1; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); min-width: 180px; }

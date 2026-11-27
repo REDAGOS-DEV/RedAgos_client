@@ -45,26 +45,28 @@ describe('the hospital inventory page', () => {
     }
   })
 
-  it('shows the blood type cards as the centre does, filtering the list (project owner, 2026-11-01)', () => {
-    expect(page).toContain('<HospitalBloodTypeAvailability')
-    expect(page).toContain('@select="toggleTypeFilter"')
-    expect(page).toContain('"types expiring" "list activity"')
+  it('shows the shelf by blood type in its overview, filtering the list (project owner, 2026-11-27)', () => {
+    expect(page).toContain('<HospitalInventoryOverview')
+    expect(page).toContain('@select-type="toggleTypeFilter"')
+    expect(page).toContain('"list expiring" "list activity"')
   })
 
   it('still opens the list on a type from the dashboard', () => {
     expect(page).toContain('Number(route.query.blood_type_id)')
 
-    const dashboard = source('app/pages/hospital/dashboard.vue')
-    expect(dashboard).toContain('<HospitalBloodTypeAvailability v-if="thresholds || thresholdsLoading" :thresholds="thresholds" />')
-    expect(source('app/components/Hospital/BloodTypeAvailability.vue')).toContain('{ to: `/hospital/inventory?blood_type_id=${card.id}` }')
+    // The dashboard's Blood bank card: a bar per blood type opens the list on it (2026-11-26).
+    expect(source('app/pages/hospital/dashboard.vue')).toContain(':thresholds="thresholds"')
+    expect(source('app/components/Hospital/DashboardSummary.vue')).toContain('navigateTo(`/hospital/inventory?blood_type_id=${bar.id}`)')
   })
 
   it('opens Tag History on what a dashboard Untagged tile counts (project owner, 2026-11-07)', () => {
+    // The counts are the Blood bank card's untagged chips now (2026-11-26).
     const dashboard = source('app/pages/hospital/dashboard.vue')
-    expect(dashboard).toContain('label="Untagged Crossmatch" :value="untaggedCrossmatched"')
-    expect(dashboard).toContain('to="/hospital/inventory?tag_status=untagged_crossmatched&untag_reason=transfusion_deadline_expired"')
-    expect(dashboard).toContain('label="Untagged Assigned" :value="untaggedAssigned"')
-    expect(dashboard).toContain('to="/hospital/inventory?tag_status=untagged_assigned&untag_reason=crossmatch_deadline_expired"')
+    const summary = source('app/components/Hospital/DashboardSummary.vue')
+    expect(dashboard).toContain(':untagged-after="untaggedCrossmatched"')
+    expect(summary).toContain("to: '/hospital/inventory?tag_status=untagged_crossmatched&untag_reason=transfusion_deadline_expired'")
+    expect(dashboard).toContain(':untagged-before="untaggedAssigned"')
+    expect(summary).toContain("to: '/hospital/inventory?tag_status=untagged_assigned&untag_reason=crossmatch_deadline_expired'")
     expect(dashboard).toContain('data.untagged_crossmatched')
     expect(dashboard).toContain('data.untagged_assigned')
 
@@ -132,6 +134,22 @@ describe('the hospital inventory page', () => {
     // Never tagged, so the tag dialog has nothing to warn about.
     expect(source('app/components/Hospital/TagUnitDialog.vue')).not.toContain('partner_reservation')
     expect(source('app/utils/tagDeadline.ts')).toMatch(/case 'partner_reserved':\r?\n\s*return \['discard'\]/)
+  })
+
+  it('suggests a sooner-expiring bag when tagging, without restricting the one opened (project owner, 2026-11-27)', () => {
+    const dialog = source('app/components/Hospital/TagUnitDialog.vue')
+    // The shelf of this bag's type and component, first-expiring first.
+    expect(dialog).toContain('const response = await hospitalService.inventory({')
+    expect(dialog).toContain('blood_type_id: bloodTypeId,')
+    expect(dialog).toContain("sort: 'fefo',")
+    // Sooner only, in date, and never a bag received for another patient's request.
+    expect(dialog).toContain('&& bag.expiry_date < expiry')
+    expect(dialog).toContain('&& (!bag.source?.transfusion_request_id || bag.source.transfusion_request_id === requirementId.value))')
+    // A switch, not a block: the opened bag can still be tagged.
+    expect(dialog).toContain("@click=\"$emit('switch', soonerBag)\"")
+    expect(dialog).toContain("{{ busy ? 'Tagging…' : 'Tag to patient' }}")
+    expect(page).toContain('@switch="switchTagBag"')
+    expect(page).toContain('dialog.value = { ...dialog.value, unit }')
   })
 })
 
@@ -246,7 +264,7 @@ describe('the hospital Inventory Report', () => {
     expect(page).toContain('title="Tagged to a patient, waiting for crossmatch">(T)</abbr>')
     expect(page).toContain('title="Reserved for a blood donor partner">(R)</abbr>')
     // The day's transfusions are counted apart from the bags still here.
-    expect(page).toContain("{ label: 'Transfused today', value: transfusedTotal.value }")
+    expect(page).toContain("{ label: 'Transfused today', value: transfusedTotal.value, color: '#2E7D32' }")
   })
 
   it('names the pages of the other components that follow the form', () => {
@@ -255,7 +273,7 @@ describe('the hospital Inventory Report', () => {
   })
 
   it('is listed under Reports in the sidebar and the search', () => {
-    const sidebar = source('app/components/Hospital/Sidebar.vue')
+    const sidebar = source('app/utils/hospitalNav.ts')
     const group = sidebar.slice(sidebar.indexOf("label: 'Reports'"), sidebar.indexOf("label: 'System'"))
     expect(group).toContain("path: '/hospital/inventory-report'")
 
@@ -266,14 +284,14 @@ describe('the hospital Inventory Report', () => {
 
 describe('the hospital navigation', () => {
   it('lists the inventory in the sidebar and the search', () => {
-    expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/inventory'")
+    expect(source('app/utils/hospitalNav.ts')).toContain("path: '/hospital/inventory'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
     expect(layout).toContain("path: '/hospital/inventory', icon: 'package'")
   })
 
   it('lists Stock Intake under Stock and Supply, for the roles that stock bags in', () => {
-    const sidebar = source('app/components/Hospital/Sidebar.vue')
+    const sidebar = source('app/utils/hospitalNav.ts')
     const group = sidebar.slice(sidebar.indexOf("label: 'Stock and Supply'"), sidebar.indexOf("label: 'System'"))
     expect(group).toContain("{ label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', requires: 'hospital.inventory.stock_in' }")
 

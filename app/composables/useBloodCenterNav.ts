@@ -243,18 +243,20 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'Billing',
     items: [
-      // No Cash Shifts entry: the counter runs without shifts (one billing staff
-      // member). When the server turns them on, the counter links to their history.
-      { label: 'Billing Counter', path: '/blood-center/pos', icon: 'philippine-peso', requires: 'billing.record_payment', keywords: 'pos point of sale counter cashier cash change tendered gcash qr receipt print restocking settlement' },
       // The project owner's terms (2026-10-25): an invoice is one billable
       // request; a Statement of Account sums up a hospital's invoices,
       // payments and balance over a period; a receipt proves a payment.
       // The badge counts invoices still to be paid (the billing summary).
       { label: 'Invoices', path: '/blood-center/billing', icon: 'file-text', badge: 'invoices', requires: 'billing.view', keywords: 'invoice inv bill billing request patient weekly hospital settlement subsidy balance' },
       { label: 'Statements', path: '/blood-center/statements', icon: 'clipboard', requires: 'billing.view', keywords: 'statement of account soa hospital period invoices payments balance opening closing' },
-      // Receipts and Transactions are one list of payments seen two ways
-      // (2026-10-27): one link, two tabs on the pages (PaymentsTabs).
-      { label: 'Payments', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', alsoActiveOn: ['/blood-center/billing-transactions'], keywords: 'payments receipt acknowledgement ar reprint print 80mm pdf void transactions journal ledger history export csv correction' },
+      // One link, three tabs (PaymentsTabs): the Billing Counter, where a
+      // payment is taken, then its Receipts and Transactions (2026-10-27). The
+      // counter left the sidebar for the first tab (project owner, 2026-11-27),
+      // so the link opens on it. No Cash Shifts entry: the counter runs without
+      // shifts (one billing staff member); when the server turns them on, the
+      // counter links to their history.
+      { label: 'Payments', path: '/blood-center/pos', icon: 'receipt', requires: 'billing.record_payment', alsoActiveOn: ['/blood-center/receipts', '/blood-center/billing-transactions'], keywords: 'payments billing counter pos point of sale cashier cash change tendered gcash card bank restocking settlement receipt acknowledgement ar reprint print 80mm pdf void transactions journal ledger history export csv correction' },
+      { label: 'Payments', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', hidden: true },
       { label: 'Payments', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', hidden: true },
       // Last, together: the prices and the discounts taken off them, the
       // Billing Supervisor's alone (billing.prices).

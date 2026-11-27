@@ -26,7 +26,7 @@
       </PageHeader>
 
       <!-- Today across every center, from the same status the cards read. -->
-      <StatStrip>
+      <StatStrip variant="panel">
         <StatItem :loading="statusLoading" label="Due today" :value="dueCount" icon="send" tone="warning" :alert="dueCount > 0" hint="Still to send" />
         <StatItem :loading="statusLoading" label="Sent today" :value="sentCount" icon="check-circle" tone="success" hint="Already with the center" />
         <StatItem :loading="statusLoading" label="Missed in 4 weeks" :value="missedCount" icon="circle-alert" tone="danger" :alert="missedCount > 0" hint="Request days with none sent" />
@@ -64,10 +64,10 @@
               </div>
               <span class="sk sk--line" style="width: 84px" />
             </div>
-            <div v-if="card.days" class="days">
-              <div v-for="day in card.days" :key="day" class="day">
-                <span class="sk day__mark" />
-                <span class="sk sk--line day__sk-date" />
+            <div v-if="card.days" class="track">
+              <span class="sk sk--line" style="width: 90px" />
+              <div class="days">
+                <span v-for="day in card.days" :key="day" class="sk day__sk" />
               </div>
             </div>
             <p v-else class="center__none center__sk-none"><span class="sk sk--line" style="width: min(220px, 60%)" /></p>
@@ -91,16 +91,25 @@
         </div>
 
         <ul v-else class="centers">
+          <!--
+            One card per center (2026-11-26): who, when its request days are,
+            the last four weeks as a run of chips ending on today, how many
+            went out, and what to do now.
+          -->
           <li
             v-for="entry in orderedSchedules"
             :key="entry.schedule.id"
             class="center"
-            :class="{ 'center--due': entry.due_today && !entry.sent_today }"
+            :class="`center--${centerState(entry)}`"
           >
             <div class="center__top">
-              <div class="cell">
-                <span class="cell__main center__name">{{ entry.schedule.target_facility?.name || 'Blood center' }}</span>
-                <span v-if="entry.schedule.target_facility?.address" class="cell__sub">{{ entry.schedule.target_facility.address }}</span>
+              <span class="center__icon" aria-hidden="true"><AssetIcon name="building-2" :size="18" /></span>
+              <div class="center__who">
+                <span class="center__name">{{ entry.schedule.target_facility?.name || 'Blood center' }}</span>
+                <span class="center__meta">
+                  <template v-if="entry.schedule.target_facility?.address">{{ entry.schedule.target_facility.address }} · </template>
+                  Request days: <strong>{{ entry.schedule.days_label || '—' }}</strong>
+                </span>
               </div>
               <span class="badge" :class="badgeClass(stateFor(entry).tone)">
                 <span class="badge__dot" aria-hidden="true" />
@@ -108,26 +117,42 @@
               </span>
             </div>
 
-            <!-- The last few request days, oldest first, so a run of misses reads left to right. -->
-            <ol v-if="entry.recent.length" class="days" :aria-label="`Recent request days for ${entry.schedule.target_facility?.name}`">
-              <li
-                v-for="day in [...entry.recent].slice(0, 8).reverse()"
-                :key="day.date"
-                class="day"
-                :class="day.sent ? 'day--sent' : 'day--missed'"
-                :title="`${formatDay(day.date)} — ${day.sent ? `sent (${day.weekly_request?.reference_number})` : 'no request sent'}`"
-              >
-                <span class="day__mark"><AssetIcon :name="day.sent ? 'check' : 'x'" :size="11" /></span>
-                <span class="day__date">{{ formatDay(day.date) }}</span>
-              </li>
-            </ol>
-            <p v-else class="center__none">No request days have passed yet.</p>
+            <!-- The last four weeks, oldest first, ending on today, so a run of misses reads left to right. -->
+            <div class="track">
+              <div class="track__head">
+                <span class="track__label">Last 4 weeks</span>
+                <span v-if="entry.recent.length" class="track__rate">
+                  <strong>{{ sentOf(entry) }}</strong> of {{ entry.recent.length }} sent
+                  <span class="track__bar" aria-hidden="true"><span class="track__fill" :style="{ width: `${(sentOf(entry) / entry.recent.length) * 100}%` }" /></span>
+                </span>
+              </div>
+              <ol class="days" :aria-label="`Recent request days for ${entry.schedule.target_facility?.name}`">
+                <li
+                  v-for="day in [...entry.recent].slice(0, 8).reverse()"
+                  :key="day.date"
+                  class="day"
+                  :class="day.sent ? 'day--sent' : 'day--missed'"
+                  :title="`${formatDay(day.date)} — ${day.sent ? `sent (${day.weekly_request?.reference_number})` : 'no request sent'}`"
+                >
+                  <AssetIcon :name="day.sent ? 'check' : 'x'" :size="12" />
+                  {{ formatDay(day.date) }}
+                </li>
+                <li v-if="entry.is_request_day || entry.sent_today" class="day" :class="entry.sent_today ? 'day--sent day--today' : 'day--due day--today'">
+                  <AssetIcon :name="entry.sent_today ? 'check' : 'clock'" :size="12" />
+                  Today
+                </li>
+                <li v-else-if="entry.next_request_day" class="day day--next" :title="`Next request day: ${formatDay(entry.next_request_day, true)}`">
+                  <AssetIcon name="calendar" :size="12" />
+                  Next {{ formatDay(entry.next_request_day) }}
+                </li>
+              </ol>
+              <p v-if="!entry.recent.length" class="center__none">No request days have passed yet.</p>
+            </div>
 
             <footer class="center__foot">
-              <span class="center__note">
-                <strong v-if="entry.missed_count" class="center__missed">{{ entry.missed_count }} missed in 4 weeks</strong>
-                <template v-else>None missed in 4 weeks</template>
-                <template v-if="!entry.sent_today && !entry.due_today && entry.next_request_day"> · Next: {{ formatDay(entry.next_request_day, true) }}</template>
+              <span class="center__note" :class="`center__note--${noteOf(entry).tone}`">
+                <AssetIcon :name="noteOf(entry).icon" :size="14" />
+                {{ noteOf(entry).text }}
               </span>
 
               <NuxtLink v-if="entry.sent_today" :to="`/hospital/receiving/weekly/${entry.sent_today.id}`" class="ui-btn ui-btn--sm" :title="`View ${entry.sent_today.reference_number}`">
@@ -137,11 +162,11 @@
               <NuxtLink
                 v-else-if="entry.due_today && canSend"
                 :to="`/hospital/receiving/weekly/new?target=${entry.schedule.target_facility?.id}`"
-                class="ui-btn ui-btn--sm ui-btn--primary"
+                class="ui-btn ui-btn--primary center__send"
                 :aria-label="`Send today's request to ${entry.schedule.target_facility?.name}`"
               >
-                <AssetIcon name="send" :size="14" />
-                Send request
+                <AssetIcon name="send" :size="15" />
+                Send today's request
               </NuxtLink>
             </footer>
           </li>
@@ -489,6 +514,37 @@ function stateFor(entry) {
   return { label: 'Not a request day', tone: 'muted' }
 }
 
+/** due, sent, or quiet: the card's edge and tint. */
+function centerState(entry) {
+  if (entry.sent_today) return 'sent'
+  if (entry.due_today) return 'due'
+  return 'quiet'
+}
+
+/** Request days in the last four weeks that had a request sent. */
+function sentOf(entry) {
+  return entry.recent.filter((day) => day.sent).length
+}
+
+/** Misses since the last sent day, newest first: a run says more than a total. */
+function missedInARow(entry) {
+  let run = 0
+  for (const day of entry.recent) {
+    if (day.sent) break
+    run += 1
+  }
+  return run
+}
+
+/** The card's one line at the foot: how it has gone, in a tone. */
+function noteOf(entry) {
+  const run = missedInARow(entry)
+  if (run >= 2) return { tone: 'bad', icon: 'triangle-alert', text: `${run} missed in a row` }
+  if (entry.missed_count) return { tone: 'warn', icon: 'circle-alert', text: `${entry.missed_count} missed in 4 weeks` }
+  if (entry.recent.length) return { tone: 'good', icon: 'circle-check-big', text: 'Every request day sent' }
+  return { tone: 'quiet', icon: 'calendar', text: entry.next_request_day ? `First request day: ${formatDay(entry.next_request_day, true)}` : 'No request days yet' }
+}
+
 /** The blood types a weekly request asked for, as one line. Its one request may restock several. */
 function bloodTypesOf(weekly) {
   const codes = [...new Set((weekly.requests ?? []).flatMap((request) => bloodTypeCodes(request)))]
@@ -537,38 +593,75 @@ function formatDay(value, withWeekday = false) {
 .today__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .today__rule { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .centers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+/* ── A center's card (2026-11-26) ──
+   An edge in its state's colour: amber due, green sent, none when quiet. */
 .center {
+  --edge: transparent;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
-  padding: 16px 18px;
+  padding: 18px 20px 16px 22px;
+  overflow: hidden;
   border: 1px solid var(--rb-border);
   border-radius: var(--rb-radius-lg);
   background: var(--rb-surface);
   box-shadow: var(--rb-shadow-sm);
 }
-.center--due { border-color: rgba(var(--rb-warning-rgb), 0.6); }
-.center__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.center__name { font-size: 14px; font-weight: 700; }
+.center::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--edge); }
+.center--due { --edge: var(--rb-warning); border-color: rgba(var(--rb-warning-rgb), 0.45); background: linear-gradient(180deg, rgba(var(--rb-warning-rgb), 0.05), var(--rb-surface) 55%); }
+.center--sent { --edge: var(--rb-success); }
+.center__top { display: flex; align-items: flex-start; gap: 12px; }
+.center__icon {
+  display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.center--due .center__icon { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
+.center--sent .center__icon { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
+.center__who { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.center__name { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.center__meta { font-size: 12.5px; color: var(--rb-text-secondary); }
+.center__meta strong { font-weight: 600; color: var(--rb-text-primary); }
+.center__top > .badge { flex: none; }
 .center__none { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.center__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: auto; min-height: 34px; }
+
+/* The last four weeks */
+.track { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--rb-surface-alt); }
+.track__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.track__label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rb-text-muted); }
+.track__rate { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.track__rate strong { color: var(--rb-text-primary); }
+.track__bar { width: 64px; height: 5px; overflow: hidden; border-radius: 999px; background: var(--rb-border); }
+.track__fill { display: block; height: 100%; border-radius: inherit; background: var(--rb-success); }
+
+.center__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rb-border); min-height: 34px; }
 .center__foot .ui-btn { text-decoration: none; }
-.center__note { font-size: 12.5px; color: var(--rb-text-secondary); }
-.center__missed { font-weight: 600; color: var(--rb-accent-text); }
+.center__note { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.center__note--bad { color: var(--rb-accent-text); }
+.center__note--warn { color: var(--rb-warning-text); }
+.center__note--good { color: var(--rb-success-text); }
+.center__note--quiet { font-weight: 500; }
+.center__send { box-shadow: 0 4px 12px -4px rgba(var(--rb-primary-rgb), 0.55); }
 .center__sk-name { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 38px; }
 .center__sk-empty { min-height: 271px; }
 .center__sk-none { display: flex; align-items: center; min-height: 19px; }
 .center__sk-action { width: 112px; height: 32px; border-radius: 9px; }
-.day__sk-date { width: 28px; height: 8px; margin-top: 4px; }
 
-/* Recent request days: one mark each, sent or missed. */
-.days { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
-.day { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; min-height: 41px; }
-.day__mark { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; }
-.day--sent .day__mark { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
-.day--missed .day__mark { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
-.day__date { font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--rb-text-secondary); }
+/* Recent request days: a chip each, sent or missed, then today or the next one. */
+.days { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.day {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px;
+  border: 1px solid transparent; border-radius: 999px;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.day--sent { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
+.day--missed { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
+.day--due { border: 1.5px dashed rgba(var(--rb-warning-rgb), 0.8); background: var(--rb-surface); color: var(--rb-warning-text); }
+.day--today { font-weight: 700; }
+.day--next { border: 1px dashed var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-secondary); }
+/* The loading cards: a chip's shape. */
+.day__sk { width: 72px; height: 26px; border-radius: 999px; }
 
 /* Supplied, of what was asked. */
 .supply { display: inline-flex; flex-direction: column; gap: 5px; min-width: 88px; }

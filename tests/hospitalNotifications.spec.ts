@@ -307,8 +307,8 @@ describe('the inbox page and its layout', () => {
   })
 
   it('uses the server\'s category names, and filters stock alerts', () => {
-    expect(page).toContain("{ key: 'request', label: 'Blood Requests' }")
-    expect(page).toContain("{ key: 'inventory', label: 'Stock Alerts' }")
+    expect(page).toContain("{ key: 'request', label: 'Blood Requests', icon: 'clipboard-list' }")
+    expect(page).toContain("{ key: 'inventory', label: 'Stock Alerts', icon: 'package' }")
     expect(page).not.toContain("key: 'blood_request'")
   })
 

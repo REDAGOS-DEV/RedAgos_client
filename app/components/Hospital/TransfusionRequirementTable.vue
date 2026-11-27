@@ -19,19 +19,37 @@
         </thead>
         <tbody>
           <tr v-for="line in lines" :key="line.id">
+            <!--
+              The component, then its indication as a code and one line of
+              text, the rest on request (2026-11-26): a long indication no
+              longer squeezes the row.
+            -->
             <th scope="row" class="requirement__component">
-              {{ line.component?.name || '—' }}
-              <span v-if="line.indication_text || line.indication_label" class="requirement__indication">
-                {{ line.indication_label }}<template v-if="line.indication_text && line.indication_text !== line.indication_label"> — {{ line.indication_text }}</template>
+              <span class="requirement__name">{{ line.component?.name || '—' }}</span>
+              <span v-if="line.indication_text || line.indication_label" class="requirement__why">
+                <span v-if="line.indication_label" class="requirement__code">{{ line.indication_label }}</span>
+                <span
+                  v-if="indicationOf(line)"
+                  class="requirement__indication"
+                  :class="{ 'requirement__indication--open': open[line.id] }"
+                  :title="open[line.id] ? undefined : indicationOf(line)"
+                >{{ indicationOf(line) }}</span>
+                <button
+                  v-if="indicationOf(line).length > 60"
+                  type="button"
+                  class="requirement__more"
+                  :aria-expanded="Boolean(open[line.id])"
+                  @click="open[line.id] = !open[line.id]"
+                >{{ open[line.id] ? 'Show less' : 'Show more' }}</button>
               </span>
             </th>
             <td class="num requirement__strong">{{ line.quantity }}</td>
-            <td class="num">{{ line.awaiting }}</td>
-            <td class="num">{{ line.approved }}</td>
-            <td class="num">{{ line.fulfilled }}</td>
-            <td class="num">{{ line.received }}</td>
-            <td class="num" :class="{ 'requirement__strong': line.remaining > 0 }">{{ line.remaining }}</td>
-            <td class="num" :class="{ 'requirement__alert': line.unallocated > 0 }">{{ line.unallocated }}</td>
+            <td class="num" :class="figureClass(line.awaiting)">{{ line.awaiting }}</td>
+            <td class="num" :class="figureClass(line.approved)">{{ line.approved }}</td>
+            <td class="num" :class="figureClass(line.fulfilled)">{{ line.fulfilled }}</td>
+            <td class="num" :class="figureClass(line.received)">{{ line.received }}</td>
+            <td class="num" :class="line.remaining > 0 ? 'requirement__strong' : 'requirement__zero'">{{ line.remaining }}</td>
+            <td class="num" :class="line.unallocated > 0 ? 'requirement__alert' : 'requirement__zero'">{{ line.unallocated }}</td>
             <td>
               <span class="requirement__chip" :class="`tone--${toneFor(line)}`">{{ labelFor(line) }}</span>
               <span v-if="line.closed_at" class="requirement__closure">
@@ -83,7 +101,7 @@
  * came of asking.
  */
 
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { TRANSFUSION_LINE_STATUS_LABELS, TRANSFUSION_LINE_STATUS_TONES } from '~/types/bloodRequest'
 import { canCloseRequirementLine } from '~/utils/transfusionSourcing'
 
@@ -99,6 +117,20 @@ const props = defineProps({
 defineEmits(['close-line'])
 
 const requestOpen = computed(() => props.isOpen)
+
+// Which lines show their whole indication.
+const open = reactive({})
+
+/** The indication's words, without repeating its code. */
+function indicationOf(line) {
+  const text = line.indication_text || ''
+  return text && text !== line.indication_label ? text : ''
+}
+
+/** A zero reads quieter than a figure that holds something. */
+function figureClass(value) {
+  return Number(value) > 0 ? 'requirement__strong' : 'requirement__zero'
+}
 
 function labelFor(line) {
   return line.line_status_label || TRANSFUSION_LINE_STATUS_LABELS[line.line_status] || '—'
@@ -157,14 +189,27 @@ function toneFor(line) {
   font-weight: 600;
 }
 
-.requirement__indication {
-  display: block;
-  max-width: 16rem;
-  white-space: normal;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--rb-text-secondary);
+.requirement__component { min-width: 18rem; max-width: 26rem; vertical-align: top; }
+.requirement__name { display: block; font-size: 0.88rem; font-weight: 700; }
+/* The indication: its code, one line of words, the rest on request. */
+.requirement__why { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin-top: 4px; }
+.requirement__code {
+  flex: none; padding: 0 6px; border-radius: 6px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+  font-size: 0.7rem; font-weight: 700;
 }
+.requirement__indication {
+  flex: 1 1 10rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.74rem; font-weight: 500; color: var(--rb-text-secondary);
+}
+.requirement__indication--open { flex-basis: 100%; white-space: normal; line-height: 1.45; }
+.requirement__more {
+  flex: none; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 0.72rem; font-weight: 600; color: var(--rb-primary-text);
+}
+.requirement__more:hover { text-decoration: underline; }
+.requirement__more:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
+.requirement__zero { color: var(--rb-text-muted); }
 
 .num {
   text-align: right !important;

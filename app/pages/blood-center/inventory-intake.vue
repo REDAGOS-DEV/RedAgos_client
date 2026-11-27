@@ -111,8 +111,8 @@
                 <th scope="col">Donation</th>
                 <th scope="col">Group</th>
                 <th scope="col">Date</th>
-                <th scope="col">Bags</th>
-                <th scope="col" class="end"><span class="sr-only">Open</span></th>
+                <th scope="col">Bags left</th>
+                <th scope="col" class="end"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -126,29 +126,13 @@
                 @click="!busy && openDonation(row)"
                 @keydown.enter.self="!busy && openDonation(row)"
               >
-                <td>
-                  <span class="qrow__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</span>
-                  <span class="qrow__sub">#{{ row.donation_id }}</span>
-                </td>
-                <td>
-                  <span class="type-pill" :class="{ 'type-pill--unknown': !row.donor?.blood_type }">{{ row.donor?.blood_type || '?' }}</span>
-                </td>
+                <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
+                <td class="qrow__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</td>
+                <td class="nowrap">{{ row.donor?.blood_type || '—' }}</td>
                 <td class="nowrap">{{ formatDate(row.donation_date) }}</td>
-                <td>
-                  <span class="qrow__bags">
-                    <span class="bag-dots" aria-hidden="true">
-                      <span
-                        v-for="n in dotCount(row)"
-                        :key="n"
-                        class="bag-dot"
-                        :class="{ 'bag-dot--in': n <= (row.recorded_units || 0) }"
-                      />
-                    </span>
-                    <span v-if="!row.into_stock" class="queue__left queue__left--held"><AssetIcon name="clock" :size="12" /> Not ready</span>
-                    <span v-else class="queue__left">{{ row.outstanding_units }} bag{{ row.outstanding_units === 1 ? '' : 's' }} left</span>
-                  </span>
-                </td>
-                <td class="end">
+                <td class="nowrap">{{ row.into_stock ? row.outstanding_units : 'Not ready' }}</td>
+                <td class="end nowrap">
+                  <RowViewButton :label="`View ${donorTitle(row.donor, row.donation_barcode, row.donation_id)}`" @view="viewing = row" />
                   <span class="qrow__open">
                     Open
                     <AssetIcon name="arrow-right" :size="14" />
@@ -382,6 +366,13 @@
       </section>
     </div>
 
+
+    <!-- Everything about a waiting donation, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing ? donorTitle(viewing.donor, viewing.donation_barcode, viewing.donation_id) : 'Donation'" eyebrow="Waiting to be booked in" :sections="viewSections" @close="viewing = null">
+      <template v-if="viewing" #actions>
+        <button type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="openViewed">Open</button>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -395,6 +386,8 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import RecentlyBookedIn from '~/components/BloodCenter/RecentlyBookedIn.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
 import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
@@ -437,12 +430,6 @@ definePageMeta({
 // more than that is shelved over several batches. The queue counts what is
 // already in, so stopping halfway is safe.
 const MAX_PER_REQUEST = 10
-
-// Bag dots: one per declared bag, capped so a large donation stays one line.
-const MAX_DOTS = 12
-function dotCount(row) {
-  return Math.min(Number(row?.declared_units) || 0, MAX_DOTS)
-}
 
 // The scanner types into whatever has focus, so the scan field takes it on arrival.
 const scanInput = ref(null)
@@ -569,6 +556,49 @@ function formatDate(value) {
   const date = new Date(value)
 
   return Number.isNaN(date.getTime()) ? 'date not recorded' : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
+}
+
+/* VIEW: a waiting donation's eye opens everything the queue leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const NUMBERS_MISSING = {
+  barcode_missing: 'The donation has no barcode',
+  centre_abbreviation_missing: 'The centre has no abbreviation',
+}
+const viewSections = computed(() => {
+  const row = viewing.value
+  if (!row) return []
+  const lines = (row.components ?? []).map((c) => {
+    const parts = [`${c.declared ?? 0} declared`, `${c.recorded ?? 0} booked in`, `${c.outstanding ?? 0} left`]
+    if (c.expiry_date) parts.push(`expires ${formatDate(c.expiry_date)}`)
+    return `${c.component || 'Component'}: ${parts.join(', ')}`
+  })
+  const bags = (row.components ?? []).flatMap((c) => (c.outstanding_bags ?? []).map((b) => b.bag_number).filter(Boolean))
+  return [
+    { title: 'Donation', rows: [
+      { label: 'Donor', value: donorTitle(row.donor, row.donation_barcode, row.donation_id) },
+      { label: 'Donor ID', value: donorReference(row.donor), mono: true },
+      { label: 'Donation number', value: row.donation_id ? `#${row.donation_id}` : '', mono: true },
+      { label: 'Barcode', value: row.donation_barcode, mono: true },
+      { label: 'Blood group', value: row.donor?.blood_type || 'Not recorded' },
+      { label: 'Donation date', value: formatDate(row.donation_date) },
+      { label: 'Volume', value: row.volume_ml ? `${row.volume_ml} mL` : '' },
+    ] },
+    { title: 'Bags', rows: [
+      { label: 'Declared', value: row.declared_units ?? '' },
+      { label: 'Booked in', value: row.recorded_units ?? '' },
+      { label: 'Left', value: row.outstanding_units ?? '' },
+      { label: 'Ready for stock', value: row.into_stock ? 'Yes' : 'Not yet: not cleared and labelled' },
+      { label: 'Bag numbers', value: NUMBERS_MISSING[row.numbers_missing] || '' },
+      { label: 'Bags left', value: bags.join(', '), mono: true, wide: true },
+      { label: 'Components', value: lines.join('\n'), wide: true },
+    ] },
+  ]
+})
+
+function openViewed() {
+  const row = viewing.value
+  viewing.value = null
+  if (row) openDonation(row)
 }
 
 /**
@@ -1031,8 +1061,6 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 .queue__name { font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue__meta { font-size: 12px; color: var(--rb-text-secondary); }
 .queue__bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.queue__left { font-size: 12px; font-weight: 600; color: var(--rb-warning-text); white-space: nowrap; }
-.queue__left--held { color: var(--rb-text-secondary); }
 
 /* Nothing listed: centred in the stretched panel, a little above the middle. */
 .queue-empty { flex: 1; display: grid; place-items: center; padding-bottom: 48px; }
@@ -1049,11 +1077,6 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 .type-pill--unknown { background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-weight: 600; }
 
 /* bag dots */
-.bag-dots { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
-.bag-dot { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--rb-border-strong); }
-.bag-dot--in { border-color: var(--rb-primary); background: var(--rb-primary); }
-.bag-dots--lg { gap: 4px; }
-.bag-dots--lg .bag-dot { width: 14px; height: 14px; border-radius: 4px; }
 
 /* workbench */
 .bench {
@@ -1304,7 +1327,6 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 /* ===== Refresh (project owner, 2026-10-24) ===== */
 .queue__item--held { opacity: 0.72; }
 .queue__item--held .queue__name { font-weight: 600; }
-.queue__left--held { display: inline-flex; align-items: center; gap: 4px; }
 
 .bench__label { font-weight: 600; letter-spacing: 0.02em; }
 .bench__progress { flex-direction: row; align-items: center; gap: 10px; }
@@ -1382,9 +1404,9 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 .qrow:hover { background: rgba(var(--rb-primary-rgb), 0.05); }
 .qrow:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
 .qrow--held { color: var(--rb-text-secondary); }
-.qrow__name { display: block; font-weight: 700; color: var(--rb-text-primary); white-space: nowrap; }
-.qrow__sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
-.qrow__bags { display: inline-flex; align-items: center; gap: 10px; }
+.qrow__name { font-weight: 700; color: var(--rb-text-primary); white-space: nowrap; }
+.qtable td.end > * { vertical-align: middle; }
+.qtable td.end > * + * { margin-left: 6px; }
 .qrow__open {
   display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
   border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);

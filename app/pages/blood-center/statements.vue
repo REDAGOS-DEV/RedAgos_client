@@ -110,11 +110,12 @@
                   <th scope="col" class="num">Amount</th>
                   <th scope="col" class="num">Settled</th>
                   <th scope="col" class="num">Balance</th>
+                  <th scope="col"><span class="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 <template v-if="loading">
-                  <tr v-for="n in 3" :key="`s-${n}`"><td colspan="6"><span class="skeleton" /></td></tr>
+                  <tr v-for="n in 3" :key="`s-${n}`"><td colspan="7"><span class="skeleton" /></td></tr>
                 </template>
                 <template v-else>
                   <tr v-for="inv in invoices" :key="inv.billing_id">
@@ -125,10 +126,13 @@
                     <td class="nowrap">{{ day(inv.billed_on) }}</td>
                     <td class="num">{{ pesos(inv.amount) }}</td>
                     <td class="num">{{ pesos(inv.settled) }}</td>
-                    <td class="num strong" :class="{ owing: Number(inv.balance) > 0 }">{{ pesos(inv.balance) }}</td>
+                    <td class="num">{{ pesos(inv.balance) }}</td>
+                    <td class="row-actions">
+                      <RowViewButton :label="`View ${inv.invoice_number || inv.request_reference || 'invoice'}`" @view="viewInvoice(inv)" />
+                    </td>
                   </tr>
                   <tr v-if="!invoices.length" class="empty-row">
-                    <td colspan="6">No invoices in this period.</td>
+                    <td colspan="7">No invoices in this period.</td>
                   </tr>
                 </template>
               </tbody>
@@ -143,40 +147,46 @@
               <thead>
                 <tr>
                   <th scope="col">Date</th>
-                  <th scope="col">Description</th>
+                  <th scope="col">Entry</th>
+                  <th scope="col">Invoice</th>
                   <th scope="col" class="num">Charges</th>
                   <th scope="col" class="num">Payments</th>
                   <th scope="col" class="num">Balance</th>
+                  <th scope="col"><span class="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 <tr class="carried">
                   <td class="nowrap">{{ day(from) }}</td>
                   <td>Opening balance</td>
+                  <td />
                   <td class="num" />
                   <td class="num" />
                   <td class="num">{{ pesos(statement?.opening_balance) }}</td>
+                  <td />
                 </tr>
                 <template v-if="loading">
-                  <tr v-for="n in 3" :key="`a-${n}`"><td colspan="5"><span class="skeleton" /></td></tr>
+                  <tr v-for="n in 3" :key="`a-${n}`"><td colspan="7"><span class="skeleton" /></td></tr>
                 </template>
                 <tr v-for="row in activity" v-else :key="row.transaction_number">
                   <td class="nowrap">{{ day(row.occurred_at) }}</td>
-                  <td>
-                    {{ row.type_label }}
-                    <span class="mono muted">· {{ row.invoice_number || row.request_reference }}</span>
-                    <span v-if="row.reference" class="muted"> · ref <span class="mono">{{ row.reference }}</span></span>
-                  </td>
+                  <td>{{ row.type_label }}</td>
+                  <td class="mono nowrap">{{ row.invoice_number || row.request_reference || '—' }}</td>
                   <td class="num">{{ row.charge ? pesos(row.charge) : '' }}</td>
                   <td class="num">{{ row.payment ? pesos(row.payment) : '' }}</td>
                   <td class="num">{{ pesos(row.balance) }}</td>
+                  <td class="row-actions">
+                    <RowViewButton :label="`View ${row.transaction_number}`" @view="viewActivity(row)" />
+                  </td>
                 </tr>
                 <tr class="closing">
                   <td class="nowrap">{{ day(to) }}</td>
                   <td>Closing balance</td>
+                  <td />
                   <td class="num">{{ pesos(statement?.invoiced) }}</td>
                   <td class="num">{{ pesos(statement?.payments) }}</td>
                   <td class="num">{{ pesos(statement?.closing_balance) }}</td>
+                  <td />
                 </tr>
               </tbody>
             </table>
@@ -184,6 +194,13 @@
         </section>
       </article>
     </div>
+
+    <!-- Everything about the invoice or entry the row names, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.title || ''" :eyebrow="viewing?.eyebrow || ''" :sections="viewing?.sections || []" @close="viewing = null">
+      <template v-if="viewing?.invoiceTo" #actions>
+        <NuxtLink :to="viewing.invoiceTo" class="ui-btn" @click="viewing = null">Open invoice</NuxtLink>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -204,6 +221,8 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import { PERIOD_PRESETS, periodFor, periodLabel } from '~/utils/reportPeriod'
@@ -227,6 +246,56 @@ function day(value) {
   if (!value) return '—'
   const date = value.length === 10 ? new Date(`${value}T00:00:00`) : new Date(value)
   return date.toLocaleDateString(undefined, { dateStyle: 'medium' })
+}
+
+/* VIEW: each row's eye opens everything the table leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const hospitalName = () => statement.value?.hospital?.name || selectedHospital.value?.label || ''
+
+function viewInvoice(inv) {
+  viewing.value = {
+    eyebrow: 'Invoice',
+    title: inv.invoice_number || 'Invoice not issued',
+    invoiceTo: inv.request_id ? `/blood-center/invoice/${inv.request_id}` : '',
+    sections: [
+      { title: 'Invoice', rows: [
+        { label: 'Invoice number', value: inv.invoice_number || 'Not issued', mono: true },
+        { label: 'Billed on', value: inv.billed_on ? day(inv.billed_on) : '' },
+        { label: 'Request', value: inv.request_reference, mono: true },
+        { label: 'Hospital', value: hospitalName() },
+      ] },
+      { title: 'Amounts', rows: [
+        { label: 'Amount', value: pesos(inv.amount) },
+        { label: 'Settled', value: pesos(inv.settled) },
+        { label: 'Balance', value: pesos(inv.balance) },
+        { label: 'Settlement reference', value: inv.settlement_reference, mono: true },
+      ] },
+    ],
+  }
+}
+
+function viewActivity(row) {
+  viewing.value = {
+    eyebrow: 'Statement entry',
+    title: row.type_label || 'Entry',
+    invoiceTo: '',
+    sections: [
+      { title: 'Entry', rows: [
+        { label: 'Transaction number', value: row.transaction_number, mono: true },
+        { label: 'Date', value: row.occurred_at ? new Date(row.occurred_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '' },
+        { label: 'Type', value: row.type_label },
+        { label: 'Invoice', value: row.invoice_number, mono: true },
+        { label: 'Request', value: row.request_reference, mono: true },
+        { label: 'Reference', value: row.reference, mono: true },
+        { label: 'Hospital', value: hospitalName() },
+      ] },
+      { title: 'Amounts', rows: [
+        { label: 'Charge', value: row.charge ? pesos(row.charge) : '' },
+        { label: 'Payment', value: row.payment ? pesos(row.payment) : '' },
+        { label: 'Balance after', value: pesos(row.balance) },
+      ] },
+    ],
+  }
 }
 
 /* WHOSE STATEMENT, AND FOR WHEN */
@@ -392,11 +461,11 @@ onPageReturn(() => load({ quiet: true }))
 .soa-table .carried td { color: var(--rb-text-secondary); font-style: italic; }
 .soa-table .closing td { font-weight: 800; background: rgba(var(--rb-primary-rgb), .06); }
 .empty-row td { padding: 18px 14px; text-align: center; color: var(--rb-text-muted); }
+.soa-table td.row-actions { width: 1%; padding-block: 6px; text-align: right; white-space: nowrap; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .num { text-align: right !important; white-space: nowrap; }
 .nowrap { white-space: nowrap; }
-.strong { font-weight: 700; }
-.owing { color: var(--rb-accent-text); }
 .muted { color: var(--rb-text-muted); }
 .mono { font-family: var(--rb-font-mono); }
 .link { color: var(--rb-primary-text); font-weight: 700; text-decoration: none; }

@@ -1,7 +1,8 @@
 <template>
   <!--
-    Receipts and Transactions are one list of payments seen two ways
-    (2026-10-27): one sidebar link, these two tabs on top of both pages.
+    One sidebar link, three tabs on top of each page: the Billing Counter,
+    where a payment is taken (in Payments since 2026-11-27), then Receipts and
+    Transactions, one list of payments seen two ways (2026-10-27).
   -->
   <nav class="pay-tabs" aria-label="Payments">
     <NuxtLink
@@ -24,6 +25,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 const route = useRoute()
 
 const TABS = [
+  { to: '/blood-center/pos', label: 'Billing Counter', icon: 'philippine-peso' },
   { to: '/blood-center/receipts', label: 'Receipts', icon: 'receipt' },
   { to: '/blood-center/billing-transactions', label: 'Transactions', icon: 'list' },
 ]

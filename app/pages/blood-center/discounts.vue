@@ -165,12 +165,8 @@
               <td class="c-amount">{{ row.label }}</td>
             </template>
 
-            <td class="c-status">
-              <span class="badge" :class="row.is_active ? 'badge--ok' : 'badge--neutral'">
-                <span class="badge__dot" aria-hidden="true" />
-                {{ row.is_active ? 'On' : 'Off' }}
-              </span>
-            </td>
+            <!-- Plain text (project owner, 2026-11-27); the eye shows the rest. -->
+            <td class="c-status">{{ row.is_active ? 'On' : 'Off' }}</td>
 
             <td class="right">
               <div class="row-actions">
@@ -181,6 +177,7 @@
                   </button>
                 </template>
                 <template v-else>
+                  <RowViewButton :label="`View ${row.name}`" @view="viewing = row" />
                   <button type="button" class="btn btn--ghost btn--sm" :disabled="savingId === row.id" @click="startEdit(row)">Edit</button>
                   <button type="button" class="btn btn--sm" :disabled="savingId === row.id" @click="toggleActive(row)">
                     {{ row.is_active ? 'Turn off' : 'Turn on' }}
@@ -192,12 +189,18 @@
         </tbody>
       </table>
     </section>
+
+    <!-- Everything about the discount the row names, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.name || 'Discount'" eyebrow="Discount" :sections="viewSections" @close="viewing = null" />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { pesos } from '~/utils/billing'
 import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
@@ -231,6 +234,25 @@ const KINDS = [
 
 const rows = ref([])
 const busy = ref(false)
+
+/* VIEW: the row's eye opens everything the table leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const d = viewing.value
+  if (!d) return []
+  const value = Number(d.value)
+  return [
+    { rows: [
+      { label: 'Name', value: d.name },
+      { label: 'Discount', value: d.label },
+      { label: 'Type', value: d.kind === 'percentage' ? 'Percent off' : d.kind === 'fixed' ? 'Fixed amount off' : '' },
+      { label: d.kind === 'percentage' ? 'Percent off' : 'Amount off', value: Number.isFinite(value) ? (d.kind === 'percentage' ? `${value}%` : pesos(value)) : '' },
+      { label: 'Status', value: d.is_active ? 'On' : 'Off' },
+      { label: 'Last changed', value: d.updated_at ? new Date(d.updated_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '' },
+      { label: 'Changed by', value: d.updated_by },
+    ] },
+  ]
+})
 const banner = ref('')
 const bannerKind = ref('success')
 
@@ -509,10 +531,6 @@ onPageReturn(() => {
 .right { text-align: right; }
 .empty { padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
 
-.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.badge__dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
-.badge--ok { color: var(--rb-success-text); }
-.badge--neutral { color: var(--rb-text-secondary); }
 
 .row-actions { display: inline-flex; align-items: center; gap: 6px; }
 

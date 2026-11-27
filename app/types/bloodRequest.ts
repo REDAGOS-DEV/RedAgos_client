@@ -975,9 +975,19 @@ export interface TransfusionRequest {
   closed_at: string | null
   cancelled_at: string | null
   cancellation_reason: string | null
+  /** Only on the hospital's list: when each step last happened, from the request's history. */
+  step_times?: TransfusionStepTimes
   /** Only on the detail view. */
   allocations?: FacilityAllocation[]
   walk_in?: WalkInDetails | null
+}
+
+/** Units tagged, released and received: the latest time each happened, or null. */
+export interface TransfusionStepTimes {
+  submitted: string | null
+  approved: string | null
+  released: string | null
+  received: string | null
 }
 
 /** One centre holding matching stock, and how much of the need it is suggested for. */

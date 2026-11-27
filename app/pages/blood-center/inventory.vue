@@ -183,10 +183,11 @@
           <table v-else class="mini-table">
             <thead>
               <tr>
-                <th>Unit ID / Blood Type</th>
+                <th>Unit ID</th>
+                <th>Type</th>
                 <th>Expiry Date</th>
                 <th>Remaining</th>
-                <th><span class="sr-only">Open</span></th>
+                <th><span class="sr-only">View</span></th>
               </tr>
             </thead>
             <tbody>
@@ -199,18 +200,12 @@
                 @click="openDetails(row)"
                 @keydown.enter.self="openDetails(row)"
               >
-                <td>
-                  <span class="mini-row__id mono">{{ row.id }}</span>
-                  <span class="type-chip">{{ displayType(row.blood_type) }}</span>
-                </td>
+                <!-- One plain value a column (project owner, 2026-11-27); the eye opens the unit. -->
+                <td class="mini-row__id mono">{{ row.id }}</td>
+                <td class="nowrap">{{ displayType(row.blood_type) }}</td>
                 <td class="num">{{ row.expiry_date }}</td>
-                <td>
-                  <span class="badge" :class="row.days_remaining <= 3 ? 'tone--danger' : 'tone--warning'">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ daysLeftLabel(row.days_remaining) }}
-                  </span>
-                </td>
-                <td class="mini-row__chevron"><AssetIcon name="chevron-right" :size="15" /></td>
+                <td class="nowrap">{{ daysLeftLabel(row.days_remaining) }}</td>
+                <td class="mini-row__view" @click.stop><RowViewButton :label="`View unit ${row.id}`" @view="openDetails(row)" /></td>
               </tr>
             </tbody>
           </table>
@@ -313,22 +308,18 @@
                   @keydown.enter.self="openDetails(row)"
                 >
                   <td class="mono">{{ row.id }}</td>
-                  <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type) }}</span></td>
+                  <td class="nowrap">{{ displayType(row.blood_type) }}</td>
                   <td class="wrap-cell">{{ row.component }}</td>
                   <td class="num">{{ formatDay(row.collected_at) }}</td>
-                  <td class="num" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</td>
-                  <td>
-                    <span class="days" :class="[`tone--${row.remaining.tone}`, { 'days--pill': row.remaining.tone === 'warning' || row.remaining.tone === 'danger' }]">{{ row.remaining.label }}</span>
-                  </td>
-                  <td class="wrap-cell" :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</td>
-                  <td><span class="badge" :class="`tone--${row.tag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ row.tag.label }}</span></td>
-                  <td>
-                    <span class="avail" :class="`tone--${row.availability.tone}`">
-                      <span class="avail__dot" aria-hidden="true" />
-                      {{ row.availability.label }}
-                    </span>
-                  </td>
+                  <td class="num">{{ row.expiry_date || '—' }}</td>
+                  <td class="nowrap">{{ row.remaining.label }}</td>
+                  <td class="wrap-cell">{{ row.storage_location || 'Not set' }}</td>
+                  <td class="nowrap">{{ row.tag.label }}</td>
+                  <td class="nowrap">{{ row.availability.label }}</td>
                   <td class="actions-col" @click.stop>
+                    <div class="row-acts">
+                    <!-- The eye opens the unit's details, as the menu's View details does (2026-11-27). -->
+                    <RowViewButton :label="`View unit ${row.id}`" @view="openDetails(row)" />
                     <div class="row-menu" @focusout="onRowMenuFocusOut">
                       <button
                         type="button"
@@ -365,6 +356,7 @@
                           </button>
                         </template>
                       </div>
+                    </div>
                     </div>
                   </td>
                 </tr>
@@ -630,6 +622,7 @@ import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import CenterModal from '~/components/ui/CenterModal.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, resolveComponent } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -1640,15 +1633,10 @@ onMounted(() => {
 .mini-row { cursor: pointer; transition: background 0.12s ease; }
 .mini-row:hover { background: var(--inv-hover); }
 .mini-row:focus-visible { outline-offset: -2px; }
-.mini-row__id { display: block; font-size: 11.5px; margin-bottom: 4px; white-space: nowrap; }
-.mini-row__chevron { width: 24px; color: var(--inv-faint); }
+.mini-row__id { font-size: 11.5px; white-space: nowrap; }
+.mini-row__view { width: 1%; padding-right: 12px !important; text-align: right; }
 
-.type-chip {
-  display: inline-flex; padding: 0 6px; border-radius: 4px; border: 1px solid var(--inv-border);
-  font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--inv-text);
-}
 .type-text { font-weight: 600; color: var(--inv-text); white-space: nowrap; }
-.type-chip--cell { min-width: 32px; justify-content: center; padding: 1px 7px; border-radius: 6px; background: var(--inv-elevated); font-size: 12px; }
 
 /* Activity */
 .activity-list { list-style: none; margin: 0; padding: 0; }
@@ -1704,15 +1692,11 @@ onMounted(() => {
 .unit-row { cursor: pointer; transition: background 0.12s ease; }
 .unit-row:hover { background: var(--inv-hover); }
 .unit-row:focus-visible { outline-offset: -2px; }
-.actions-col { width: 44px; text-align: right; }
+.actions-col { width: 1%; text-align: right; white-space: nowrap; }
+.row-acts { display: inline-flex; align-items: center; gap: 6px; }
+.nowrap { white-space: nowrap; }
 .mono { font-family: var(--rb-font-mono); font-size: 11.5px; }
 .num { font-variant-numeric: tabular-nums; }
-.cell-muted { color: var(--inv-muted) !important; }
-.ink-danger { color: var(--inv-crit) !important; }
-.days { font-variant-numeric: tabular-nums; color: var(--tone); }
-.days.tone--warning, .days.tone--danger { font-weight: 600; }
-.days.tone--neutral { color: var(--inv-text); }
-.days--pill { display: inline-flex; padding: 1px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
 
 .th-sort {
   display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none;
@@ -1721,8 +1705,6 @@ onMounted(() => {
 .th-sort:hover, .th-sort--on { color: var(--inv-text); }
 .th-sort:focus-visible { border-radius: 4px; }
 
-.avail { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--inv-text); white-space: nowrap; }
-.avail__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
 
 /* Row action menu */
 .row-menu { position: relative; display: inline-flex; }
@@ -1879,7 +1861,6 @@ onMounted(() => {
 .badge { border-color: color-mix(in srgb, var(--tone-fill) 30%, transparent); background: color-mix(in srgb, var(--tone-fill) 10%, transparent); }
 .badge.tone--neutral, .badge.tone--muted, .badge:not([class*="tone--"]) { border-color: var(--inv-border); background: var(--inv-elevated); }
 .badge__dot, .legend__dot, .avail__dot { background: var(--tone-fill); }
-.days--pill { background: color-mix(in srgb, var(--tone-fill) 14%, transparent); }
 
 /* Filled marks */
 .gauge__fill { stroke: var(--tone-fill); }
