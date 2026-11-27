@@ -2,11 +2,8 @@
   <div class="request-details-page">
     <!-- ============== PAGE HEADER ============== -->
     <div class="page-header">
-      <button class="back-link back-link--narrow" type="button" @click="goBack">
-        <AssetIcon name="arrow-left" />
-        <span>Back to Patient Request</span>
-      </button>
       <PageHeader title="Blood Request Details" :subtitle="hospitalPageSubtitle('requestDetails', can)">
+        <template #back><BackButton to="/hospital/bloodrequests" label="Patient Request" /></template>
         <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="ui-btn" type="button" @click="handleDownloadPdf">
@@ -664,6 +661,7 @@
 
 <script setup>
 import PageSkeleton from '~/components/ui/PageSkeleton.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -962,23 +960,6 @@ function scrollToTimeline() {
 }
 
 /* ---------- Header ---------- */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--rb-primary-text);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 10px;
-}
-.back-link:hover {
-  text-decoration: underline;
-}
-
 .page-header :deep(.ph) { margin-bottom: 24px; }
 .page-header__row {
   display: flex;
@@ -1606,7 +1587,7 @@ function scrollToTimeline() {
 
 /* ---------- Print ---------- */
 @media print {
-  .back-link,
+  .page-header :deep(.back-btn),
   .page-header__actions,
   .bottom-actions,
   .content-side {

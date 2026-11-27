@@ -1,7 +1,30 @@
 <template>
   <div class="list-page inv-tones">
     <div class="list-inner">
-      <PageHeader title="Stock Intake" :subtitle="hospitalPageSubtitle('stockIntake', can)" />
+      <PageHeader title="Stock Intake" :subtitle="hospitalPageSubtitle('stockIntake', can)">
+        <template #actions>
+          <button
+            type="button"
+            class="btn-outline"
+            :disabled="refreshing"
+            aria-label="Refresh the list"
+            :title="lastUpdatedLabel ? `Refresh · updated ${lastUpdatedLabel}` : 'Refresh'"
+            @click="refresh()"
+          >
+            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: refreshing }" />
+            Refresh
+          </button>
+          <NuxtLink to="/hospital/inventory" class="btn-outline" title="Blood Bank Inventory">
+            <AssetIcon name="package" :size="14" />
+            Blood Bank Inventory
+          </NuxtLink>
+          <!-- Blood from outside RedAgos is added here (project owner, 2026-10-30). -->
+          <button v-if="canAdd" type="button" class="btn-primary" @click="addingUnit = true">
+            <AssetIcon name="plus" :size="15" />
+            Add Blood Unit
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -9,17 +32,61 @@
         <button type="button" class="btn-link" @click="refresh()">Retry</button>
       </div>
 
-      <!-- ============ KPI ROW ============ -->
-      <section class="kpi-row" aria-label="Stock intake at a glance">
-        <div v-for="kpi in kpis" :key="kpi.key" class="kpi" :class="`tone--${kpi.tone}`">
-          <span class="kpi__icon" aria-hidden="true">
-            <AssetIcon :name="kpi.icon" :size="20" />
+      <!-- ============ SCAN ============ -->
+      <!-- The work of the page first (2026-11-27): scan, give the scanned bags a
+           shelf, and see how far along the batch is. -->
+      <section class="scan-panel" aria-labelledby="scan-title">
+        <div class="scan-panel__head">
+          <h2 id="scan-title" class="scan-panel__title">
+            <span class="scan-panel__icon" aria-hidden="true"><AssetIcon name="scan-line" :size="16" /></span>
+            Scan bags to stock in
+          </h2>
+          <span v-if="pastDate" class="scan-flag" :title="'Discard these rather than stock them in'">
+            <AssetIcon name="triangle-alert" :size="13" />
+            {{ pastDate }} past {{ pastDate === 1 ? 'its' : 'their' }} date
           </span>
-          <span class="kpi__body">
-            <span class="kpi__label">{{ kpi.label }}</span>
-            <span class="kpi__value">{{ loading ? '—' : kpi.value }}</span>
-            <span class="kpi__sub">{{ kpi.sub }}</span>
+        </div>
+
+        <div class="scan-panel__row">
+          <form class="scan-field" @submit.prevent="scanBag">
+            <AssetIcon name="scan-line" :size="17" class="scan-field__icon" />
+            <input
+              ref="scanInput"
+              v-model="scanEntry"
+              type="text"
+              class="scan-field__input mono"
+              placeholder="Scan or type a bag number"
+              aria-label="Scan a bag to stock in"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="characters"
+              maxlength="50"
+            />
+            <kbd class="scan-field__hint" aria-hidden="true">Enter</kbd>
+          </form>
+
+          <form class="bulk-field" @submit.prevent="applyBulkLocation">
+            <SelectField
+              v-model="bulkLocation"
+              class="bulk-field__select"
+              :options="locationOptions"
+              placeholder="Location for the scanned bags"
+              aria-label="Storage location for the scanned bags"
+              empty-text="No storage locations loaded"
+            />
+            <button type="submit" class="btn-outline" :disabled="!bulkLocation || !ticked.length">Apply</button>
+          </form>
+        </div>
+
+        <!-- How far along the batch is. -->
+        <div class="scan-progress" :aria-label="`${ticked.length} of ${tickable.length} bags scanned`">
+          <span class="scan-progress__track" aria-hidden="true">
+            <span class="scan-progress__fill" :style="{ width: tickable.length ? `${(ticked.length / tickable.length) * 100}%` : '0%' }" />
           </span>
+          <span class="scan-progress__label">
+            <strong>{{ loading ? '–' : ticked.length }}</strong> of {{ loading ? '–' : tickable.length }} scanned
+          </span>
+          <span v-if="scanNote" class="scan-progress__note" :class="{ 'scan-progress__note--alert': scanAlert }" aria-live="polite">{{ scanNote }}</span>
         </div>
       </section>
 
@@ -28,77 +95,11 @@
            arrival was confirmed, or that came from outside RedAgos, wait here
            until inventory staff put them on a shelf. They are not stock until
            then. Its own page since 2026-10-28, apart from Blood Bank Inventory. -->
-      <section class="panel" aria-labelledby="arrived-title">
-        <h2 id="arrived-title" class="sr-only">Awaiting Stock-in</h2>
-
-        <!-- The donors page's toolbar (project owner, 2026-10-30): scan and the
-             scanned bags' location at the left, the page's actions at the right. -->
-        <div class="toolbar">
-          <div class="toolbar__filters">
-            <form class="search" @submit.prevent="scanBag">
-              <AssetIcon name="scan-line" :size="15" class="search__icon" />
-              <input
-                ref="scanInput"
-                v-model="scanEntry"
-                type="text"
-                class="search__input mono"
-                placeholder="Scan or type a bag number"
-                aria-label="Scan a bag to stock in"
-                autocomplete="off"
-                spellcheck="false"
-                autocapitalize="characters"
-                maxlength="50"
-              />
-            </form>
-
-            <form class="bulk-field" @submit.prevent="applyBulkLocation">
-              <SelectField
-                v-model="bulkLocation"
-                class="bulk-field__select"
-                :options="locationOptions"
-                placeholder="Location for the scanned bags"
-                aria-label="Storage location for the scanned bags"
-                empty-text="No storage locations loaded"
-                size="sm"
-              />
-              <button type="submit" class="btn-outline" :disabled="!bulkLocation || !ticked.length">Apply</button>
-            </form>
-          </div>
-
-          <div class="toolbar__actions">
-            <span v-if="lastUpdatedLabel" class="updated" :title="`List loaded at ${lastUpdatedLabel}`">
-              <AssetIcon name="clock" :size="13" />
-              Updated {{ lastUpdatedLabel }}
-            </span>
-
-            <button
-              type="button"
-              class="btn-outline btn-outline--squeeze"
-              :disabled="refreshing"
-              aria-label="Refresh the list"
-              :title="lastUpdatedLabel ? `Refresh · updated ${lastUpdatedLabel}` : 'Refresh'"
-              @click="refresh()"
-            >
-              <AssetIcon name="refresh-cw" :size="14" :class="{ spin: refreshing }" />
-              <span class="btn-text">Refresh</span>
-            </button>
-
-            <NuxtLink to="/hospital/inventory" class="btn-outline btn-outline--squeeze" title="Blood Bank Inventory">
-              <AssetIcon name="package" :size="14" />
-              <span class="btn-text">Blood Bank Inventory</span>
-            </NuxtLink>
-
-            <!-- Blood from outside RedAgos is added here (project owner, 2026-10-30). -->
-            <button v-if="canAdd" type="button" class="btn-primary" @click="addingUnit = true">
-              <AssetIcon name="plus" :size="15" />
-              Add Blood Unit
-            </button>
-          </div>
-        </div>
-
-        <p v-if="arrived.length" class="scan-note" :class="{ 'scan-note--alert': scanAlert }" aria-live="polite">
-          {{ scanNote || `${ticked.length} of ${tickable.length} scanned` }}
-        </p>
+      <section class="panel arrived-panel" aria-labelledby="arrived-title">
+        <header class="list-head">
+          <h2 id="arrived-title" class="list-head__title">Awaiting stock-in</h2>
+          <span class="list-head__count">{{ loading ? '–' : arrived.length }}</span>
+        </header>
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && arrived.length }">
           <table class="list-table">
@@ -116,10 +117,9 @@
                   />
                 </th>
                 <th scope="col">Bag</th>
-                <th scope="col">Group</th>
+                <th scope="col">Type</th>
                 <th scope="col">Component</th>
-                <th scope="col">Expiry</th>
-                <th scope="col">Remaining</th>
+                <th scope="col">Expires</th>
                 <th scope="col">Arrived</th>
                 <th scope="col">Storage location</th>
                 <th v-if="canDiscard" scope="col" class="c-actions">Actions</th>
@@ -161,7 +161,10 @@
                 </td>
                 <td>
                   <div class="cell">
-                    <span class="code">{{ bagLabel(unit) }}</span>
+                    <span class="code">
+                      <AssetIcon v-if="ticked.includes(unit.unit_id)" name="check" :size="13" class="scanned-mark" />
+                      {{ bagLabel(unit) }}
+                    </span>
                     <span v-if="unit.source?.reference_number" class="cell__sub">from {{ unit.source.reference_number }}</span>
                     <span v-else-if="unit.source?.direct_distribution" class="cell__sub">from {{ unit.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
                   </div>
@@ -173,12 +176,10 @@
                     <span v-if="unit.volume_ml" class="cell__sub">{{ unit.volume_ml }} mL</span>
                   </div>
                 </td>
-                <td class="nowrap" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</td>
-                <td>
-                  <span class="badge" :class="badgeClass(remaining(unit).tone)">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ remaining(unit).label }}
-                  </span>
+                <!-- The date over how long is left (2026-11-27: one column). -->
+                <td class="expires-cell">
+                  <span class="expires-cell__date" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</span>
+                  <span class="days-pill" :class="`tone--${remaining(unit).tone}`">{{ remaining(unit).label }}</span>
                 </td>
                 <td class="nowrap">{{ formatDateTime(unit.received_at) }}</td>
                 <td>
@@ -282,7 +283,6 @@ import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { UNIT_REFUSAL_MESSAGES } from '~/types/hospitalInventory'
 import { hospitalRemainingDaysTag } from '~/utils/hospitalInventoryDashboard'
-import { badgeClass } from '~/utils/listBadge'
 import { matchStockInScan } from '~/utils/stockIn'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
@@ -298,7 +298,7 @@ const { can } = useUser()
 const canDiscard = computed(() => can('hospital.inventory.discard'))
 // Adding a bag is a direct-distribution receipt on the server, so it needs that ability.
 const canAdd = computed(() => can('hospital.receiving.direct'))
-const columnCount = computed(() => (canDiscard.value ? 9 : 8))
+const columnCount = computed(() => (canDiscard.value ? 8 : 7))
 
 const loading = ref(true)
 const loadError = ref('')
@@ -336,32 +336,6 @@ const blockers = computed(() => {
 
 const canStockIn = computed(() => ticked.value.length > 0 && !stockingIn.value && !blockers.value.length)
 
-const kpis = computed(() => [
-  {
-    key: 'waiting',
-    label: 'Awaiting Stock-in',
-    value: arrived.value.length,
-    sub: `bag${arrived.value.length === 1 ? '' : 's'} arrived, not yet shelved`,
-    icon: 'package',
-    tone: 'neutral',
-  },
-  {
-    key: 'scanned',
-    label: 'Scanned',
-    value: ticked.value.length,
-    sub: `of ${tickable.value.length} in date`,
-    icon: 'scan-line',
-    tone: ticked.value.length ? 'success' : 'neutral',
-  },
-  {
-    key: 'expired',
-    label: 'Past Their Date',
-    value: pastDate.value,
-    sub: pastDate.value ? 'discard rather than stock in' : 'none on arrival',
-    icon: 'triangle-alert',
-    tone: pastDate.value ? 'danger' : 'muted',
-  },
-])
 
 async function loadArrived() {
   const page = await hospitalService.inventory({ status: 'received', per_page: 100 })
@@ -642,43 +616,83 @@ onBeforeUnmount(() => {
 
 .list-inner { container-type: inline-size; container-name: si; }
 
-/* Summary cards: one surface, the state in the icon alone. */
-.kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.kpi {
-  display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 88px;
-  padding: 16px; border-radius: 12px; border: 1px solid var(--inv-border); background: var(--inv-surface); color: var(--inv-text);
+/* ── The scan panel (2026-11-27) ── */
+.scan-panel {
+  display: flex; flex-direction: column; gap: 14px; padding: 18px 20px;
+  border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  background: var(--rb-surface); box-shadow: var(--rb-shadow-sm);
 }
-.kpi__icon {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone);
+.scan-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.scan-panel__title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.scan-panel__icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.scan-flag {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); font-size: 12.5px; font-weight: 700;
 }
-.kpi.tone--neutral .kpi__icon { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
-.kpi.tone--muted .kpi__icon { background: var(--inv-elevated); color: var(--inv-faint); }
-.kpi__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.kpi__label { font-size: 12.5px; font-weight: 500; color: var(--inv-muted); }
-.kpi__value { font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-text); font-variant-numeric: tabular-nums; }
-.kpi__sub { font-size: 12px; color: var(--inv-muted); }
+.scan-panel__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
-/* Scan, then the scanned bags' location, in the toolbar's filters. */
-.bulk-field { display: flex; flex: none; align-items: center; gap: 8px; }
-.bulk-field__select { width: 230px; }
-.scan-note {
-  margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--rb-border);
-  font-size: 12.5px; color: var(--rb-text-secondary);
+/* The scanner field: large, where a scan lands. */
+.scan-field { position: relative; flex: 1 1 320px; min-width: 0; }
+.scan-field__icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--rb-primary-text); pointer-events: none; }
+.scan-field__input {
+  width: 100%; height: 46px; padding: 0 72px 0 42px; border: 1.5px solid var(--rb-border-strong); border-radius: 12px;
+  background: var(--rb-surface-alt); font: inherit; font-size: 15px; letter-spacing: .02em; color: var(--rb-text-primary);
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
-.scan-note--alert { color: var(--rb-accent-text); font-weight: 600; }
+.scan-field__input::placeholder { color: var(--rb-text-muted); letter-spacing: 0; }
+.scan-field__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); box-shadow: 0 0 0 4px rgba(var(--rb-primary-rgb), .12); }
+.scan-field__hint {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  padding: 2px 7px; border: 1px solid var(--rb-border-strong); border-radius: 6px; background: var(--rb-surface);
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--rb-text-muted);
+}
+
+/* How far along the batch is. */
+.scan-progress { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.scan-progress__track { flex: 1 1 200px; height: 8px; overflow: hidden; border-radius: 999px; background: var(--rb-surface-alt); }
+.scan-progress__fill { display: block; height: 100%; border-radius: inherit; background: var(--inv-ok-fill); transition: width .3s ease; }
+.scan-progress__label { font-size: 13px; color: var(--rb-text-secondary); white-space: nowrap; }
+.scan-progress__label strong { font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.scan-progress__note { font-size: 12.5px; color: var(--rb-text-secondary); }
+.scan-progress__note--alert { color: var(--rb-accent-text); font-weight: 600; }
+
+/* This panel lets its stock-in bar stick to the bottom of the screen. */
+.arrived-panel { overflow: visible; }
+.arrived-panel .table-wrap { border-radius: 0; }
+
+/* The list's heading, with how many wait. */
+.list-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--rb-border); }
+.list-head__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.list-head__count { min-width: 22px; padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; text-align: center; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+
+/* Expires: the date over how long is left. */
+.expires-cell { white-space: nowrap; }
+.expires-cell__date { display: block; font-size: 13px; }
+.days-pill {
+  display: inline-flex; margin-top: 3px; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone); font-size: 11.5px; font-weight: 700;
+}
+.scanned-mark { margin-right: 4px; vertical-align: -2px; color: var(--inv-ok); }
+
+/* The scanned bags' location, beside the scan field. */
+.bulk-field { display: flex; flex: none; align-items: center; gap: 8px; }
+.bulk-field__select { width: 240px; }
 
 .check-col { width: 36px; }
 .location-cell { width: 200px; }
 .ink-danger { color: var(--rb-accent-text) !important; font-weight: 600; }
 /* A scanned bag is marked along its edge; one past its date in red. */
 .row--scanned td:first-child { box-shadow: inset 3px 0 0 var(--inv-ok-fill); }
+.row--scanned { background: color-mix(in srgb, var(--inv-ok-fill) 6%, transparent); }
 .row--expired td:first-child { box-shadow: inset 3px 0 0 var(--inv-crit-fill); }
 
 /* Where the pager sits on the donors page: what stops the stock-in, and the button. */
 .list-foot {
+  position: sticky; bottom: 0; z-index: 2;
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding: 12px 16px; border-top: 1px solid var(--rb-border);
+  background: var(--rb-surface); border-radius: 0 0 var(--rb-radius-lg) var(--rb-radius-lg);
+  box-shadow: 0 -8px 16px -12px rgba(15, 23, 42, .25);
 }
 .list-foot__summary { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .list-foot__error { margin: 0; font-size: 12.5px; color: var(--rb-accent-text); }
@@ -704,7 +718,6 @@ onBeforeUnmount(() => {
 }
 
 @container si (max-width: 760px) {
-  .kpi-row { grid-template-columns: minmax(0, 1fr); }
   .bulk-field { width: 100%; }
   .bulk-field__select { flex: 1; width: auto; min-width: 0; }
 }

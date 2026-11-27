@@ -395,6 +395,26 @@ class HospitalService extends BaseService {
     return this.request<Paginated<HospitalInventoryActivity>>('/hospital/inventory/activity', 'GET', params)
   }
 
+  /**
+   * How many days each blood type and component lasts at the blood bank's own
+   * rate of use over the last `window_days` (2026-11-27). `days_left` is null
+   * when nothing of it was used in that time.
+   */
+  daysOfCover() {
+    return this.request<{
+      window_days: number
+      rows: Array<{
+        blood_type: { id: number; code: string | null }
+        component: { id: number; code: string | null; name: string | null }
+        available: number
+        used: number
+        per_day: number
+        days_left: number | null
+      }>
+      as_of: string
+    }>('/hospital/inventory/days-of-cover')
+  }
+
   /** Tag an available bag to a patient: Tag Assigned, 24 hours to crossmatch. */
   tagUnit(unit: string, payload: TagUnitPayload) {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/tag`, 'POST', payload)

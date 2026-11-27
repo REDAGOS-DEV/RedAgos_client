@@ -32,6 +32,13 @@ const LINES: Record<string, (can: Can) => string> = {
   inventory: (can) => (can('hospital.inventory.handle')
     ? 'Tag bags to patients, record crossmatch and transfusion, and release or discard them.'
     : 'Every bag in your blood bank and the patient it is tagged to. Inventory staff handle the bags.'),
+  requestHistory: (can) => {
+    const requests = can('hospital.requests.view')
+    const bags = can('hospital.inventory.view')
+    if (requests && bags) return 'Your patient requests and weekly restock, by day: sent, approved, dispatched and received, and what became of the bags they brought.'
+    if (requests) return 'Your patient requests and weekly restock, by day: sent, approved, dispatched and received.'
+    return 'What became of the bags your requests brought, by day: arrivals, tags, transfusions and losses.'
+  },
   stockIntake: (can) => (can('hospital.receiving.direct')
     ? 'Put arrived bags on the shelf so they can be tagged, or add a bag from outside RedAgos.'
     : 'Put arrived bags on the shelf so they can be tagged.'),

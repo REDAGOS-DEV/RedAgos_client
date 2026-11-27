@@ -201,7 +201,7 @@ describe('the receiving routes and pages', () => {
   })
 
   it('puts Patient Request and Weekly Request under Receiving in the sidebar and the search', () => {
-    const sidebar = source('app/components/Hospital/Sidebar.vue')
+    const sidebar = source('app/utils/hospitalNav.ts')
     expect(sidebar).toContain("label: 'Receiving'")
     expect(sidebar).toContain("{ label: 'Patient Request', path: '/hospital/bloodrequests'")
     expect(sidebar).toContain("{ label: 'Weekly Request', path: '/hospital/receiving/weekly'")
@@ -215,6 +215,7 @@ describe('the receiving routes and pages', () => {
     expect(existsSync(path.join(root, 'app/pages/hospital/receiving/direct-distribution'))).toBe(false)
     for (const file of [
       'app/components/Hospital/Sidebar.vue',
+      'app/utils/hospitalNav.ts',
       'app/layouts/hospitaldashboard.vue',
       'app/components/Hospital/TransfusionRequestDetail.vue',
     ]) {
@@ -223,9 +224,9 @@ describe('the receiving routes and pages', () => {
   })
 
   it('puts Request Days under Facility Settings in the sidebar and the search', () => {
-    const sidebar = source('app/components/Hospital/Sidebar.vue')
+    const sidebar = source('app/utils/hospitalNav.ts')
     expect(sidebar).toMatch(/label: 'Facility Settings',\s*items: \[\s*\{ label: 'Request Days', path: '\/hospital\/request-days'/)
-    expect(sidebar).toContain("'Facility Settings': 'building-2'")
+    expect(source('app/components/Hospital/Sidebar.vue')).toContain("'Facility Settings': 'building-2'")
 
     const layout = source('app/layouts/hospitaldashboard.vue')
     expect(layout).toContain("{ label: 'Request Days', path: '/hospital/request-days'")

@@ -43,7 +43,7 @@ describe('the hospital help guides', () => {
   })
 
   it('files every guide under a sidebar group', () => {
-    const sidebar = source('app/components/Hospital/Sidebar.vue')
+    const sidebar = source('app/utils/hospitalNav.ts')
     for (const department of HOSPITAL_HELP_DEPARTMENTS) {
       if (department === 'Receiving') continue
       expect(sidebar).toContain(`label: '${department}'`)
@@ -73,7 +73,7 @@ describe('the hospital help guides', () => {
       ['app/pages/hospital/inventory-report.vue', 'View PDF'],
       ['app/pages/hospital/bloodrequests/newrequest.vue', 'Find facilities'],
       ['app/pages/hospital/bloodrequests/newrequest.vue', 'View my stock'],
-      ['app/pages/hospital/receiving/weekly/index.vue', 'Send request'],
+      ['app/pages/hospital/receiving/weekly/index.vue', 'Send today\'s request'],
     ]
     for (const [file, words] of says) expect(source(file!), `${file}: ${words}`).toContain(words)
   })
@@ -81,7 +81,7 @@ describe('the hospital help guides', () => {
 
 describe('the hospital Help Center page', () => {
   it('is in the sidebar and the search', () => {
-    expect(source('app/components/Hospital/Sidebar.vue')).toContain("path: '/hospital/help'")
+    expect(source('app/utils/hospitalNav.ts')).toContain("path: '/hospital/help'")
     const layout = source('app/layouts/hospitaldashboard.vue')
     expect(layout).toContain('searchHospitalGuides(q, hospitalGuidesFor(can))')
   })

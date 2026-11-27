@@ -1,11 +1,6 @@
 <template>
   <div class="rc-page">
     <div class="rc-inner">
-      <NuxtLink to="/blood-center/receipts" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Payments
-      </NuxtLink>
-
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form'], ['table']]" />
       </div>
@@ -22,6 +17,7 @@
 
       <template v-else-if="receipt">
         <header class="doc-header">
+          <BackButton to="/blood-center/receipts" label="Payments" class="doc-back" />
           <div>
             <h1 class="page-title">Acknowledgement Receipt</h1>
             <div class="doc-meta">
@@ -152,6 +148,7 @@
  * server is the official copy; the 80mm print is the counter's slip.
  */
 import PageSkeleton from '~/components/ui/PageSkeleton.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
@@ -279,20 +276,12 @@ onMounted(load)
 
 /* The way back to the page above, as on the drive roster: no breadcrumb
    in any portal (project owner, 2026-11-19). */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--rb-text-primary); }
 
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+/* The way back (ui/BackButton) beside the heading, which takes the room up to the actions. */
+.doc-header > .doc-back { align-self: flex-start; }
+.doc-header > .doc-back + * { flex: 1 1 auto; min-width: 0; margin-left: -2px; }
 .page-title { font-size: 22px; font-weight: 800; color: var(--rb-text-primary); margin: 0; letter-spacing: -0.01em; }
 .doc-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .doc-number { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }

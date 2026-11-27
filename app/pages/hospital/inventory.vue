@@ -7,15 +7,38 @@
           <h1 class="page-title">Blood Bank Inventory</h1>
           <p class="page-subtitle">{{ hospitalPageSubtitle('inventory', can) }}</p>
         </div>
+        <!-- The page's actions together, as the layout the owner chose has them (2026-11-27). -->
         <div class="page-head__meta">
-          <span v-if="lastUpdatedLabel" class="live-note">
-            <span class="live-note__dot" aria-hidden="true" />
-            Updated {{ lastUpdatedLabel }}
-          </span>
-          <button type="button" class="btn-outline btn-outline--sm" :disabled="refreshing" @click="refresh()">
-            <AssetIcon name="refresh-cw" :size="13" :class="{ 'spin-icon': refreshing }" />
+          <!-- The charts can be put away; the page remembers (2026-11-27). -->
+          <button
+            type="button"
+            class="btn-ghost"
+            :aria-expanded="showOverview"
+            aria-controls="inv-overview"
+            :title="showOverview ? 'Hide overview' : 'Show overview'"
+            @click="toggleOverview"
+          >
+            <AssetIcon :name="showOverview ? 'chevron-up' : 'chevron-down'" :size="14" />
+            <span class="btn-label">{{ showOverview ? 'Hide overview' : 'Show overview' }}</span>
+          </button>
+          <button
+            type="button"
+            class="btn-outline"
+            :disabled="refreshing"
+            :title="lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : undefined"
+            @click="refresh()"
+          >
+            <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
             Refresh
           </button>
+          <button type="button" class="btn-outline" title="Tag History" @click="openTagHistory">
+            <AssetIcon name="history" :size="14" />
+            <span class="btn-label">Tag History</span>
+          </button>
+          <NuxtLink v-if="canStockIn" to="/hospital/stock-intake" class="btn-primary">
+            <AssetIcon name="plus" :size="15" />
+            Stock Intake
+          </NuxtLink>
         </div>
       </header>
 
@@ -36,53 +59,50 @@
         </span>
       </p>
 
-      <!-- ============ KPI ROW ============ -->
-      <section class="kpi-row" aria-label="Inventory at a glance">
-        <component
-          :is="kpi.to ? NuxtLinkComponent : kpi.onClick ? 'button' : 'div'"
-          v-for="kpi in kpis"
-          :key="kpi.key"
-          v-bind="kpi.to ? { to: kpi.to } : kpi.onClick ? { type: 'button' } : {}"
-          class="kpi"
-          :class="[`tone--${kpi.tone}`, { 'kpi--action': kpi.to || kpi.onClick }]"
-          @click="kpi.onClick ? kpi.onClick() : undefined"
-        >
-          <span class="kpi__icon" aria-hidden="true">
-            <AssetIcon :name="kpi.icon" :size="20" />
-          </span>
-          <span class="kpi__body">
-            <span class="kpi__label">{{ kpi.label }}</span>
-            <span v-if="loading" class="sk sk--figure" />
-            <span v-else class="kpi__value">{{ kpi.value }}</span>
-            <span class="kpi__sub" :class="{ 'kpi__sub--up': kpi.rising, 'sk kpi__sub--loading': loading }">
-              <AssetIcon v-if="kpi.rising" name="trending-up" :size="13" />
-              {{ kpi.sub }}
-            </span>
-          </span>
-          <AssetIcon v-if="kpi.to || kpi.onClick" name="chevron-right" :size="16" class="kpi__chevron" />
-        </component>
-      </section>
+      <!-- ============ OVERVIEW: three chart cards (project owner, 2026-11-27, option A) ============ -->
+      <!-- The shelf by type, where bags stand and what expires; each filters the list below. -->
+      <HospitalInventoryOverview
+        v-show="showOverview"
+        id="inv-overview"
+        ref="overview"
+        :loading="loading"
+        :thresholds="thresholds"
+        :totals="totals"
+        :selected-type-id="filters.bloodTypeId"
+        :selected-status="filters.expiryRisk ? '' : filters.status"
+        @select-type="toggleTypeFilter"
+        @select-status="onOverviewStatus"
+        @show-expiring="showExpiringInList"
+      />
+      <p v-if="!showOverview" class="ov-line" aria-label="Inventory at a glance">
+        <button type="button" class="ov-line__item" @click="onOverviewStatus('available')">
+          <strong>{{ summary ? formatCount(totals.available || 0) : '–' }}</strong> available
+        </button>
+        <span class="ov-line__sep" aria-hidden="true">·</span>
+        <button type="button" class="ov-line__item" :class="{ 'ov-line__item--warn': expiringSoonCount > 0 }" @click="showExpiringInList">
+          <strong>{{ summary ? formatCount(expiringSoonCount) : '–' }}</strong> expiring in 7 days
+        </button>
+        <span class="ov-line__sep" aria-hidden="true">·</span>
+        <button type="button" class="ov-line__item" @click="onOverviewStatus('tagged')">
+          <strong>{{ summary ? formatCount((totals.tag_assigned || 0) + (totals.tag_crossmatched || 0)) : '–' }}</strong> tagged
+        </button>
+        <span class="ov-line__sep" aria-hidden="true">·</span>
+        <button type="button" class="ov-line__item" :class="{ 'ov-line__item--warn': (totals.pending_return || 0) > 0 }" @click="onOverviewStatus('pending_return')">
+          <strong>{{ summary ? formatCount(totals.pending_return || 0) : '–' }}</strong> pending return
+        </button>
+      </p>
 
       <!-- Every shelf under its critical level, by name; hidden when none is. -->
       <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" />
 
-      <div class="inv-grid" :class="{ 'inv-grid--no-types': !loading && !thresholds }">
-        <!-- ============ BLOOD TYPE AVAILABILITY ============ -->
-        <HospitalBloodTypeAvailability
-          v-if="loading || thresholds"
-          class="types-panel"
-          :thresholds="thresholds"
-          filterable
-          :selected-id="filters.bloodTypeId"
-          @select="toggleTypeFilter"
-        />
+      <div class="inv-grid">
 
         <!-- ============ EXPIRING SOON ============ -->
         <aside class="panel side-panel expiring-panel" aria-labelledby="expiring-title">
           <header class="side-head">
             <h2 id="expiring-title" class="side-title">
               <span class="side-title__icon"><AssetIcon name="clock" :size="15" /></span>
-              Expiring Soon
+              Use first
             </h2>
             <button type="button" class="link-btn" @click="showExpiringInList">View All</button>
           </header>
@@ -96,65 +116,62 @@
             <AssetIcon name="check-circle" :size="22" />
             Nothing on the shelf expires in the next 7 days.
           </p>
-          <table v-else class="mini-table" :class="{ 'mini-table--loading': loading }">
-            <thead>
-              <tr>
-                <th>Bag / Blood Type</th>
-                <th>Expiry Date</th>
-                <th>Remaining</th>
-                <th><span class="sr-only">Open</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <SkeletonRows v-if="loading" :columns="4" :rows="shape.expiring" />
-              <tr
-                v-for="row in (loading ? [] : expiringUnits)"
-                :key="row.id"
-                class="mini-row"
-                tabindex="0"
+          <!-- The bags to use first, as the dashboard lists them (2026-11-26): type, component and bag, then how long is left. -->
+          <ol v-else-if="loading" class="use-first" aria-busy="true">
+            <li v-for="n in shape.expiring" :key="n" class="use-first__row use-first__row--sk">
+              <span class="sk use-first__sk-type" />
+              <span class="use-first__main"><span class="sk sk--line" style="width: 60%" /><span class="sk sk--line" style="width: 40%" /></span>
+              <span class="sk use-first__sk-when" />
+            </li>
+          </ol>
+          <ol v-else class="use-first">
+            <li v-for="row in expiringUnits" :key="row.id">
+              <button
+                type="button"
+                class="use-first__row"
                 :aria-label="`${bagLabel(row)}, ${row.blood_type?.code} ${row.component?.name}, ${daysLeftLabel(row.days_remaining)}. Open details`"
                 @click="openDetails(row)"
-                @keydown.enter.self="openDetails(row)"
               >
-                <td>
-                  <span class="mini-row__id mono">{{ bagLabel(row) }}</span>
-                  <span class="type-chip">{{ displayType(row.blood_type?.code) }}</span>
-                </td>
-                <td class="num">{{ row.expiry_date }}</td>
-                <td>
-                  <span class="badge" :class="row.days_remaining <= 3 ? 'tone--danger' : 'tone--warning'">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ daysLeftLabel(row.days_remaining) }}
-                  </span>
-                </td>
-                <td class="mini-row__chevron"><AssetIcon name="chevron-right" :size="15" /></td>
-              </tr>
-            </tbody>
-          </table>
+                <span class="use-first__type">{{ displayType(row.blood_type?.code) }}</span>
+                <span class="use-first__main">
+                  <span class="use-first__name">{{ row.component?.name || 'Component' }}</span>
+                  <span class="use-first__bag mono">{{ bagLabel(row) }} · {{ row.expiry_date }}</span>
+                </span>
+                <span class="use-first__when" :class="{ 'use-first__when--soon': row.days_remaining <= 3 }">{{ daysLeftLabel(row.days_remaining) }}</span>
+              </button>
+            </li>
+          </ol>
         </aside>
 
         <!-- ============ INVENTORY LIST ============ -->
         <section ref="listSection" class="panel list-panel" aria-labelledby="list-title">
+          <!-- Tag History and Stock Intake moved up to the page's own actions (2026-11-27). -->
           <header class="panel-head">
-            <div>
-              <h2 id="list-title" class="panel-title">Inventory List</h2>
-            </div>
-            <div class="panel-head__actions">
-              <button type="button" class="btn-outline" @click="openTagHistory">
-                <AssetIcon name="history" :size="14" />
-                Tag History
-              </button>
-              <NuxtLink v-if="canStockIn" to="/hospital/stock-intake" class="btn-primary">
-                <AssetIcon name="plus" :size="15" />
-                Stock Intake
-              </NuxtLink>
-            </div>
+            <h2 id="list-title" class="panel-title">Bags</h2>
           </header>
+
+          <!-- Where the bags stand, one click each, with how many (2026-11-26). -->
+          <div class="status-tabs" role="group" aria-label="Show bags by status">
+            <button
+              v-for="tab in statusTabs"
+              :key="tab.value || 'all'"
+              type="button"
+              class="status-tab"
+              :class="[`status-tab--${tab.tone}`, { 'status-tab--on': filters.status === tab.value && !filters.expiryRisk }]"
+              :aria-pressed="filters.status === tab.value && !filters.expiryRisk"
+              @click="setStatusTab(tab.value)"
+            >
+              <span class="status-tab__dot" aria-hidden="true" />
+              {{ tab.label }}
+              <span class="status-tab__count">{{ summary ? formatCount(tab.count) : '–' }}</span>
+            </button>
+          </div>
 
           <div class="list-filters">
             <label class="search-field">
               <AssetIcon name="search" :size="15" class="search-field__icon" />
               <input
+                ref="searchInput"
                 v-model="filters.search"
                 type="search"
                 class="search-field__input"
@@ -164,34 +181,21 @@
               />
             </label>
 
-            <label class="filter-field">
-              <span class="filter-field__label">Blood Type</span>
-              <SelectField v-model="filters.bloodTypeId" size="sm" aria-label="Blood type"
-                :options="[{ value: '', label: 'All' }, ...bloodTypeOptions.map(t => ({ value: t.id, label: displayType(t.code) }))]" />
-            </label>
+            <!-- One compact row: each control says what it filters in its own value (2026-11-26). -->
+            <SelectField v-model="filters.bloodTypeId" class="filter-select" size="sm" aria-label="Blood type"
+              :options="[{ value: '', label: 'All blood types' }, ...bloodTypeOptions.map(t => ({ value: t.id, label: displayType(t.code) }))]" />
 
-            <label class="filter-field">
-              <span class="filter-field__label">Component</span>
-              <SelectField v-model="filters.componentId" size="sm" aria-label="Component"
-                :options="[{ value: '', label: 'All' }, ...componentOptions.map(c => ({ value: c.id, label: c.name }))]" />
-            </label>
+            <SelectField v-model="filters.componentId" class="filter-select filter-select--wide" size="sm" aria-label="Component"
+              :options="[{ value: '', label: 'All components' }, ...componentOptions.map(c => ({ value: c.id, label: c.name }))]" />
 
-            <label class="filter-field">
-              <span class="filter-field__label">Expiry Risk</span>
-              <SelectField v-model="filters.expiryRisk" size="sm" aria-label="Expiry risk"
-                :options="[{ value: '', label: 'All' }, { value: '3', label: 'Within 3 days' }, { value: '7', label: 'Within 7 days' }, { value: 'expired', label: 'Expired' }]"
-                @change="onExpiryRiskChange" />
-            </label>
+            <SelectField v-model="filters.expiryRisk" class="filter-select" size="sm" aria-label="Expiry risk"
+              :options="[{ value: '', label: 'Any expiry' }, { value: '3', label: 'Within 3 days' }, { value: '7', label: 'Within 7 days' }, { value: 'expired', label: 'Expired' }]"
+              @change="onExpiryRiskChange" />
 
-            <label class="filter-field">
-              <span class="filter-field__label">Status</span>
-              <SelectField v-model="filters.status" size="sm" aria-label="Status"
-                :options="[{ value: '', label: 'All' }, ...STATUS_OPTIONS]" @change="onStatusChange" />
-            </label>
-
-            <button type="button" class="clear-btn" :disabled="!hasActiveFilters" @click="clearFilters">
-              <AssetIcon name="refresh-cw" :size="13" />
-              Clear Filters
+            <!-- The status is the tabs above, every status among them (2026-11-27). -->
+            <button v-if="hasActiveFilters" type="button" class="clear-btn" @click="clearFilters">
+              <AssetIcon name="x" :size="13" />
+              Clear filters
             </button>
           </div>
 
@@ -201,29 +205,28 @@
             <table v-if="unitRows.length || (unitsLoading && shape.units)" class="unit-table" :class="{ 'unit-table--loading': !unitRows.length }">
               <thead>
                 <tr>
-                  <th>Bag</th>
-                  <th>Blood Type</th>
-                  <th>Component</th>
+                  <!-- Bag sorts newest arrival first; Expires, first to expire (2026-11-27). -->
                   <th :aria-sort="filters.sort === 'recent' ? 'descending' : 'none'">
-                    <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sort === 'recent' }" @click="filters.sort = 'recent'">
-                      Received
+                    <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sort === 'recent' }" title="Newest arrival first" @click="filters.sort = 'recent'">
+                      Bag
                       <AssetIcon v-if="filters.sort === 'recent'" name="chevron-down" :size="12" />
                     </button>
                   </th>
+                  <th>Type</th>
+                  <th>Component</th>
                   <th :aria-sort="filters.sort === 'fefo' ? 'ascending' : 'none'">
                     <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sort === 'fefo' }" @click="filters.sort = 'fefo'">
-                      Expiry Date
+                      Expires
                       <AssetIcon v-if="filters.sort === 'fefo'" name="chevron-up" :size="12" />
                     </button>
                   </th>
-                  <th>Remaining Days</th>
                   <th>Location</th>
                   <th>Status</th>
                   <th class="actions-col"><span class="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
-                <SkeletonRows v-if="!unitRows.length" :columns="9" :rows="shape.units" />
+                <SkeletonRows v-if="!unitRows.length" :columns="7" :rows="shape.units" />
                 <tr
                   v-for="(row, index) in unitRows"
                   :key="row.id"
@@ -235,21 +238,21 @@
                   @keydown.enter.self="openDetails(row)"
                 >
                   <td>
-                    <span class="mono">{{ bagLabel(row) }}</span>
+                    <span class="mono" :title="row.received_at ? `Received ${formatDay(row.received_at)}` : undefined">{{ bagLabel(row) }}</span>
                     <span v-if="row.source?.transfusion_reference" class="cell-sub">for {{ row.source.transfusion_reference }}</span>
                     <span v-else-if="row.source?.direct_distribution" class="cell-sub">from {{ row.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
                   </td>
                   <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type?.code) }}</span></td>
                   <td class="wrap-cell">{{ row.component?.name || '—' }}</td>
-                  <td class="num">{{ formatDay(row.received_at) }}</td>
-                  <td class="num" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</td>
-                  <td>
+                  <!-- The date, and under it how long is left (2026-11-26: one column, not two). -->
+                  <td class="expires-cell">
+                    <span class="num expires-cell__date" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</span>
                     <span class="days" :class="[`tone--${row.remaining.tone}`, { 'days--pill': row.remaining.tone === 'warning' || row.remaining.tone === 'danger' }]">{{ row.remaining.label }}</span>
                   </td>
                   <td class="wrap-cell" :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</td>
                   <!-- The status, and under it the patient a tag holds the bag for, with its deadline. -->
                   <td class="status-cell">
-                    <span class="badge" :class="`tone--${row.tag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ row.tag.label }}</span>
+                    <span class="status-pill" :class="`tone--${row.tag.tone}`">{{ row.tag.label }}</span>
                     <template v-if="row.active_tag">
                       <span class="patient">{{ row.active_tag.patient.full_name }}</span>
                       <span
@@ -876,7 +879,7 @@ import { resolveComponent } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import SelectField from '~/components/common/SelectField.vue'
-import HospitalBloodTypeAvailability from '~/components/Hospital/BloodTypeAvailability.vue'
+import HospitalInventoryOverview from '~/components/Hospital/InventoryOverview.vue'
 import HospitalTagUnitDialog from '~/components/Hospital/TagUnitDialog.vue'
 import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -897,7 +900,6 @@ import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })
 
-const NuxtLinkComponent = resolveComponent('NuxtLink')
 
 /** What each bag action is called and drawn with, in the menu and the drawer. */
 const ACTIONS = {
@@ -1051,64 +1053,6 @@ const typesBelowMinimum = computed(() => (thresholds.value?.blood_types ?? [])
   .filter(({ code }) => ['low', 'critical'].includes(typeHealthByCode(stockCells.value, code)))
   .length)
 
-const kpis = computed(() => {
-  const added = summary.value?.stocked_last_7_days ?? 0
-  const assigned = totals.value.tag_assigned ?? 0
-  const crossmatched = totals.value.tag_crossmatched ?? 0
-  const pending = totals.value.pending_return ?? 0
-
-  return [
-    {
-      key: 'available',
-      label: 'Total Available Units',
-      value: formatCount(availableTotal.value),
-      sub: added > 0 ? `+${formatCount(added)} stocked in 7 days` : 'None stocked in 7 days',
-      rising: added > 0,
-      icon: 'blood-drop',
-      tone: 'neutral',
-    },
-    {
-      key: 'critical',
-      label: 'Critical Low Stock',
-      value: anyMinimumSet.value ? formatCount(typesBelowMinimum.value) : '—',
-      sub: anyMinimumSet.value
-        ? `type${typesBelowMinimum.value === 1 ? '' : 's'} below critical level`
-        : 'No critical levels set',
-      icon: 'triangle-alert',
-      // State rides on the icon alone: every card shares one surface.
-      tone: !anyMinimumSet.value ? 'muted' : typesBelowMinimum.value > 0 ? 'danger' : 'success',
-      to: '/hospital/stock-thresholds',
-    },
-    {
-      key: 'expiring',
-      label: 'Expiring Soon',
-      value: formatCount(summary.value?.near_expiry?.within_7_days),
-      sub: 'units (≤ 7 days)',
-      icon: 'clock',
-      tone: Number(summary.value?.near_expiry?.within_7_days) > 0 ? 'warning' : 'neutral',
-      onClick: showExpiringInList,
-    },
-    {
-      key: 'tagged',
-      label: 'Tagged to Patients',
-      value: summary.value ? formatCount(assigned + crossmatched) : '—',
-      sub: `${formatCount(crossmatched)} of them crossmatched`,
-      icon: 'user-check',
-      tone: 'neutral',
-      onClick: () => showStatusInList('tagged'),
-    },
-    {
-      key: 'pending',
-      label: 'Pending Return',
-      value: formatCount(totals.value.pending_return),
-      sub: 'out of storage, untagged',
-      icon: 'refresh-cw',
-      // Bags someone has to confirm back or discard.
-      tone: pending > 0 ? 'warning' : 'neutral',
-      onClick: () => showStatusInList('pending_return'),
-    },
-  ]
-})
 
 // --- Inventory list (server-paginated) ---
 const PAGE_SIZE = 8
@@ -1224,6 +1168,39 @@ function onStatusChange() {
   if (filters.status) filters.expiryRisk = ''
 }
 
+/** The status tabs over the list: the states staff work with, with their counts. */
+const statusTabs = computed(() => {
+  const t = totals.value
+  const n = (key) => Number(t[key]) || 0
+  const tagged = n('tag_assigned') + n('tag_crossmatched')
+  // "All" lists every status, so it counts every status.
+  const all = Object.values(t).reduce((sum, v) => sum + (Number(v) || 0), 0)
+  return [
+    { value: '', label: 'All', count: all, tone: 'neutral' },
+    { value: 'available', label: 'Available', count: n('available'), tone: 'success' },
+    { value: 'tagged', label: 'Tagged', count: tagged, tone: 'info' },
+    { value: 'pending_return', label: 'Pending return', count: n('pending_return'), tone: 'warning' },
+    { value: 'received', label: 'To stock in', count: n('received'), tone: 'purple' },
+    { value: 'expired', label: 'Expired', count: n('expired'), tone: 'danger' },
+    // The rarer states, once a bag is in one (or the list is showing it), so every status stays one click away.
+    ...[
+      { value: 'partner_reserved', label: 'Reserved for partner', tone: 'neutral' },
+      { value: 'transfused', label: 'Transfused', tone: 'neutral' },
+      { value: 'discarded', label: 'Discarded', tone: 'neutral' },
+    ]
+      .map((tab) => ({ ...tab, count: n(tab.value) }))
+      .filter((tab) => tab.count > 0 || filters.status === tab.value),
+  ]
+})
+/** From the overview's status legend: the same status again shows them all. */
+function onOverviewStatus(value) {
+  if (filters.status === value && !filters.expiryRisk) setStatusTab('')
+  else showStatusInList(value)
+}
+function setStatusTab(value) {
+  Object.assign(filters, { status: value, expiryRisk: '' })
+}
+
 function toggleTypeFilter(card) {
   filters.bloodTypeId = filters.bloodTypeId === card.id ? '' : card.id
 }
@@ -1315,6 +1292,18 @@ function rowAction(action, row) {
 }
 
 // --- Bag details drawer ---
+// The chart cards at the top; Refresh reloads their expiring chart too.
+const overview = ref(null)
+// Shown or put away, remembered in this browser only (a convenience; it never has to persist).
+const OVERVIEW_KEY = 'redagos:hospital-inventory-overview'
+const showOverview = ref(true)
+function toggleOverview() {
+  showOverview.value = !showOverview.value
+  try { localStorage.setItem(OVERVIEW_KEY, showOverview.value ? 'shown' : 'hidden') } catch { /* storage blocked */ }
+}
+const expiringSoonCount = computed(() => Number(summary.value?.near_expiry?.within_7_days) || 0)
+// The list is the page's work: its search takes the cursor when the page opens.
+const searchInput = ref(null)
 const drawerUnit = ref(null)
 const drawerHistory = ref([])
 const drawerHistoryLoading = ref(false)
@@ -1692,7 +1681,7 @@ async function refresh({ quiet = true } = {}) {
   if (refreshing.value) return
   refreshing.value = true
   try {
-    await Promise.all([loadSummary(), loadOverview(), loadUnits(unitsMeta.page, { quiet })])
+    await Promise.all([loadSummary(), loadOverview(), loadUnits(unitsMeta.page, { quiet }), overview.value?.reload()])
     lastUpdated.value = new Date()
   } finally {
     refreshing.value = false
@@ -1717,6 +1706,9 @@ let pollTimer = null
 let ticker = null
 
 onMounted(async () => {
+  try { showOverview.value = localStorage.getItem(OVERVIEW_KEY) !== 'hidden' } catch { /* storage blocked: shown */ }
+  // Ready to type a bag number, unless something else already has the cursor.
+  if (!document.activeElement || document.activeElement === document.body) searchInput.value?.focus({ preventScroll: true })
   readShape()
   if (startTagStatus || startUntagReason) openTagHistory()
   await loadReference()
@@ -1873,10 +1865,21 @@ onBeforeUnmount(() => {
 }
 
 /* Header */
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
+.page-head > :first-child { min-width: 0; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--inv-text); margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--inv-muted); margin: 4px 0 0; }
-.page-head__meta { display: flex; align-items: center; gap: 12px; }
+.page-head__meta { display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.page-head__meta > * { flex: none; white-space: nowrap; }
+/* Short of room (a wide sidebar, a narrow window): the two quieter actions keep their icon and tooltip. */
+@container inv (max-width: 820px) {
+  .page-head__meta .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* A phone: the actions go under the title, as every portal page does. */
+@media (max-width: 640px) {
+  .page-head { grid-template-columns: minmax(0, 1fr); }
+  .page-head__meta { flex-wrap: wrap; justify-content: flex-start; }
+}
 .live-note { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--inv-muted); }
 .live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok-fill); box-shadow: 0 0 0 3px color-mix(in srgb, var(--inv-ok-fill) 22%, transparent); }
 
@@ -1924,31 +1927,7 @@ onBeforeUnmount(() => {
 .link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
 .link-btn:focus-visible { border-radius: 4px; }
 
-/* Summary cards: one surface, one shape. Only the icon takes a state colour. */
-.kpi-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.kpi {
-  position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; min-height: 88px;
-  padding: 16px 30px 16px 16px; border-radius: 12px; border: 1px solid var(--inv-border); background: var(--inv-surface);
-  color: var(--inv-text); font: inherit; text-align: left; text-decoration: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.kpi--action { cursor: pointer; }
-.kpi--action:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); box-shadow: 0 4px 14px rgba(var(--rb-shadow-rgb, 15, 23, 42), 0.06); }
-.kpi__icon {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone);
-}
-.kpi.tone--neutral .kpi__icon { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
-.kpi.tone--muted .kpi__icon { background: var(--inv-elevated); color: var(--inv-faint); }
-.kpi__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.kpi__label { font-size: 12.5px; font-weight: 500; color: var(--inv-muted); }
-.kpi__value { font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-text); font-variant-numeric: tabular-nums; }
-.kpi__sub { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--inv-muted); }
-.kpi__sub--up :deep(svg) { color: var(--inv-ok); }
 /* Holds the wording's place and height without saying anything yet. */
-.kpi__sub--loading { width: fit-content; color: transparent; border-radius: 6px; }
-.kpi__sub--loading :deep(svg) { visibility: hidden; }
-.kpi__body .sk--figure { height: 31px; }
 
 /* Loading rows stand as tall as the rows they become. SkeletonRows draws its
    own cells, so these reach it with :deep. */
@@ -1956,25 +1935,19 @@ onBeforeUnmount(() => {
 .side-empty .sk--line { margin-block: 3.5px; }
 .empty-state__sk-mark { width: 36px; height: 36px; border-radius: 10px; }
 .empty-state--sk { min-height: 232px; }
-.mini-table--loading :deep(td) { height: 64px; padding: 0 8px; border-bottom: 1px solid var(--inv-border-soft); }
-.mini-table--loading :deep(td:first-child) { padding-left: 16px; }
-.mini-table--loading :deep(tr:last-child td) { border-bottom: none; }
 .unit-table--loading :deep(td) { height: 67px; padding: 0 12px; border-bottom: 1px solid var(--inv-border-soft); }
 .unit-table--loading :deep(td:first-child) { padding-left: 18px; }
 .activity-item__sk { justify-content: center; gap: 8px; min-height: 40px; }
 .history-list__sk { flex: 1; gap: 8px; padding-top: 4px; }
-.kpi__chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--inv-faint); }
-.kpi--action:hover .kpi__chevron { color: var(--inv-action-text); }
 
-/* Main grid: the centre's two columns, stacking once the page narrows. */
+/* Main grid (2026-11-27, option A): the list wide on the left; the bags to
+   use first and the recent activity in a column on its right. */
 .inv-grid {
-  display: grid; gap: 16px; align-items: stretch;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-areas: "types expiring" "list activity";
+  display: grid; gap: 16px; align-items: start;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-areas: "list expiring" "list activity";
+  grid-template-rows: auto 1fr;
 }
-/* The thresholds failed to load, so there are no type cards to place. */
-.inv-grid--no-types { grid-template-areas: "list expiring" "list activity"; }
-.types-panel { grid-area: types; min-width: 0; }
 .expiring-panel { grid-area: expiring; }
 .list-panel { grid-area: list; }
 .activity-panel { grid-area: activity; }
@@ -2010,19 +1983,6 @@ onBeforeUnmount(() => {
   font-size: 12.5px; color: var(--inv-muted); text-align: center;
 }
 
-.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.mini-table th {
-  text-align: left; font-size: 11.5px; font-weight: 500; color: var(--inv-muted); padding: 9px 8px;
-  border-bottom: 1px solid var(--inv-border); white-space: nowrap;
-}
-.mini-table th:first-child, .mini-table td:first-child { padding-left: 16px; }
-.mini-table td { padding: 11px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); vertical-align: middle; }
-.mini-table tr:last-child td { border-bottom: none; }
-.mini-row { cursor: pointer; transition: background 0.12s ease; }
-.mini-row:hover { background: var(--inv-hover); }
-.mini-row:focus-visible { outline-offset: -2px; }
-.mini-row__id { display: block; font-size: 11.5px; margin-bottom: 4px; white-space: nowrap; }
-.mini-row__chevron { width: 24px; color: var(--inv-faint); }
 
 .type-chip {
   display: inline-flex; padding: 0 6px; border-radius: 4px; border: 1px solid var(--inv-border);
@@ -2049,7 +2009,32 @@ onBeforeUnmount(() => {
 .activity-item__when span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Inventory list */
-.list-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 0 18px 14px; }
+/* Status tabs over the list (2026-11-26): a dot in each state's tone, the count beside it. */
+.status-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 12px; }
+.status-tab {
+  --tab: var(--inv-muted);
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 6px 0 12px;
+  border: 1px solid var(--inv-border); border-radius: 999px; background: var(--inv-surface);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--inv-muted); cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.status-tab--success { --tab: var(--rb-success); }
+.status-tab--info { --tab: var(--rb-primary); }
+.status-tab--warning { --tab: var(--rb-warning); }
+.status-tab--danger { --tab: var(--rb-accent); }
+.status-tab--purple { --tab: var(--rb-purple, #7C3AED); }
+.status-tab:hover { color: var(--inv-text); border-color: var(--rb-border-strong); }
+.status-tab__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--tab); }
+.status-tab__count {
+  min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--inv-elevated);
+  font-size: 11.5px; font-weight: 700; text-align: center; color: var(--inv-text); font-variant-numeric: tabular-nums;
+}
+.status-tab--on { border-color: color-mix(in srgb, var(--tab) 55%, transparent); background: color-mix(in srgb, var(--tab) 9%, var(--inv-surface)); color: var(--inv-text); }
+.status-tab--on .status-tab__count { background: var(--tab); color: #FFFFFF; }
+
+.list-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 18px 14px; }
+.filter-select { flex: 0 1 160px; min-width: 130px; }
+.filter-select--wide { flex-basis: 190px; }
 .search-field { position: relative; flex: 1 1 220px; min-width: 200px; }
 .search-field__icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--inv-muted); pointer-events: none; }
 .search-field__input {
@@ -2091,6 +2076,59 @@ onBeforeUnmount(() => {
 .cell-sub { display: block; margin-top: 3px; font-size: 11.5px; color: var(--inv-muted); }
 .cell-muted { color: var(--inv-muted) !important; }
 .ink-danger { color: var(--inv-crit) !important; }
+/* Expiring Soon: the bags to use first (2026-11-26). */
+.use-first { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 4px 16px 16px; list-style: none; }
+.use-first__row {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%;
+  padding: 9px 12px; border: 1px solid transparent; border-radius: 10px; background: var(--inv-elevated);
+  font: inherit; text-align: left; color: inherit; cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
+}
+.use-first__row:hover { border-color: rgba(var(--rb-warning-rgb), .45); background: rgba(var(--rb-warning-rgb), .06); }
+.use-first__row--sk { cursor: default; }
+.use-first__type {
+  display: inline-flex; justify-content: center; padding: 2px 0; border-radius: 999px;
+  border: 1px solid rgba(var(--rb-accent-rgb), .35); background: rgba(var(--rb-accent-rgb), .07);
+  font-size: 12px; font-weight: 700; color: var(--rb-accent-text);
+}
+.use-first__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.use-first__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--inv-text); }
+.use-first__bag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--inv-muted); }
+.use-first__when { padding: 2px 9px; border-radius: 999px; background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.use-first__when--soon { background: rgba(var(--rb-accent-rgb), .12); color: var(--rb-accent-text); }
+.use-first__sk-type { width: 44px; height: 22px; border-radius: 999px; }
+.use-first__sk-when { width: 64px; height: 22px; border-radius: 999px; }
+
+/* Hide / Show overview: a quiet button beside the page's actions (2026-11-27). */
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-radius: 9px;
+  background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--inv-muted); cursor: pointer;
+}
+.btn-ghost:hover { background: var(--inv-hover); color: var(--inv-text); }
+.btn-ghost:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* The overview put away: one line of figures, each a filter. */
+.ov-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 0; padding: 10px 14px;
+  border: 1px solid var(--inv-border); border-radius: 12px; background: var(--inv-surface); font-size: 13px; color: var(--inv-muted);
+}
+.ov-line__item { padding: 2px 6px; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; cursor: pointer; }
+.ov-line__item strong { font-weight: 800; color: var(--inv-text); font-variant-numeric: tabular-nums; }
+.ov-line__item:hover { background: var(--inv-hover); color: var(--inv-text); }
+.ov-line__item:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.ov-line__item--warn, .ov-line__item--warn strong { color: var(--rb-warning-text); }
+.ov-line__sep { color: var(--inv-faint); }
+
+/* Status in the list: a tinted pill in its tone (2026-11-27). */
+.status-pill {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--tone-fill, var(--inv-muted)) 14%, transparent);
+  color: var(--tone, var(--inv-text)); font-size: 12px; font-weight: 700;
+}
+
+/* Expires: the date over how long is left. */
+.expires-cell { white-space: nowrap; }
+.expires-cell__date { display: block; font-size: 13px; color: var(--inv-text); }
+.expires-cell .days { display: inline-flex; margin-top: 3px; font-size: 12px; }
 .days { font-variant-numeric: tabular-nums; color: var(--tone); }
 .days.tone--warning, .days.tone--danger { font-weight: 600; }
 .days.tone--neutral { color: var(--inv-text); }
@@ -2238,26 +2276,16 @@ onBeforeUnmount(() => {
 .inventory-toast__close { border: 0; background: none; color: var(--inv-muted); cursor: pointer; display: inline-flex; padding: 0.15rem; }
 
 /* Responsive: by the width the page actually has. */
-@container inv (max-width: 1240px) {
-  .kpi { padding-left: 14px; gap: 12px; }
+/* Side by side as the preview has it down to 900px; then the list above the two cards. */
+@container inv (max-width: 900px) {
   .inv-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "types types" "list list" "expiring activity";
+    grid-template-areas: "list list" "expiring activity";
+    grid-template-rows: auto;
   }
-  .inv-grid--no-types { grid-template-areas: "list list" "expiring activity"; }
 }
-@container inv (max-width: 1040px) {
-  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .kpi-row > :first-child { grid-column: span 2; }
-}
-@container inv (max-width: 760px) {
-  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "types" "list" "expiring" "activity"; }
-  .inv-grid--no-types { grid-template-areas: "list" "expiring" "activity"; }
-}
-@container inv (max-width: 440px) {
-  .kpi-row { grid-template-columns: minmax(0, 1fr); }
-  .kpi-row > :first-child { grid-column: auto; }
+@container inv (max-width: 640px) {
+  .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "list" "expiring" "activity"; }
 }
 
 @media (max-width: 640px) {

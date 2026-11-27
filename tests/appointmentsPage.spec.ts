@@ -80,7 +80,7 @@ describe('the appointments page', () => {
     expect(page).not.toContain('time-slot-card')
     expect(page).not.toContain('Time Slots')
     for (const heading of ['ID', 'Donor', 'Date', 'Slot', 'Drive / Center', 'Status', 'Actions']) {
-      expect(page).toMatch(new RegExp(`<th scope="col" class="c-[a-z]+">${heading.replace('/', '\\/')}</th>`))
+      expect(page).toMatch(new RegExp(`<th scope="col" class="c-[a-z]+"[^>]*>${heading.replace('/', '\\/')}</th>`))
     }
     for (const control of ['Search donor / drive…', 'All statuses', 'Export', 'Refresh', 'New Appointment']) {
       expect(page).toContain(control)

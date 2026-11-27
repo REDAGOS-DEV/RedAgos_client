@@ -5,11 +5,6 @@
     </div>
 
     <div v-else class="sheet-inner">
-      <NuxtLink to="/blood-center/paper-records" class="back-link">
-        <AssetIcon name="arrow-left" :size="14" />
-        Paper Records
-      </NuxtLink>
-
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
         <p class="banner__text">{{ loadError }}</p>
@@ -18,6 +13,7 @@
 
       <template v-if="sheet">
         <header class="sheet-head">
+          <BackButton to="/blood-center/paper-records" label="Paper Records" class="sheet-back" />
           <div class="sheet-head__main">
             <p class="eyebrow">
               <span class="code">{{ sheet.code }}</span>
@@ -185,6 +181,7 @@
 
 <script setup>
 import PageSkeleton from '~/components/ui/PageSkeleton.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donationTone } from '~/utils/donationRecords'
@@ -338,17 +335,6 @@ onBeforeUnmount(() => {
 
 /* The way back to the page above, as on the drive roster: no breadcrumb
    in any portal (project owner, 2026-11-19). */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--rb-text-primary); }
 
 .sr-only {
   position: absolute;
@@ -383,7 +369,9 @@ onBeforeUnmount(() => {
 
 /* ---------- Header ---------- */
 .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; }
-.sheet-head__main { min-width: 0; }
+.sheet-head__main { min-width: 0; flex: 1 1 auto; }
+/* The way back (ui/BackButton) beside the heading. */
+.sheet-head > .sheet-back { align-self: flex-start; margin-right: -8px; }
 .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; overflow-wrap: anywhere; }
 .page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }

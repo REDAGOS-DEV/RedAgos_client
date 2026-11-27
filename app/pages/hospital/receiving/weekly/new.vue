@@ -1,11 +1,8 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <NuxtLink to="/hospital/receiving/weekly" class="back-link back-link--narrow">
-        <AssetIcon name="arrow-left" :size="14" />
-        Weekly Request
-      </NuxtLink>
       <PageHeader title="New weekly request">
+        <template #back><BackButton to="/hospital/receiving/weekly" label="Weekly Request" /></template>
         <template #subtitle>Ask a blood center for this week's restock. It supplies what it can — you may be sent all, part or none of what you ask for — and only the units you actually receive are added to your inventory.</template>
       </PageHeader>
 
@@ -157,6 +154,7 @@
 
 <script setup>
 import PageHeader from '~/components/ui/PageHeader.vue'
+import BackButton from '~/components/ui/BackButton.vue'
 /**
  * Sending a blood center this week's restock.
  *
@@ -321,10 +319,7 @@ function formatDay(value) {
 .rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; margin-bottom: 6px; }
-.back-link:hover { text-decoration: underline; }
 /* Sits just above the title, not a full gap away, and only as wide as its words. */
-.rcv-inner > .back-link { align-self: flex-start; margin-bottom: -10px; }
 .page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 76ch; }
 
