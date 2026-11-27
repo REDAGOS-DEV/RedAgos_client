@@ -10,6 +10,7 @@ import {
   breakdownPayload,
   breakdownSummary,
   componentChips,
+  componentCodes,
   correctionLockText,
   editableBags,
   handoverBlockedText,
@@ -65,6 +66,15 @@ describe('how a processed row reads', () => {
     // A legacy row's count, and a row the server sent no code for, still read.
     expect(componentChips([{ component: 'Platelets', code: null, quantity: 3 }])).toEqual([{ code: 'Platelets', name: 'Platelets', count: 3 }])
     expect(componentChips(null)).toEqual([])
+  })
+
+  it('reads the breakdown in the row as plain codes, a repeat as ×N (project owner, 2026-11-28)', () => {
+    expect(componentCodes([
+      { component: 'Packed RBC', code: 'PRBC', quantity: 1 },
+      { component: 'Fresh Frozen Plasma', code: 'FFP', quantity: 1 },
+      { component: 'Packed RBC', code: 'PRBC', quantity: 1 },
+    ])).toBe('PRBC ×2, FFP')
+    expect(componentCodes(null)).toBe('')
   })
 
   it('names a bag by its volume, or by its count when no volume was kept', () => {
@@ -146,6 +156,17 @@ describe('the Processed page', () => {
   it('is its own sidebar page under Processing, and the link asks what the page does', () => {
     expect(page).toContain("requires: 'lab.record_components'")
     expect(nav).toMatch(/label: 'Processed', path: '\/blood-center\/processed'[^}]*badge: 'handover'[^}]*requires: 'lab\.record_components'/)
+  })
+
+  it('keeps each row to one plain value per column; the unit itself holds the rest (2026-11-28)', () => {
+    expect(page).toContain('<td class="c-components" :title="breakdownSummary(row.components) || undefined">{{ componentCodes(row.components) || \'—\' }}</td>')
+    expect(page).toContain('<td class="c-status">{{ row.status_label }}</td>')
+    expect(page).toContain(`@click="openRow(row, 'view')"`)
+    // Gone from the row, kept in the dialog.
+    expect(page).not.toContain('class="c-testing"')
+    expect(page).not.toContain('class="trail"')
+    expect(page).toContain('<span class="fact__label">Bag type</span>')
+    expect(page).toContain('<span class="fact__label">Group</span>')
   })
 
   it('reads the list and its export from the processed routes', () => {

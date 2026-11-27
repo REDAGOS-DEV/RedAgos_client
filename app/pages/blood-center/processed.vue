@@ -89,14 +89,13 @@
               <!-- Processing works blind: the blood type on the bag, never the person. -->
               <th scope="col" class="c-donor">{{ canViewIdentity ? 'Donor' : 'Group' }}</th>
               <th scope="col" class="c-components">Components</th>
-              <th scope="col" class="c-testing">Testing</th>
               <th scope="col" class="c-processed" :aria-sort="sort === 'oldest' ? 'ascending' : 'descending'">
                 <button type="button" class="th-sort" @click="toggleSort">
                   Processed
                   <AssetIcon :name="sort === 'oldest' ? 'chevron-up' : 'chevron-down'" :size="12" />
                 </button>
               </th>
-              <th scope="col" class="c-status">Hand-over</th>
+              <th scope="col" class="c-status">Status</th>
               <th scope="col" class="c-actions">Actions</th>
             </tr>
           </thead>
@@ -123,59 +122,22 @@
           </tbody>
 
           <tbody v-else>
-            <tr v-for="row in rows" :key="row.donation_id" class="processed-row">
-              <td class="c-id"><span class="code">{{ row.code }}</span></td>
-              <td class="c-bag">
-                <span v-if="row.bag?.barcode" class="bag">{{ row.bag.barcode }}</span>
-                <span v-else class="muted">—</span>
-                <span v-if="row.bag?.type" class="sub">{{ row.bag.type }}</span>
-              </td>
-              <td class="c-donor">
-                <template v-if="row.donor && !row.donor.blinded">
-                  <span class="donor__name">{{ row.donor.full_name }}</span>
-                  <span class="sub">{{ row.donor.donor_code }}</span>
-                </template>
-                <span v-else-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
-                <span v-else class="muted" title="Not typed yet">—</span>
-              </td>
-              <td class="c-components">
-                <!-- By the code on each bag's label; the full name is the tooltip, and the dialog lists every bag. -->
-                <span class="chips" :aria-label="breakdownSummary(row.components)">
-                  <span v-for="chip in componentChips(row.components)" :key="chip.code" class="chip" :class="`comp--${componentTone(chip.name)}`" :title="chip.name">
-                    <span class="chip__swatch" aria-hidden="true" />
-                    {{ chip.code }}<span v-if="chip.count > 1" class="chip__count">×{{ chip.count }}</span>
-                  </span>
-                </span>
-                <span class="sub sub--nowrap">
-                  {{ row.bag_count }} bag{{ row.bag_count === 1 ? '' : 's' }}<template v-if="row.processed_volume_ml"> · {{ row.processed_volume_ml }} mL</template>
-                </span>
-              </td>
-              <td class="c-testing">
-                <span class="clearances">
-                  <span class="clearance" :class="{ 'clearance--done': row.clearances?.tti }" :title="row.clearances?.tti ? 'TTI cleared' : 'TTI not cleared yet'">
-                    <AssetIcon v-if="row.clearances?.tti" name="check" :size="11" />
-                    TTI
-                  </span>
-                  <span class="clearance" :class="{ 'clearance--done': row.clearances?.immunohematology }" :title="row.clearances?.immunohematology ? 'ABO/Rh cleared' : 'ABO/Rh not cleared yet'">
-                    <AssetIcon v-if="row.clearances?.immunohematology" name="check" :size="11" />
-                    ABO/Rh
-                  </span>
-                </span>
-              </td>
-              <td class="c-processed">
-                {{ formatShortDate(row.processed_at) || '—' }}
-                <span v-if="row.processed_by" class="sub">{{ row.processed_by }}</span>
-              </td>
-              <td class="c-status">
-                <span class="state" :class="`state--${row.label_state || row.status}`">{{ row.status_label }}</span>
-                <span v-if="row.status !== 'rejected'" class="trail" :aria-label="`Step ${stepOf(row)} of 4`">
-                  <span v-for="n in 4" :key="n" class="trail__dot" :class="{ 'trail__dot--done': n <= stepOf(row) }" />
-                </span>
-                <span v-if="row.status === 'rejected' && row.rejection_reason" class="sub" :title="row.rejection_reason">{{ row.rejection_reason }}</span>
-                <span v-else-if="bookedText(row)" class="sub">{{ bookedText(row) }}</span>
-                <span v-if="row.correction_pending" class="sub sub--pending">Correction pending</span>
-              </td>
-              <td class="c-actions">
+            <!--
+              One plain value per column (project owner, 2026-11-28), as on
+              Donations: the row or its eye opens the unit, which holds the
+              rest (bag type, bags and volume, who processed it, the Testing
+              clearances, booked in, a rejection's reason, a pending correction).
+              "Awaiting testing" in Status says what the clearances did.
+            -->
+            <tr v-for="row in rows" :key="row.donation_id" class="processed-row" @click="openRow(row, 'view')">
+              <td class="c-id">{{ row.code }}</td>
+              <td class="c-bag">{{ row.bag?.barcode || '—' }}</td>
+              <td class="c-donor" :title="rowSubject(row) === '—' ? 'Not typed yet' : undefined">{{ rowSubject(row) }}</td>
+              <!-- By the code on each bag's label; the full names are the tooltip. -->
+              <td class="c-components" :title="breakdownSummary(row.components) || undefined">{{ componentCodes(row.components) || '—' }}</td>
+              <td class="c-processed">{{ formatShortDate(row.processed_at) || '—' }}</td>
+              <td class="c-status">{{ row.status_label }}</td>
+              <td class="c-actions" @click.stop>
                 <div class="row-actions">
                   <button
                     type="button"
@@ -302,13 +264,21 @@
 
             <div class="facts">
               <div class="fact">
-                <span class="fact__label">Hand-over</span>
+                <span class="fact__label">Status</span>
                 <span class="state" :class="`state--${open.row.label_state || open.row.status}`">{{ open.row.status_label }}</span>
               </div>
               <div class="fact">
                 <span class="fact__label">Processed</span>
                 <span class="fact__value">{{ formatDateTime(open.row.processed_at) }}</span>
                 <span v-if="open.row.processed_by" class="sub">{{ open.row.processed_by }}</span>
+              </div>
+              <div class="fact">
+                <span class="fact__label">Group</span>
+                <span class="fact__value">{{ open.row.donor?.blood_type || 'Not typed yet' }}</span>
+              </div>
+              <div class="fact">
+                <span class="fact__label">Bag type</span>
+                <span class="fact__value">{{ open.row.bag?.type || 'Not recorded' }}</span>
               </div>
               <div class="fact">
                 <span class="fact__label">Collected</span>
@@ -331,7 +301,7 @@
 
             <!-- Reviewing, the proposal below sets the saved bags beside the proposed ones. -->
             <div v-if="open.mode !== 'edit' && open.mode !== 'review'" class="bags">
-              <p class="bags__title">Bags ({{ open.row.bag_count }})</p>
+              <p class="bags__title">Bags ({{ open.row.bag_count }})<template v-if="open.row.processed_volume_ml"> · {{ open.row.processed_volume_ml }} mL</template></p>
               <ul class="bags__list">
                 <li v-for="bag in open.row.components" :key="bag.id ?? bag.bag_number">
                   <span class="bags__number mono">{{ bag.bag_number || '—' }}</span>
@@ -622,7 +592,7 @@ import {
   breakdownChanged,
   breakdownPayload,
   breakdownSummary,
-  componentChips,
+  componentCodes,
   correctionLockText,
   editableBags,
   handoverBlockedText,
@@ -700,7 +670,7 @@ const catalogue = ref([])
 const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 
 const PER_PAGE = 25
-const COLUMN_COUNT = 8
+const COLUMN_COUNT = 7
 
 const loading = ref(true)
 const loadError = ref('')
@@ -732,20 +702,10 @@ function formatDateTime(iso) {
   return `${formatShortDate(iso)} · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-/** How far a unit has got: 1 testing, 2 labels, 3 hand over, 4 handed over. */
-function stepOf(row) {
-  if (row.status === 'handed_over') return 4
-  return { awaiting_testing: 1, awaiting_labels: 2, labelled: 3 }[row.label_state] ?? 1
-}
-
-/** Each component's colour, as on the Processing dashboard and bench. */
-function componentTone(name) {
-  const n = String(name).toLowerCase()
-  if (n.includes('red') || n.includes('rbc') || n.includes('whole')) return 'red'
-  if (n.includes('cryo')) return 'blue'
-  if (n.includes('plasma')) return 'amber'
-  if (n.includes('platelet')) return 'purple'
-  return 'grey'
+/** The third column: the donor's name for a viewer with identity, else the blood type on the bag. */
+function rowSubject(row) {
+  if (row.donor && !row.donor.blinded) return row.donor.full_name || '—'
+  return row.donor?.blood_type || '—'
 }
 
 // The labelling rule, put away once read and remembered on this browser.
@@ -1329,15 +1289,26 @@ onBeforeUnmount(() => {
 .processed-table td:last-child { padding-right: 16px; }
 
 .processed-table tbody tr:last-child td { border-bottom: 0; }
-.processed-row { transition: background 0.12s ease; }
+.processed-row { cursor: pointer; transition: background 0.12s ease; }
 .processed-row:hover { background: var(--rb-surface-hover); }
+.processed-table tbody td.c-actions { cursor: default; }
+
+/* Plain text, one line each, as on Donations (2026-11-28); the eye or the row opens the rest. */
+.processed-table tbody td.c-id,
+.processed-table tbody td.c-bag,
+.processed-table tbody td.c-donor,
+.processed-table tbody td.c-components,
+.processed-table tbody td.c-processed,
+.processed-table tbody td.c-status {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* Every column but the breakdown is fixed, so the breakdown takes what is left. */
 .c-id { width: 112px; }
 .c-bag { width: 132px; }
-/* The blood type pill; a name only reaches here for a viewer with identity, who has none in Processing. */
+/* The blood type; a name only reaches here for a viewer with identity, who has none in Processing. */
 .c-donor { width: 72px; }
-.c-testing { width: 150px; }
 .c-processed { width: 128px; }
 .c-status { width: 156px; }
 /* View, edit (or review), the labelled hand-over and reject, with the cell's padding. */
@@ -1360,51 +1331,8 @@ onBeforeUnmount(() => {
 
 .th-sort:hover { color: var(--rb-text-primary); }
 
-.code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
 .mono { font-family: var(--rb-font-mono); letter-spacing: 0.02em; }
-.bag { display: block; font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 700; overflow-wrap: anywhere; }
-.donor__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: break-word; }
 .sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); overflow-wrap: anywhere; }
-.sub--nowrap { white-space: nowrap; overflow-wrap: normal; }
-
-/* The breakdown: one chip per component, by its bag-label code. A chip never breaks; chips wrap between them. */
-.chips { display: flex; flex-wrap: wrap; gap: 4px; }
-
-.chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 2px;
-  padding: 1px 7px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 6px;
-  background: var(--rb-surface-alt);
-  font-family: var(--rb-font-mono);
-  font-size: 11.5px;
-  font-weight: 700;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  cursor: default;
-}
-
-.chip__count { font-weight: 600; color: var(--rb-text-secondary); }
-.c-status .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sub--pending { color: var(--rb-warning-text); font-weight: 600; }
-.muted { color: var(--rb-text-secondary); }
-
-.blood {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface-alt);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
 
 .clearances { display: flex; flex-wrap: wrap; gap: 4px; }
 
@@ -1471,19 +1399,13 @@ onBeforeUnmount(() => {
 .icon-btn--review:hover:not(:disabled) { background: rgba(var(--rb-warning-rgb), 0.22); color: var(--rb-warning-text); border-color: rgba(var(--rb-warning-rgb), 0.6); }
 
 /*
- * The panel narrows as the sidebar opens. The ID goes first (the bag and the
- * dialog still name the donation) and the two clearances stack. That keeps
- * the breakdown at 150px or more, enough for its chips on two lines at most;
- * below that the table scrolls sideways rather than squeeze it, as Serology
- * Results does. The min-width is the fixed columns (796px) plus those 150px.
+ * The panel narrows as the sidebar opens: the bag and the date give a little.
+ * Below that the table scrolls sideways rather than squeeze the breakdown, as
+ * Serology Results does (the 1300px block further down sets the layout).
  */
 @container (max-width: 1120px) {
-  .c-id { display: none; }
   .c-bag { width: 116px; }
-  .c-testing { width: 100px; }
-  .c-testing .clearances { flex-direction: column; align-items: flex-start; }
   .c-processed { width: 108px; }
-  .processed-table { min-width: 984px; }
 }
 
 .skeleton {
@@ -1795,17 +1717,7 @@ onBeforeUnmount(() => {
 .header-actions { display: flex; align-items: center; gap: 14px; }
 .note-link { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
 
-/* Rows: the step trail, coloured chips, quieter waiting hand-overs. */
-.trail { display: flex; gap: 3px; margin-top: 6px; }
-.trail__dot { width: 14px; height: 4px; border-radius: 2px; background: var(--rb-border-strong); }
-.trail__dot--done { background: var(--rb-success); }
-.chip { display: inline-flex !important; align-items: center; gap: 5px; }
-.chip__swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--comp); }
-.comp--red { --comp: rgb(var(--rb-accent-rgb)); }
-.comp--amber { --comp: rgb(var(--rb-warning-rgb)); }
-.comp--purple { --comp: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
-.comp--blue { --comp: rgb(var(--rb-primary-rgb)); }
-.comp--grey { --comp: var(--rb-text-muted); }
+/* Rows: quieter waiting hand-overs. */
 .icon-btn__text { margin-left: 6px; font-size: 12.5px; font-weight: 700; }
 .icon-btn--due { display: inline-flex !important; align-items: center; width: auto !important; padding: 0 10px !important; border-color: var(--rb-primary) !important; background: var(--rb-primary) !important; color: #fff !important; }
 .icon-btn--due:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000) !important; }
@@ -1841,9 +1753,9 @@ onBeforeUnmount(() => {
 .processed-table th:last-child, .processed-table td:last-child { padding-right: 20px; }
 /* Widths grown by the extra padding, so no column loses its content. */
 .c-id { width: 100px; }
-.c-bag { width: 150px; }
+/* A 17-digit barcode on one line. */
+.c-bag { width: 176px; }
 .c-donor { width: 84px; }
-.c-testing { width: 162px; }
 .c-processed { width: 140px; }
 .c-status { width: 168px; }
 .c-actions { width: 340px; }
@@ -1861,8 +1773,6 @@ onBeforeUnmount(() => {
   .processed-table tbody td { padding: 12px 12px; }
   .processed-table th:first-child, .processed-table td:first-child { padding-left: 16px; }
   .processed-table th:last-child, .processed-table td:last-child { padding-right: 16px; }
-  /* The ID keeps its column here too (it was folded away below 1120px). */
-  .c-id { display: table-cell; }
   .c-id, .c-bag, .c-processed, .c-actions { white-space: nowrap; }
   .c-components { min-width: 150px; }
   /* Actions and ID take only what their content needs (the 1% width of an

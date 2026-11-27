@@ -167,6 +167,16 @@ export function componentChips(components: Pick<ProcessedBag, 'component' | 'cod
   return [...chips.values()]
 }
 
+/**
+ * The breakdown as the list's plain cell (project owner, 2026-11-28): the
+ * bag-label codes in declared order, a repeat as ×N ("PRBC ×2, FFP").
+ */
+export function componentCodes(components: Pick<ProcessedBag, 'component' | 'code' | 'quantity'>[] | null | undefined): string {
+  return componentChips(components)
+    .map((chip) => (chip.count > 1 ? `${chip.code} ×${chip.count}` : chip.code))
+    .join(', ')
+}
+
 /** How far Issuance has got with a unit that was handed over; null before then. */
 export function bookedText(row: Pick<ProcessedRow, 'status' | 'units_booked' | 'bag_count'>): string | null {
   if (row.status !== 'handed_over') return null

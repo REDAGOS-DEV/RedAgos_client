@@ -172,7 +172,7 @@
                   <th scope="col" class="num">Tagged</th>
                   <th scope="col">First Expiry</th>
                   <th scope="col">Needed By</th>
-                  <th scope="col">Payment</th>
+                  <th v-if="forDispatch" scope="col">Payment</th>
                 </template>
                 <template v-else>
                   <th scope="col" class="num">Dispatched</th>
@@ -223,7 +223,7 @@
                     <td class="num">{{ isOrder(request) ? '—' : taggedCount(request) }}</td>
                     <td class="nowrap">{{ firstExpiry(request) || '—' }}</td>
                     <td class="nowrap">{{ neededBy(request) ? formatWhen(neededBy(request)) : '—' }}</td>
-                    <td class="nowrap">{{ paymentLabel(request) }}</td>
+                    <td v-if="forDispatch" class="nowrap">{{ paymentLabel(request) }}</td>
                   </template>
                   <template v-else>
                     <td class="num">{{ request.fulfilled_quantity ?? 0 }}</td>
@@ -689,7 +689,8 @@ const tabs = [
 
 // Request Fulfillment and For Dispatch's first tab: units still to go out.
 const awaitingRelease = computed(() => activeTab.value === 'awaiting_release')
-const columnCount = computed(() => (awaitingRelease.value ? 11 : 9))
+// Request Fulfillment drops the Payment column: every row there is still owing.
+const columnCount = computed(() => (awaitingRelease.value ? (forDispatch.value ? 11 : 10) : 9))
 
 /* TOASTS */
 const { notify: toast } = useToast()
@@ -931,7 +932,8 @@ const search = ref('')
 const show = ref('all')
 const sortBy = ref('urgent')
 
-const groupBy = ref('priority')
+// Flat by default; priority is the STAT / Routine chips (project owner, 2026-11-28).
+const groupBy = ref('none')
 // Groups folded away, by key; open again on another grouping.
 const folded = ref(new Set())
 watch(groupBy, () => { folded.value = new Set() })
@@ -944,12 +946,11 @@ function toggleGroup(key) {
 }
 
 const GROUPINGS = [
-  { value: 'priority', label: 'Priority' },
+  { value: 'none', label: 'No grouping' },
   { value: 'status', label: 'Status' },
   { value: 'handover', label: 'Hand-over' },
   { value: 'type', label: 'Request type' },
   { value: 'hospital', label: 'Hospital' },
-  { value: 'none', label: 'No grouping' },
 ]
 
 const SORTS = [
@@ -1000,6 +1001,7 @@ function waitingFor(request) {
 
 const FILTERS = [
   { key: 'stat', label: 'STAT', tone: 'crit', test: (r) => r.is_emergency },
+  { key: 'routine', label: 'Routine', tone: 'neutral', test: (r) => !r.is_emergency },
   { key: 'today', label: 'Needed today', tone: 'warn', test: (r) => dueToday(neededBy(r)) },
   { key: 'expiring', label: 'Expiring units', tone: 'warn', test: (r) => expiringCount(r) > 0 },
   { key: 'walk_in', label: 'Walk-in', tone: 'info', test: (r) => r.is_walk_in },
@@ -1052,15 +1054,6 @@ function handoverKind(request) {
 }
 
 const GROUP_DEFS = {
-  priority: {
-    of: (r) => (r.is_emergency ? 'stat' : dueToday(neededBy(r)) ? 'today' : neededBy(r) ? 'scheduled' : 'routine'),
-    groups: [
-      { key: 'stat', label: 'STAT', tone: 'crit', hint: 'Send these first' },
-      { key: 'today', label: 'Needed today', tone: 'warn', hint: 'Due within the day' },
-      { key: 'scheduled', label: 'Scheduled', tone: 'info', hint: 'A later hand-over' },
-      { key: 'routine', label: 'Routine', tone: 'neutral', hint: '' },
-    ],
-  },
   status: {
     of: (r) => r.status ?? 'other',
     groups: () => STATUS_ORDER.concat('other').map((key) => ({
@@ -1103,7 +1096,8 @@ const groups = computed(() => {
     return [...byName.entries()].map(([name, items]) => ({ key: `h:${name}`, label: name, tone: 'neutral', items }))
   }
 
-  const def = GROUP_DEFS[groupBy.value] ?? GROUP_DEFS.priority
+  const def = GROUP_DEFS[groupBy.value]
+  if (!def) return [{ key: 'all', label: '', items: list }]
   const named = typeof def.groups === 'function' ? def.groups() : def.groups
   return named
     .map((g) => ({ ...g, items: list.filter((r) => def.of(r) === g.key) }))
