@@ -463,7 +463,14 @@ function visitSteps(d) {
   return [
     { key: 'opened', label: 'Visit opened', detail: `${formatShortDate(d.date)} · ${d.time}`, state: 'done' },
     d.screening
-      ? { key: 'screening', label: `Screening: ${outcome || 'recorded'}`, by: d.screening.recorded_by, state: deferred ? 'warn' : 'done' }
+      ? {
+          key: 'screening',
+          label: `Screening: ${outcome || 'recorded'}`,
+          // Sent only to the clinical record's holder.
+          detail: d.screening.out_of_range_reason ? `Accepted out of range: ${d.screening.out_of_range_reason}` : '',
+          by: d.screening.recorded_by,
+          state: deferred ? 'warn' : 'done',
+        }
       : { key: 'screening', label: 'Screening', detail: 'Not screened yet', state: d.open ? 'pending' : 'skipped' },
     collected
       ? { key: 'collection', label: 'Blood collected', detail: formatDateTime(d.collection.collected_at), by: d.collection.collected_by, state: 'done' }
