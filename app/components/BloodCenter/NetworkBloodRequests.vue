@@ -54,95 +54,66 @@
       </EmptyState>
     </div>
 
-    <div v-else class="nbr-list">
-      <article
-        v-for="row in rows"
-        :key="row.id"
-        class="card nbr-card"
-        :class="{ 'nbr-card--stat': row.is_emergency && row.is_open }"
-      >
-        <header class="nbr-head">
-          <div class="nbr-title">
-            <span class="mono">{{ row.reference_number }}</span>
-            <span v-if="row.is_emergency" class="tag tag--stat">STAT</span>
-            <span v-if="!row.hospital.is_registered" class="tag tag--muted">Not on RedAgos</span>
-            <span class="status" :class="`status--${row.status}`">{{ requestStatusLabel(row) }}</span>
-          </div>
-          <span v-if="row.request_date" class="nbr-when">
-            <AssetIcon name="clock" :size="13" />
-            {{ formatWhen(row.request_date) }}
-          </span>
-        </header>
-
-        <p class="nbr-sub">
-          <span class="nbr-hospital">{{ row.hospital.name || 'Hospital not recorded' }}</span>
-          <span class="blood-pill">{{ row.blood_type?.code || '?' }}</span>
-          <span>{{ row.patient?.full_name || 'Patient not recorded' }}</span>
-          <span v-if="row.needed_by" class="nbr-needed">Needed by {{ formatWhen(row.needed_by) }}</span>
-        </p>
-
-        <div class="nbr-body">
-          <table class="nbr-table">
-            <caption class="sr-only">Components for {{ row.reference_number }}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Component</th>
-                <th scope="col" class="num">Needed</th>
-                <th scope="col" class="num">Approved</th>
-                <th scope="col" class="num">Released</th>
-                <th scope="col" class="num">Unallocated</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="line in row.lines" :key="line.transfusion_request_item_id">
-                <td>{{ line.component?.name || '—' }}</td>
-                <td class="num">{{ line.required }}</td>
-                <td class="num">{{ line.approved }}</td>
-                <td class="num">{{ line.fulfilled }}</td>
-                <td class="num" :class="{ 'num--open': line.unallocated > 0 }">{{ line.unallocated }}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="nbr-shares">
-            <h3 class="nbr-shares__title">Blood centers</h3>
-            <ul v-if="row.shares.length" class="nbr-shares__list">
-              <li v-for="share in row.shares" :key="share.reference_number" class="nbr-share" :class="{ 'nbr-share--mine': share.is_mine }">
-                <span class="nbr-share__centre">
-                  {{ share.centre || 'Blood center' }}
-                  <span v-if="share.is_mine" class="tag tag--mine">This center</span>
-                </span>
-                <span class="nbr-share__meta">
-                  <NuxtLink
-                    v-if="share.is_mine && share.id"
-                    :to="{ path: '/blood-center/bloodrequests', query: { request: share.id } }"
-                    class="mono nbr-share__link"
-                  >{{ share.reference_number }}</NuxtLink>
-                  <span v-else class="mono">{{ share.reference_number }}</span>
-                  · {{ share.quantity }} unit{{ share.quantity === 1 ? '' : 's' }} · {{ share.status_label }}
-                </span>
-              </li>
-            </ul>
-            <p v-else class="nbr-shares__none">No blood center yet</p>
-          </div>
-        </div>
-
-        <footer v-if="row.can_add_share || row.add_share_blocked" class="nbr-actions">
-          <span v-if="row.add_share_blocked" class="nbr-blocked">
-            <AssetIcon name="info" :size="13" />
-            {{ row.add_share_blocked }}
-          </span>
-          <button
-            v-if="row.can_add_share && canAddShare"
-            type="button"
-            class="ui-btn ui-btn--primary ui-btn--sm"
-            @click="openShare(row)"
-          >
-            <AssetIcon name="plus" :size="14" />
-            Add this center's share — {{ row.unallocated_quantity }} unallocated
-          </button>
-        </footer>
-      </article>
+    <!--
+      One row a request, one plain value a column, like the other lists
+      (project owner, 2026-11-27). The row or its eye shows the components
+      and the blood centers holding shares; Add Share stays on the row.
+    -->
+    <div v-else class="card nbr-table-card">
+      <div class="nbr-table-wrap">
+        <table class="nbr-table">
+          <caption class="sr-only">Every hospital's Blood Requests</caption>
+          <thead>
+            <tr>
+              <th scope="col">Request</th>
+              <th scope="col">Received</th>
+              <th scope="col">Hospital</th>
+              <th scope="col">Patient</th>
+              <th scope="col">Blood Type</th>
+              <th scope="col" class="num">Needed</th>
+              <th scope="col" class="num">Released</th>
+              <th scope="col" class="num">Unallocated</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="end"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in rows"
+              :key="row.id"
+              class="nbr-row"
+              :class="{ 'nbr-row--stat': row.is_emergency && row.is_open }"
+              tabindex="0"
+              :aria-label="`View ${row.reference_number}`"
+              @click="viewRow(row)"
+              @keydown.enter.self="viewRow(row)"
+            >
+              <td class="mono nowrap">{{ row.reference_number }}</td>
+              <td class="nowrap">{{ row.request_date ? formatWhen(row.request_date) : '—' }}</td>
+              <td>{{ row.hospital.name || 'Not recorded' }}</td>
+              <td>{{ row.patient?.full_name || 'Not recorded' }}</td>
+              <td class="nowrap">{{ row.blood_type?.code || '—' }}</td>
+              <td class="num">{{ total(row, 'required') }}</td>
+              <td class="num">{{ total(row, 'fulfilled') }}</td>
+              <td class="num">{{ row.unallocated_quantity ?? total(row, 'unallocated') }}</td>
+              <td class="nowrap">{{ requestStatusLabel(row) }}</td>
+              <td class="end nowrap" @click.stop>
+                <RowViewButton :label="`View ${row.reference_number}`" @view="viewRow(row)" />
+                <button
+                  v-if="row.can_add_share && canAddShare"
+                  type="button"
+                  class="nbr-add"
+                  :aria-label="`Add this center's share of ${row.reference_number}: ${row.unallocated_quantity} unallocated`"
+                  @click="openShare(row)"
+                >
+                  <AssetIcon name="plus" :size="14" />
+                  Add Share
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <ListPager
@@ -207,6 +178,16 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Everything about a Blood Request, read only, from its row. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.title || 'Blood Request'" eyebrow="Blood Request" :sections="viewing?.sections || []" @close="viewing = null">
+      <template #actions>
+        <button v-if="viewing?.row.can_add_share && canAddShare" type="button" class="ui-btn ui-btn--primary" @click="addFromView">
+          <AssetIcon name="plus" :size="15" />
+          Add This Center's Share
+        </button>
+      </template>
+    </RecordDialog>
   </div>
 </template>
 
@@ -215,6 +196,8 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
 import SkeletonList from '~/components/ui/SkeletonList.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { requestStatusLabel } from '~/types/bloodRequest'
 import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
@@ -300,6 +283,65 @@ function formatWhen(iso) {
   return new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+/** A figure summed over every component on the request. */
+function total(row, key) {
+  return (row.lines ?? []).reduce((sum, line) => sum + (Number(line[key]) || 0), 0)
+}
+
+/*
+ * VIEW (project owner, 2026-11-27): the row keeps one plain value a column;
+ * the components and the blood centers holding shares are one click away.
+ */
+const viewing = ref(null)
+
+function viewRow(row) {
+  const lines = row.lines ?? []
+  const shares = row.shares ?? []
+
+  viewing.value = {
+    row,
+    title: row.reference_number || 'Blood Request',
+    sections: [
+      { title: 'Request', rows: [
+        { label: 'Reference', value: row.reference_number, mono: true },
+        { label: 'Status', value: requestStatusLabel(row) },
+        { label: 'Hospital', value: row.hospital?.name },
+        { label: 'Hospital on RedAgos', value: row.hospital?.is_registered === false ? 'No' : '' },
+        { label: 'Patient', value: row.patient?.full_name },
+        { label: 'Blood type', value: row.blood_type?.code },
+        { label: 'Urgency', value: row.is_emergency ? 'STAT' : 'Routine' },
+        { label: 'Received', value: row.request_date ? formatWhen(row.request_date) : '' },
+        { label: 'Needed by', value: row.needed_by ? formatWhen(row.needed_by) : '' },
+      ] },
+      ...lines.map((line) => ({ title: line.component?.name || 'Component', rows: [
+        { label: 'Needed', value: line.required },
+        { label: 'Approved', value: line.approved },
+        { label: 'Released', value: line.fulfilled },
+        { label: 'Unallocated', value: line.unallocated },
+      ] })),
+      { title: 'Blood centers', rows: shares.length
+        // Keyed by the share's reference: one center can hold two shares.
+        ? shares.map((share) => ({
+            label: share.reference_number,
+            value: `${share.centre || 'Blood center'}${share.is_mine ? ' (this center)' : ''} · ${share.quantity} unit${share.quantity === 1 ? '' : 's'} · ${share.status_label}`,
+            to: share.is_mine && share.id ? { path: '/blood-center/bloodrequests', query: { request: share.id } } : undefined,
+            wide: true,
+          }))
+        : [{ label: 'Blood centers', value: 'No blood center yet', wide: true }] },
+      { title: 'This center', rows: [
+        { label: 'Adding a share', value: row.add_share_blocked, wide: true },
+      ] },
+    ],
+  }
+}
+
+// The share dialog sits under the view, so the view closes first.
+function addFromView() {
+  const row = viewing.value?.row
+  viewing.value = null
+  if (row) openShare(row)
+}
+
 /* ADD THIS CENTER'S SHARE */
 const shareFor = ref(null)
 const shareLines = ref([])
@@ -369,11 +411,12 @@ onPageReturn(() => load(meta.value.current_page, { quiet: true }))
 
 /*
  * Kept current while it is open: every 30 seconds while this tab and the
- * browser tab are in view. Paused while the share dialog is open.
+ * browser tab are in view. Paused while a request is viewed or the share
+ * dialog is open.
  */
 useLiveRefresh(() => load(meta.value.current_page, { quiet: true }), {
   intervalMs: 30_000,
-  pauseWhen: () => shareFor.value !== null || sharing.value,
+  pauseWhen: () => viewing.value !== null || shareFor.value !== null || sharing.value,
 })
 
 defineExpose({ refresh: () => load(meta.value.current_page) })
@@ -405,55 +448,45 @@ defineExpose({ refresh: () => load(meta.value.current_page) })
 .banner--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .25); }
 .skeleton-wrap { padding: 16px; }
 
-.nbr-list { display: flex; flex-direction: column; gap: 14px; }
-.nbr-card { padding: 16px 18px; }
-.nbr-card--stat { border-color: rgba(var(--rb-accent-rgb), 0.35); }
+/*
+ * The list (project owner, 2026-11-27): one row a request, one plain value a
+ * column, like FulfillmentBoard.vue's.
+ */
+.nbr-table-card { overflow: hidden; }
+.nbr-table-wrap { overflow-x: auto; }
+.nbr-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 13px; }
+.nbr-table thead th {
+  padding: 10px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); white-space: nowrap;
+}
+.nbr-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.nbr-table th:first-child, .nbr-table td:first-child { padding-left: 20px; }
+.nbr-table th:last-child, .nbr-table td:last-child { padding-right: 20px; }
+.nbr-table tbody tr:last-child td { border-bottom: 0; }
+.nbr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.nbr-table .end { text-align: right; }
+.nbr-table .nowrap { white-space: nowrap; }
+.nbr-table td.end > * { vertical-align: middle; }
+.nbr-table td.end > * + * { margin-left: 6px; }
 
-.nbr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-.nbr-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.nbr-when { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--rb-text-secondary); }
-.nbr-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--rb-text-secondary); margin: 5px 0 0; }
-.nbr-hospital { font-weight: 600; color: var(--rb-text-primary); }
-.nbr-needed { color: var(--rb-warning-text); font-weight: 600; }
+.nbr-row { cursor: pointer; transition: background 0.12s ease; }
+.nbr-row:hover { background: var(--rb-surface-hover); }
+.nbr-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+/* An open STAT request, as Incoming Requests marks it: a tint, not a chip. */
+.nbr-row--stat td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.nbr-row--stat:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
+
+.nbr-add {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer;
+  transition: background 0.12s ease;
+}
+.nbr-add:hover { background: rgba(var(--rb-primary-rgb), 0.12); }
+.nbr-add:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .mono { font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 600; }
-.tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
-.tag--stat { background: var(--rb-accent); color: #fff; }
-.tag--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
-.tag--mine { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
-.blood-pill {
-  display: inline-block; padding: 1px 7px; border-radius: 6px; font-weight: 700; font-size: 11.5px;
-  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text);
-}
-.status { padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-.status--pending { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
-.status--processing { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
-.status--partial { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
-.status--fulfilled { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
-
-.nbr-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
-.nbr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.nbr-table th {
-  padding: 7px 8px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
-  color: var(--rb-text-secondary); border-bottom: 1px solid var(--rb-border); background: var(--rb-surface-alt);
-}
-.nbr-table td { padding: 7px 8px; color: var(--rb-text-primary); border-bottom: 1px solid var(--rb-border); }
-.nbr-table tr:last-child td { border-bottom: 0; }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
-.num--open { color: var(--rb-primary-text); font-weight: 700; }
-
-.nbr-shares__title { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--rb-text-secondary); }
-.nbr-shares__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.nbr-share { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--rb-border); border-radius: 9px; }
-.nbr-share--mine { border-color: rgba(var(--rb-primary-rgb), .35); background: rgba(var(--rb-primary-rgb), .04); }
-.nbr-share__centre { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
-.nbr-share__meta { font-size: 12px; color: var(--rb-text-secondary); }
-.nbr-share__link { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 2px; }
-.nbr-shares__none { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-
-.nbr-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rb-border); }
-.nbr-blocked { flex: 1; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); min-width: 180px; }
 .nbr-pager { overflow: hidden; }
 
 .modal-overlay {
@@ -483,12 +516,10 @@ defineExpose({ refresh: () => load(meta.value.current_page) })
 .field-error { font-size: 11.5px; color: var(--rb-accent-text); margin: 0; }
 .field-error--block { margin: 10px 0 0; }
 
-@media (max-width: 860px) {
-  .nbr-body { grid-template-columns: 1fr; }
-}
 @media (max-width: 560px) {
-  .nbr-card { padding: 14px; }
   .nbr-scope { margin-left: 0; }
-  .nbr-actions { flex-direction: column; align-items: stretch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nbr-row, .nbr-add { transition: none; }
 }
 </style>

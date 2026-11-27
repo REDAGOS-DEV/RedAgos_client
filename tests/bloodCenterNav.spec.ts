@@ -119,20 +119,20 @@ describe('Fulfillment\'s payment notice', () => {
   const page = readFileSync(path.join(root, 'app/components/BloodCenter/FulfillmentBoard.vue'), 'utf8')
 
   it('offers deferred payment on anything but a walk-in', () => {
-    expect(page).toContain('v-if="gateFor(request).canDefer"')
+    expect(page).toContain('v-if="gateFor(opened).canDefer"')
     expect(page).toMatch(/if \(request\.is_walk_in\) \{\s*return \{ ok: false, message:/)
     expect(page).toContain('bloodCenterService.deferPayment(request.id)')
   })
 
   it('links to Billing only for whoever can take the payment', () => {
-    expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
+    expect(page).toContain(`v-if="!gateFor(opened).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
   // Issuance subsidises only from Issue on Incoming Requests (2026-11-27).
   it('leaves a blocked statement to Billing rather than applying the subsidy here', () => {
     expect(page).not.toContain('applySubsidy(')
     expect(page).not.toContain("can('billing.subsidise')")
-    expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
+    expect(page).toContain(`v-if="!gateFor(opened).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
   it('keeps the centre discounts beside the prices, for Billing alone, and no billing programmes', () => {
