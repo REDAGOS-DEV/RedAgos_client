@@ -920,7 +920,8 @@ onPageReturn(() => load(pager.page))
 .badge--crit { --tone: var(--rb-accent); }
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
-.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+/* Buttons start under the "Actions" heading, like every other column's value. */
+.row-actions { display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
 
 /* The visit's next step, said in words: it is the row's main action. */
 .act-btn {

@@ -168,12 +168,14 @@ export const HELP_GUIDES: HelpGuide[] = [
       'Choose Approve and tag to set the units aside for the patient, or reject it with a reason.',
       'On Inventory Replenishment, choose Confirm: how many units of each line you can supply, pick-up or delivery, and when. Nothing is set aside; the units are picked when the order is dispatched.',
       'For a watcher at the counter, use New Walk-in Request.',
+      'Once units are tagged, choose Issue, then Pay at Billing or Issue Directly.',
     ],
     questions: [
       { q: 'Why can\'t I tag units for a replenishment order?', a: 'Only a patient\'s request is tagged. A hospital\'s restocking order holds no stock: choose Confirm, say what you will supply and when it is picked up or delivered, and the hospital is told. The units stay available until you pick them on For Dispatch, as the order goes out.' },
       { q: 'Can I change the pick-up or delivery time?', a: 'Yes, until units are dispatched. Open the order and choose Edit under Supply Plan; the hospital is told of the change.' },
       { q: 'A watcher brought a request. What do I do?', a: 'Choose New Walk-in Request. You call the patient\'s hospital blood bank to confirm it; if the hospital does not confirm, nothing is recorded.' },
       { q: 'Where do approved requests go?', a: 'Approving tags the selected units for the patient and moves the request to Request Fulfillment, where they are released. A replenishment order goes to For Dispatch once it is confirmed.' },
+      { q: 'Pay at Billing or Issue Directly?', a: 'Pay at Billing: the watcher settles the bill at the Billing Counter, and the request waits on Request Fulfillment until it is paid. Issue Directly: nothing is payable; the bill is recorded as government subsidised on the hospital\'s invoice, and the request opens on For Dispatch. A bill already paid goes straight to For Dispatch.' },
     ],
   },
   {

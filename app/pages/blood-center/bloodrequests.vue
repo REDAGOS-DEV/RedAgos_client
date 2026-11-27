@@ -122,7 +122,7 @@
               <th scope="col" class="c-date">Received</th>
               <th scope="col" class="c-hospital">Hospital</th>
               <th v-if="isPatientTab" scope="col" class="c-patient">Patient</th>
-              <th v-else scope="col" class="c-patient">Blood Type</th>
+              <th scope="col" class="c-type">Blood Type</th>
               <th scope="col" class="c-component">Component</th>
               <th scope="col" class="c-units" title="Issued of requested">Units</th>
               <th scope="col" class="c-status">Status</th>
@@ -141,88 +141,17 @@
               @click="openReview(r)"
               @keydown.enter.self="openReview(r)"
             >
+              <!-- One plain value a column (project owner, 2026-11-27); the row's eye (Review) shows the rest. -->
               <td class="c-id">
                 <button type="button" class="code-link" :title="`Review ${r.code}`" @click.stop="openReview(r)">{{ r.code }}</button>
-                <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
-                <!-- Priority: only an emergency is marked; routine is the rule. -->
-                <span v-if="r.dueBy" class="chip" :title="`The hospital needs this by ${r.dueBy}`">
-                  <AssetIcon name="clock" :size="11" /> By {{ r.dueBy }}
-                </span>
-                <span v-if="r.emergency" class="chip chip--crit" :title="`${r.priority} priority`">
-                  <AssetIcon name="circle-alert" :size="11" /> {{ r.priority }}
-                </span>
-                <span v-if="r.isWalkIn" class="chip" title="Recorded at this blood center from what a watcher brought">Walk-in</span>
-                <span
-                  v-else-if="r.weeklyReference"
-                  class="chip"
-                  :title="`Weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
-                >Weekly</span>
-                <span v-else-if="r.ptrReference" class="chip" :title="`One facility's share of blood request ${r.ptrReference}`">Share</span>
               </td>
-              <td class="c-date nowrap">
-                {{ r.date }}
-                <span class="sub">{{ r.time }}</span>
-              </td>
-              <td class="c-hospital">
-                <span class="strong">{{ r.hospital }}</span>
-                <span v-if="!r.registered" class="chip" title="Named on a walk-in: no accounts on RedAgos, so it is not notified and cannot follow the request">Not on RedAgos</span>
-                <span v-if="r.requestedBy" class="sub">{{ r.requestedBy }}</span>
-              </td>
-              <td v-if="isPatientTab" class="c-patient">
-                <div class="person">
-                  <PersonAvatar :name="r.patient" :hidden="!r.patient" />
-                  <div class="person__text">
-                    <span class="patient__name" :class="{ muted: !r.patient }" :title="r.patient || ''">{{ r.patient || r.patientFallback }}</span>
-                    <span class="person__meta">
-                      <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
-                      <span v-if="r.patientDetails" class="person__details">{{ r.patientDetails }}</span>
-                    </span>
-                  </div>
-                </div>
-              </td>
-              <!-- A restocking order names no patient; a weekly one can ask
-                   for several blood types. -->
-              <td v-else class="c-patient">
-                <span class="patient">
-                  <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
-                  <span v-if="!r.bloodTypes.length" class="muted">—</span>
-                </span>
-              </td>
-              <!-- One chip per component, by its bag-label code, as the
-                   Processed list shows them; the full name is the tooltip. -->
-              <td class="c-component" :title="r.component">
-                <span class="codes">
-                  <span v-for="chip in r.componentChips" :key="chip.key" class="code-chip">{{ chip.code }}</span>
-                </span>
-              </td>
-              <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested${r.held ? `, ${r.held} tagged and waiting to go out` : ''}`">
-                <span class="units-bar" aria-hidden="true">
-                  <span class="units-bar__issued" :style="{ width: `${share(r.issued, r.units)}%` }" />
-                  <span class="units-bar__held" :style="{ width: `${share(r.held, r.units)}%` }" />
-                </span>
-                <span class="units-text">{{ r.issued }} / {{ r.units }}</span>
-                <span v-if="r.held" class="sub">{{ r.held }} tagged</span>
-              </td>
-              <td class="c-status">
-                <span class="badge" :class="`badge--${r.tone}`" :title="r.status">
-                  <span class="badge__dot" aria-hidden="true" />
-                  <span class="badge__text">{{ r.status }}</span>
-                </span>
-                <!-- A restock's hand-over once confirmed, or that it still needs confirming. -->
-                <span
-                  v-if="r.plan"
-                  class="handover"
-                  :title="`${r.plan.handover_label}${r.plan.handover_address ? ` · ${r.plan.handover_address}` : ''}: ${r.committed} of ${r.units} units`"
-                >
-                  <AssetIcon :name="r.plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="11" /> {{ r.planSummary }}
-                </span>
-                <span v-else-if="r.needsPlan" class="handover handover--todo">
-                  <AssetIcon name="circle-alert" :size="11" /> Not confirmed
-                </span>
-                <span v-if="r.isOpen && waitingLabel(r)" class="waiting" :class="{ 'waiting--crit': r.emergency }">
-                  <AssetIcon name="clock" :size="11" /> {{ waitingLabel(r) }}
-                </span>
-              </td>
+              <td class="c-date nowrap">{{ r.date }}, {{ r.time }}</td>
+              <td class="c-hospital">{{ r.hospital }}</td>
+              <td v-if="isPatientTab" class="c-patient">{{ r.patient || r.patientFallback }}</td>
+              <td class="c-type nowrap">{{ r.bloodTypes.join(', ') || '—' }}</td>
+              <td class="c-component" :title="r.component">{{ r.componentChips.map((chip) => chip.code).join(', ') || '—' }}</td>
+              <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested`">{{ r.issued }} / {{ r.units }}</td>
+              <td class="c-status">{{ r.status }}</td>
               <td class="c-actions" @click.stop>
                 <div class="row-actions">
                   <!-- A replenishment order is confirmed before it goes: what
@@ -257,8 +186,9 @@
                       {{ r.statusValue === 'pending' ? 'Approve' : 'Tag' }}
                     </button>
                   </template>
-                  <!-- Issue is dispatch, on Request Fulfillment: open once units
-                       are tagged. A confirmed replenishment order goes straight
+                  <!-- Issue, once units are tagged, first asks how it is paid:
+                       Pay at Billing or Issue Directly (project owner,
+                       2026-11-27). A confirmed replenishment order goes straight
                        to For Dispatch. "Not yet" shows only where the row offers
                        no other step. -->
                   <template v-if="r.isOpen && canRelease">
@@ -266,10 +196,17 @@
                       <AssetIcon name="send" :size="13" />
                       Dispatch
                     </NuxtLink>
-                    <NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
-                      <AssetIcon name="send" :size="13" />
+                    <button
+                      v-else-if="r.held > 0"
+                      type="button"
+                      class="btn-issue"
+                      :disabled="issueOpening === r.id"
+                      :aria-label="`Issue ${r.code}`"
+                      @click="openIssue(r)"
+                    >
+                      <AssetIcon :name="issueOpening === r.id ? 'loader' : 'send'" :size="13" :class="{ spinning: issueOpening === r.id }" />
                       Issue
-                    </NuxtLink>
+                    </button>
                     <template v-else-if="!rowHasStep(r)">
                       <span v-if="r.isReplenishment" class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Dispatch: confirm the order first" title="Dispatch: confirm the order first">
                         <AssetIcon name="send" :size="13" />
@@ -695,10 +632,16 @@
                   {{ drawerMutating ? 'Processing…' : 'Approve & Tag' }}
                 </button>
               </template>
-              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" :to="`/blood-center/fulfillment?request=${activeRequest.id}`" class="btn btn-primary">
-                <AssetIcon name="send" :size="14" />
+              <button
+                v-else-if="activeRequest.held > 0 && canRelease"
+                type="button"
+                class="btn btn-primary"
+                :disabled="issueOpening === activeRequest.id"
+                @click="openIssue(activeRequest)"
+              >
+                <AssetIcon :name="issueOpening === activeRequest.id ? 'loader' : 'send'" :size="14" :class="{ spinning: issueOpening === activeRequest.id }" />
                 Issue
-              </NuxtLink>
+              </button>
             </template>
           </div>
         </div>
@@ -733,6 +676,14 @@
       :server-errors="planErrors"
       @close="closePlan"
       @confirm="confirmPlan"
+    />
+
+    <!-- ISSUE: Pay at Billing or Issue Directly (project owner, 2026-11-27). -->
+    <IssueChoiceDialog
+      v-if="issueFor"
+      :request="issueFor.request"
+      :billing="issueFor.billing"
+      @close="issueFor = null"
     />
 
     <!-- REJECTION MODAL -->
@@ -796,10 +747,10 @@ import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
-import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vue'
 import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
 import SupplyPlanDialog from '~/components/BloodCenter/SupplyPlanDialog.vue'
+import IssueChoiceDialog from '~/components/BloodCenter/IssueChoiceDialog.vue'
 import ReferralSlipSheet from '~/components/BloodCenter/ReferralSlipSheet.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
@@ -836,7 +787,7 @@ const canDecide = computed(() => can('requests.approve'))
 // for the browser rather than have the server's markup and the client's differ.
 const hydrated = ref(false)
 const canRecord = computed(() => hydrated.value && can('requests.record'))
-// Issuing is dispatch, done on Request Fulfillment.
+// Issuing is dispatch, done on For Dispatch once the bill is cleared.
 const canRelease = computed(() => can('requests.release'))
 
 const {
@@ -1125,22 +1076,6 @@ function rowHasStep(r) {
   return (r.needsPlan && canDecide.value) || (r.canTag && canAllocate.value)
 }
 
-const share = (part, whole) => (whole ? Math.min(100, (part / whole) * 100) : 0)
-
-// "Waiting 2 h": how long an open request has sat here, kept current.
-const now = ref(Date.now())
-let nowTimer = null
-function waitingLabel(r) {
-  const at = r.raw?.request_date ? new Date(r.raw.request_date).getTime() : NaN
-  if (Number.isNaN(at)) return ''
-  const minutes = Math.max(0, Math.floor((now.value - at) / 60000))
-  if (minutes < 60) return `Waiting ${minutes} min`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 48) return `Waiting ${hours} h`
-  return `Waiting ${Math.floor(hours / 24)} days`
-}
-onMounted(() => { nowTimer = setInterval(() => { now.value = Date.now() }, 60000) })
-onBeforeUnmount(() => clearInterval(nowTimer))
 const fromDate = ref('')
 const toDate = ref('')
 
@@ -1390,8 +1325,45 @@ function handleReviewInventory() {
  */
 function onKeydown(event) {
   if (event.key !== 'Escape' || !drawerOpen.value) return
-  if (showApproveModal.value || showRejectModal.value || lineToClose.value || showWalkIn.value || planFor.value) return
+  if (showApproveModal.value || showRejectModal.value || issueFor.value || lineToClose.value || showWalkIn.value || planFor.value) return
   closeDrawer()
+}
+
+/*
+ * ISSUE (project owner, 2026-11-27): how the request is paid is asked first.
+ * Pay at Billing leaves it on Request Fulfillment until the Billing Counter
+ * settles it; Issue Directly charges nothing, records it as government
+ * subsidised and opens it on For Dispatch. A bill already cleared (paid,
+ * subsidised, deferred or not charged) asks nothing and goes there at once.
+ */
+const issueFor = ref(null)
+// The request whose bill is being read, its button busy meanwhile.
+const issueOpening = ref(null)
+
+async function openIssue(r) {
+  if (issueOpening.value) return
+  issueOpening.value = r.id
+
+  try {
+    const response = await bloodCenterService.billingForRequest(r.id)
+    const billing = response?.billing ?? null
+
+    if (billing?.clears_release) {
+      await navigateTo({ path: '/blood-center/dispatch', query: { request: r.id } })
+      return
+    }
+
+    if (!billing) throw new Error('No invoice has been raised for this request yet.')
+
+    issueFor.value = {
+      request: { id: r.id, code: r.code, hospital: r.hospital === '—' ? '' : r.hospital, patient: r.patient },
+      billing,
+    }
+  } catch (err) {
+    toast('Could Not Open Issue', 'error', err?.message || 'The bill for this request could not be read.')
+  } finally {
+    issueOpening.value = null
+  }
 }
 
 /* APPROVAL — staff pick the units to tag (project owner, 2026-10-19) */
@@ -2038,7 +2010,6 @@ useLiveRefresh(async () => {
 /* Narrow panels keep who asked, for whom, how much and where it stands. */
 @container (max-width: 1199px) {
   /* The component stays: what is asked for matters as much as for whom. */
-  .c-date { display: none; }
   .c-id { width: 132px; }
   .c-component { width: 104px; }
   .c-units { width: 90px; }
@@ -2094,18 +2065,6 @@ useLiveRefresh(async () => {
 
 .codes { display: flex; flex-wrap: wrap; gap: 4px; }
 
-.code-chip {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface-alt);
-  font-family: var(--rb-font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--rb-text-primary);
-  white-space: nowrap;
-}
 
 .patient { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
 .patient__name { font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
@@ -2162,16 +2121,21 @@ useLiveRefresh(async () => {
   height: 30px;
   padding: 0 10px;
   border-radius: 8px;
+  border: 0;
   background: var(--rb-primary);
   color: #fff;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .btn-issue:hover { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+/* Issue reads the bill before it asks how it is paid. */
+.btn-issue:disabled { cursor: progress; opacity: 0.75; }
 
 /* Shown, so the column reads the same on every open row, but not offered. */
 .btn-issue--off {
@@ -2223,14 +2187,10 @@ useLiveRefresh(async () => {
 /* A finished request steps back. */
 .req-row--closed td { color: var(--rb-text-secondary); }
 .req-row--closed .patient__name, .req-row--closed .strong { font-weight: 500; }
-.req-row--closed .units-bar, .req-row--closed .blood, .req-row--closed .code-chip { opacity: 0.7; }
 
 .chip--crit { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); font-weight: 700; }
 
 /* Units: issued, then tagged, on what was asked for. */
-.units-bar { display: flex; width: 100%; max-width: 88px; height: 6px; margin-bottom: 5px; border-radius: 999px; background: var(--rb-surface-alt); box-shadow: inset 0 0 0 1px var(--rb-border); overflow: hidden; }
-.units-bar__issued { background: var(--rb-success); }
-.units-bar__held { background: var(--rb-primary); }
 .units-text { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .waiting { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
@@ -2648,12 +2608,6 @@ useLiveRefresh(async () => {
 .quick__go { margin-left: auto; color: var(--rb-primary-text); flex-shrink: 0; }
 
 
-/* Patient: who, then the blood type and age under the name. */
-.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.person__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.person .patient__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
-.person__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
-.person__details { font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
 .c-patient { min-width: 170px; }
 .c-hospital { min-width: 190px; }
 
@@ -2691,9 +2645,4 @@ useLiveRefresh(async () => {
 .req-table th.c-actions, .req-table td.c-actions { width: 1% !important; white-space: nowrap; }
 .req-table .c-id .sub, .req-table .c-hospital .sub { white-space: normal; overflow: visible; text-overflow: clip; }
 .req-table td.c-date, .req-table td.c-units, .req-table td.c-status { white-space: nowrap; }
-/* The date under the ID only where the Date column is folded away; it was showing twice. */
-.req-table .sub.id-date { display: none; }
-@container (max-width: 1199px) {
-  .req-table .sub.id-date { display: block; }
-}
 </style>

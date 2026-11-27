@@ -771,6 +771,7 @@
       :error="dialogError"
       :field-errors="dialogFieldErrors"
       @confirm="runTag"
+      @switch="switchTagBag"
       @close="closeDialog"
     />
 
@@ -1533,6 +1534,18 @@ function closeDialog() {
 
 async function runTag(payload) {
   await perform((unit) => hospitalService.tagUnit(unit.unit_id, payload))
+}
+
+/**
+ * Tag the suggested, sooner-expiring bag instead (project owner, 2026-11-27).
+ * The same dialog stays open, so the patient already entered is kept.
+ */
+function switchTagBag(unit) {
+  if (dialog.value?.kind !== 'tag' || dialogBusy.value) return
+
+  dialog.value = { ...dialog.value, unit }
+  dialogError.value = ''
+  dialogFieldErrors.value = {}
 }
 
 async function runRelease(reason) {

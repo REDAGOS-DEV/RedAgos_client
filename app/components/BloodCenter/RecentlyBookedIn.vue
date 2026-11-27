@@ -26,21 +26,36 @@
       <p class="recent__empty-title">Nothing booked in yet</p>
       <p class="recent__empty-text">Each bag shows here as it goes on the shelf, with who booked it in and when.</p>
     </div>
-    <ul v-else class="recent__list">
-      <li v-for="item in items" :key="item.id" class="recent__item">
-        <span class="recent__type" :class="{ 'recent__type--unknown': !item.blood_type }">{{ item.blood_type || '?' }}</span>
-        <span class="recent__main">
-          <span class="recent__unit">{{ item.unit_id }}</span>
-          <span class="recent__sub">{{ item.component || 'Component not recorded' }}<template v-if="item.actor"> · {{ item.actor }}</template></span>
-        </span>
-        <span class="recent__when" :title="formatDateTime(item.at)">{{ timeAgo(item.at) }}</span>
-      </li>
-    </ul>
+    <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
+    <table v-else class="recent__table">
+      <caption class="sr-only">Bags booked in lately, newest first</caption>
+      <thead>
+        <tr>
+          <th scope="col">Unit ID</th>
+          <th scope="col">Type</th>
+          <th scope="col">When</th>
+          <th scope="col"><span class="sr-only">View</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in items" :key="item.id">
+          <td class="recent__unit">{{ item.unit_id }}</td>
+          <td>{{ item.blood_type || '—' }}</td>
+          <td :title="formatDateTime(item.at)">{{ timeAgo(item.at) }}</td>
+          <td class="recent__view"><RowViewButton :label="`View ${item.unit_id}`" @view="viewing = item" /></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Everything about the booking, read only. -->
+    <RecordDialog :open="Boolean(viewing)" :title="viewing?.unit_id || 'Unit'" eyebrow="Booked in" :sections="viewSections" @close="viewing = null" />
   </section>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import RecordDialog from '~/components/ui/RecordDialog.vue'
+import RowViewButton from '~/components/ui/RowViewButton.vue'
 
 defineProps({
   // Stock movements of kind booked_in: { id, unit_id, blood_type, component, actor, at }.
@@ -63,6 +78,20 @@ function timeAgo(iso) {
 function formatDateTime(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
 }
+
+/* VIEW: a booking's eye opens everything the table leaves out (project owner, 2026-11-27) */
+const viewing = ref(null)
+const viewSections = computed(() => {
+  const item = viewing.value
+  if (!item) return []
+  return [{ rows: [
+    { label: 'Unit ID', value: item.unit_id, mono: true },
+    { label: 'Blood type', value: item.blood_type || 'Not recorded' },
+    { label: 'Component', value: item.component || 'Not recorded' },
+    { label: 'Booked in by', value: item.actor },
+    { label: 'Booked in', value: formatDateTime(item.at) },
+  ] }]
+})
 </script>
 
 <style scoped>
@@ -74,20 +103,22 @@ function formatDateTime(iso) {
 .recent__all:hover { text-decoration: underline; text-underline-offset: 3px; }
 .recent__all:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 6px; }
 
-/* One column, beside the queue. */
+/* One column, beside the queue: the skeleton's rows. */
 .recent__list { margin: 0; padding: 0; list-style: none; }
 .recent__item { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 16px; border-bottom: 1px solid var(--rb-border); }
 .recent__item:last-child { border-bottom: 0; }
 
-.recent__type {
-  display: inline-flex; flex-shrink: 0; justify-content: center; width: 44px; padding: 2px 0; border-radius: 999px;
-  background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); font-size: 12px; font-weight: 700;
+.recent__table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.recent__table th {
+  padding: 9px 10px; border-bottom: 1px solid var(--rb-border); background: var(--rb-surface-alt);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; color: var(--rb-text-secondary);
 }
-.recent__type--unknown { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-.recent__main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.recent__unit { font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); }
-.recent__sub { margin-top: 2px; font-size: 12px; color: var(--rb-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.recent__when { flex-shrink: 0; font-size: 12px; color: var(--rb-text-secondary); white-space: nowrap; }
+.recent__table td { padding: 9px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); white-space: nowrap; vertical-align: middle; }
+.recent__table th:first-child, .recent__table td:first-child { padding-left: 16px; }
+.recent__table tbody tr:last-child td { border-bottom: 0; }
+.recent__unit { font-family: var(--rb-font-mono); font-weight: 700; }
+.recent__view { width: 1%; padding-right: 12px !important; text-align: right; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .recent__empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 32px 20px; text-align: center; }
 .recent__empty-icon {
   display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border-radius: 50%;

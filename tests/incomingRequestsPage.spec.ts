@@ -10,7 +10,8 @@ import path from 'node:path'
  * What is locked in: one search over patient, hospital and reference; the
  * dates and the status go to the server, and so does the export; each row
  * offers only what the server would accept of it, behind the ability that
- * does it; Issue hands over to Request Fulfillment.
+ * does it; Issue asks how the request is paid, at Billing or directly under
+ * the government subsidy.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -57,9 +58,17 @@ describe('patient requests and replenishment orders', () => {
     expect(page).toContain('router.replace({ query: { ...route.query, type: query } })')
   })
 
-  it('show the patient only where there is one', () => {
+  it('show the patient only where there is one, and the blood type on both', () => {
     expect(page).toContain('<th v-if="isPatientTab" scope="col" class="c-patient">Patient</th>')
-    expect(page).toContain('<th v-else scope="col" class="c-patient">Blood Type</th>')
+    expect(page).toContain('<th scope="col" class="c-type">Blood Type</th>')
+  })
+
+  // One plain value a column; the eye opens the review (project owner, 2026-11-27).
+  it('keeps one plain value a column, with the review behind the eye', () => {
+    expect(page).toContain('<td class="c-hospital">{{ r.hospital }}</td>')
+    expect(page).toContain('<td class="c-status">{{ r.status }}</td>')
+    expect(page).toContain('<button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">')
+    expect(page).not.toContain('class="units-bar"')
   })
 })
 
@@ -74,11 +83,11 @@ describe('a row', () => {
     expect(page).toMatch(/<template v-if="r\.canReject">\s*<button\s+v-if="canDecide"/)
   })
 
-  it('issues on Request Fulfillment once units are tagged, for whoever releases', () => {
+  it('issues once units are tagged, for whoever releases, asking first how it is paid', () => {
     expect(page).toContain("const canRelease = computed(() => can('requests.release'))")
     expect(page).toContain('<template v-if="r.isOpen && canRelease">')
-    // Issue opens that request alone (2026-10-31).
-    expect(page).toContain('<NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue"')
+    // Pay at Billing or Issue Directly (project owner, 2026-11-27).
+    expect(page).toMatch(/<button\s+v-else-if="r\.held > 0"[\s\S]*?class="btn-issue"[\s\S]*?@click="openIssue\(r\)"/)
     expect(page).toContain('held: Math.max(0, allocated - issued),')
   })
 
@@ -102,7 +111,41 @@ describe('the review', () => {
   })
 
   it('offers to tag only what is still needed, and to issue once all of it is tagged', () => {
-    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canTag">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" :to="`\/blood-center\/fulfillment\?request=\$\{activeRequest\.id\}`"/)
+    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canTag">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<button\s+v-else-if="activeRequest\.held > 0 && canRelease"[\s\S]*?@click="openIssue\(activeRequest\)"/)
+  })
+})
+
+describe('Issue (project owner, 2026-11-27)', () => {
+  const dialog = source('app/components/BloodCenter/IssueChoiceDialog.vue')
+
+  it('reads the bill first, and sends one already cleared straight to For Dispatch', () => {
+    expect(page).toContain('const response = await bloodCenterService.billingForRequest(r.id)')
+    expect(page).toMatch(/if \(billing\?\.clears_release\) \{\s*await navigateTo\(\{ path: '\/blood-center\/dispatch', query: \{ request: r\.id \} \}\)/)
+    expect(page).toContain('<IssueChoiceDialog')
+  })
+
+  it('asks Pay at Billing or Issue Directly, with nothing chosen to start with', () => {
+    expect(dialog).toContain('<span class="choice__label">Pay at Billing</span>')
+    expect(dialog).toContain('<span class="choice__label">Issue Directly</span>')
+    expect(dialog).toContain("const choice = ref('')")
+    expect(dialog).toContain(':disabled="busy || !choice"')
+  })
+
+  it('leaves a bill to pay on Request Fulfillment, where the Billing Counter settles it', () => {
+    expect(dialog).toContain("await navigateTo({ path: '/blood-center/fulfillment', query: { request: props.request.id } })")
+    expect(dialog).not.toContain('deferPayment(')
+  })
+
+  it('issues directly under the government subsidy, nothing payable, then opens For Dispatch', () => {
+    expect(dialog).toContain("const canSubsidise = computed(() => can('billing.subsidise'))")
+    expect(dialog).toContain("bloodCenterService.applySubsidy(props.request.id, 'Issued directly at Issuance.')")
+    expect(dialog).toContain("await navigateTo({ path: '/blood-center/dispatch', query: { request: props.request.id } })")
+    expect(dialog).toContain('<span class="choice__tag">Government Subsidised</span>')
+  })
+
+  it('keeps Escape for the dialog, not the review behind it', () => {
+    expect(dialog).toContain('@dialog-escape="emitClose"')
+    expect(page).toContain('showRejectModal.value || issueFor.value ||')
   })
 
   it('rejects only while nothing is held or sent', () => {
@@ -122,8 +165,22 @@ describe('tagging', () => {
 
   it('lists each line\'s units from the server and caps a pick at what the line still needs', () => {
     expect(picker).toContain('bloodCenterService.requestUnits(props.request.id)')
-    expect(picker).toContain(':disabled="busy || (!isPicked(line, unit) && pickedCount(line) >= line.allocatable)"')
-    expect(picker).toContain('const set = new Set(line.units.slice(0, line.allocatable).map((unit) => unit.id))')
+    expect(picker).toContain(':disabled="busy || (!isPicked(line, unit) && !hasRoom(line))"')
+    expect(picker).toContain('return pickedCount(line) < line.allocatable || swappable(line) !== null')
+  })
+
+  it('suggests the first-expiring bags without restricting newer ones (project owner, 2026-11-27)', () => {
+    // Opens on the suggestion, marked on its rows.
+    expect(picker).toContain('return line.units.slice(0, line.allocatable).map((unit) => unit.id)')
+    expect(picker).toContain("if (!(line.request_item_id in before)) return [line.request_item_id, new Set(suggestedIds(line))]")
+    expect(picker).toContain('<span v-if="isSuggested(line, unit)" class="unit__tag">Suggested</span>')
+    // A newer bag on a full line swaps out the latest-expiring suggested pick,
+    // never one staff ticked themselves.
+    expect(picker).toContain('if (set?.has(id) && !mine?.has(id)) return id')
+    expect(picker).toContain('`${unit.id} picked in place of ${swapped}.`')
+    // Warned about, not refused.
+    expect(picker).toContain('newer bag{{ newerPicks(line) === 1 ? \'\' : \'s\' }} picked over ones that expire sooner.')
+    expect(picker).not.toContain('Select oldest first')
   })
 
   it('finds a bag by its typed or scanned number in each line, Enter ticking it (project owner, 2026-10-19)', () => {
@@ -176,9 +233,9 @@ describe('a hospital not on RedAgos (project owner, 2026-10-19)', () => {
     expect(dialog).toContain('{ hospital_name: form.value.hospitalName.trim() }')
   })
 
-  it('is marked in the list and the review, and the close toast does not claim it was told', () => {
+  // Marked in the review only since the list went to one value a column (2026-11-27).
+  it('is marked in the review, and the close toast does not claim it was told', () => {
     expect(page).toContain('registered: r.requesting_facility?.is_registered !== false,')
-    expect(page).toContain('<span v-if="!r.registered" class="chip"')
     expect(page).toContain('v-if="!activeRequest.registered"')
     expect(page).toContain("' The hospital is not on RedAgos, so let the watcher know.'")
   })

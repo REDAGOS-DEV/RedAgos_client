@@ -133,6 +133,22 @@ describe('the hospital inventory page', () => {
     expect(source('app/components/Hospital/TagUnitDialog.vue')).not.toContain('partner_reservation')
     expect(source('app/utils/tagDeadline.ts')).toMatch(/case 'partner_reserved':\r?\n\s*return \['discard'\]/)
   })
+
+  it('suggests a sooner-expiring bag when tagging, without restricting the one opened (project owner, 2026-11-27)', () => {
+    const dialog = source('app/components/Hospital/TagUnitDialog.vue')
+    // The shelf of this bag's type and component, first-expiring first.
+    expect(dialog).toContain('const response = await hospitalService.inventory({')
+    expect(dialog).toContain('blood_type_id: bloodTypeId,')
+    expect(dialog).toContain("sort: 'fefo',")
+    // Sooner only, in date, and never a bag received for another patient's request.
+    expect(dialog).toContain('&& bag.expiry_date < expiry')
+    expect(dialog).toContain('&& (!bag.source?.transfusion_request_id || bag.source.transfusion_request_id === requirementId.value))')
+    // A switch, not a block: the opened bag can still be tagged.
+    expect(dialog).toContain("@click=\"$emit('switch', soonerBag)\"")
+    expect(dialog).toContain("{{ busy ? 'Tagging…' : 'Tag to patient' }}")
+    expect(page).toContain('@switch="switchTagBag"')
+    expect(page).toContain('dialog.value = { ...dialog.value, unit }')
+  })
 })
 
 describe('the hospital Stock Intake page', () => {

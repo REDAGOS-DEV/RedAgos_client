@@ -37,16 +37,20 @@
                   </template>
                   <template v-else>Nothing more is needed for this component.</template>
                 </p>
+                <p v-if="line.allocatable > 0 && newerPicks(line)" class="line__warn" role="status">
+                  <AssetIcon name="circle-alert" :size="13" />
+                  {{ newerPicks(line) }} newer bag{{ newerPicks(line) === 1 ? '' : 's' }} picked over ones that expire sooner.
+                </p>
               </div>
               <button
-                v-if="line.allocatable > 0 && line.units.length"
+                v-if="line.allocatable > 0 && line.units.length && !onSuggestion(line)"
                 type="button"
                 class="btn btn--sm"
                 :disabled="busy"
-                @click="selectOldest(line)"
+                @click="useSuggested(line)"
               >
                 <AssetIcon name="clock" :size="13" />
-                Select oldest first
+                Use suggested
               </button>
             </header>
 
@@ -111,12 +115,13 @@
                         :id="`pick-${unit.id}`"
                         type="checkbox"
                         :checked="isPicked(line, unit)"
-                        :disabled="busy || (!isPicked(line, unit) && pickedCount(line) >= line.allocatable)"
+                        :disabled="busy || (!isPicked(line, unit) && !hasRoom(line))"
                         @change="toggle(line, unit)"
                       >
                     </td>
                     <td>
                       <label :for="`pick-${unit.id}`" class="mono unit__id">{{ unit.id }}</label>
+                      <span v-if="isSuggested(line, unit)" class="unit__tag">Suggested</span>
                       <span v-if="unitErrors[unit.id]" class="unit__error" role="alert">{{ unitErrors[unit.id] }}</span>
                     </td>
                     <td class="nowrap">
@@ -188,8 +193,15 @@
  * The server lists, per line, the units it would accept — this centre's,
  * available, in date, held for nobody, of the line's own blood type and
  * component — first-expiring first. Staff tick up to what each line still
- * needs; "Select oldest first" ticks the top of the list for them to check,
- * and each line's box finds a bag by its typed or scanned number.
+ * needs, and each line's box finds a bag by its typed or scanned number.
+ *
+ * First-expiring is a suggestion, not a rule (project owner, 2026-11-27): the
+ * dialog opens with the top of each list ticked and marked Suggested, and any
+ * other bag may be picked instead. Ticking or scanning one on a full line
+ * swaps out the latest-expiring suggested pick; bags staff ticked themselves
+ * are never dropped for them. Newer bags picked over ones that expire sooner
+ * are warned about, never refused. "Use suggested" puts the suggestion back.
+ *
  * The page sends the ticks; the server holds exactly those or refuses the
  * whole pick, naming each unit it could not take (shown against its row).
  */
@@ -219,6 +231,9 @@ const loadError = ref('')
 const lines = ref([])
 // request_item_id → Set of picked unit ids.
 const picked = ref({})
+// request_item_id → Set of the picked unit ids staff ticked or scanned
+// themselves; the rest are the suggestion, which a hand pick may swap out.
+const handPicked = ref({})
 // A line lists its first few units until asked for all, so a well-stocked
 // component does not push the next one out of sight.
 const PREVIEW = 8
@@ -248,13 +263,23 @@ async function load() {
       ? bloodCenterService.dispatchUnits(props.request.id)
       : bloodCenterService.requestUnits(props.request.id))
     lines.value = response?.lines ?? []
-    // Keep any pick still on offer, so a refusal does not wipe the rest.
+    // A line opens on the suggestion. On a reload, keep any pick still on
+    // offer, so a refusal does not wipe the rest (nor quietly refill it).
+    const before = picked.value
+    const beforeHand = handPicked.value
+
     picked.value = Object.fromEntries(lines.value.map((line) => {
+      if (!(line.request_item_id in before)) return [line.request_item_id, new Set(suggestedIds(line))]
+
       const offered = new Set(line.units.map((unit) => unit.id))
-      const kept = [...(picked.value[line.request_item_id] ?? [])].filter((id) => offered.has(id)).slice(0, line.allocatable)
+      const kept = [...before[line.request_item_id]].filter((id) => offered.has(id)).slice(0, line.allocatable)
 
       return [line.request_item_id, new Set(kept)]
     }))
+    handPicked.value = Object.fromEntries(lines.value.map((line) => [
+      line.request_item_id,
+      new Set([...(beforeHand[line.request_item_id] ?? [])].filter((id) => picked.value[line.request_item_id].has(id))),
+    ]))
   } catch (err) {
     loadError.value = err?.message || 'The units could not be loaded.'
   } finally {
@@ -324,11 +349,13 @@ function pickByNumber(line) {
       const found = matchesIn(other, term).find((unit) => !isPicked(other, unit))
 
       if (found) {
-        if (pickedCount(other) >= other.allocatable) {
+        if (!hasRoom(other)) {
           note(line, 'warn', `${found.id} is ${other.component.name}, which already has ${other.allocatable} picked.`)
         } else {
-          toggle(other, found)
-          note(line, 'ok', `${found.id} is ${other.component.name}; picked there.`)
+          const swapped = toggle(other, found)
+          note(line, 'ok', swapped
+            ? `${found.id} is ${other.component.name}; picked there in place of ${swapped}.`
+            : `${found.id} is ${other.component.name}; picked there.`)
           clearAndFocus(line, found)
         }
         return
@@ -346,13 +373,13 @@ function pickByNumber(line) {
     return
   }
 
-  if (pickedCount(line) >= line.allocatable) {
+  if (!hasRoom(line)) {
     note(line, 'warn', `${line.allocatable} ${line.component.name} already picked; untick one to pick ${unit.id}.`)
     return
   }
 
-  toggle(line, unit)
-  note(line, 'ok', `${unit.id} picked.`)
+  const swapped = toggle(line, unit)
+  note(line, 'ok', swapped ? `${unit.id} picked in place of ${swapped}.` : `${unit.id} picked.`)
   clearAndFocus(line, unit)
 }
 
@@ -384,19 +411,92 @@ function isPicked(line, unit) {
   return picked.value[line.request_item_id]?.has(unit.id) ?? false
 }
 
+/**
+ * Tick or untick a bag by hand. On a full line, ticking swaps out the
+ * latest-expiring suggested pick; returns the id swapped out, if any.
+ */
 function toggle(line, unit) {
   const set = new Set(picked.value[line.request_item_id])
+  const mine = new Set(handPicked.value[line.request_item_id])
+  let swapped = null
 
-  if (set.has(unit.id)) set.delete(unit.id)
-  else if (set.size < line.allocatable) set.add(unit.id)
+  if (set.has(unit.id)) {
+    set.delete(unit.id)
+    mine.delete(unit.id)
+  } else {
+    if (set.size >= line.allocatable) {
+      swapped = swappable(line)
+      if (!swapped) return null
+      set.delete(swapped)
+    }
+
+    set.add(unit.id)
+    mine.add(unit.id)
+  }
 
   picked.value = { ...picked.value, [line.request_item_id]: set }
+  handPicked.value = { ...handPicked.value, [line.request_item_id]: mine }
+
+  return swapped
 }
 
-/** Tick the first-expiring units, up to what the line still needs. */
-function selectOldest(line) {
-  const set = new Set(line.units.slice(0, line.allocatable).map((unit) => unit.id))
-  picked.value = { ...picked.value, [line.request_item_id]: set }
+/** The first-expiring units, up to what the line still needs: the suggestion. */
+function suggestedIds(line) {
+  return line.units.slice(0, line.allocatable).map((unit) => unit.id)
+}
+
+// request_item_id → Set of the suggested unit ids, for marking their rows.
+const suggested = computed(() => Object.fromEntries(lines.value.map((line) => [line.request_item_id, new Set(suggestedIds(line))])))
+
+function isSuggested(line, unit) {
+  return suggested.value[line.request_item_id]?.has(unit.id) ?? false
+}
+
+/** The latest-expiring pick staff did not tick themselves, which a hand pick may replace. */
+function swappable(line) {
+  const set = picked.value[line.request_item_id]
+  const mine = handPicked.value[line.request_item_id]
+
+  for (let index = line.units.length - 1; index >= 0; index--) {
+    const id = line.units[index].id
+    if (set?.has(id) && !mine?.has(id)) return id
+  }
+
+  return null
+}
+
+/** Whether another bag can be ticked: the line is not full, or a suggested pick can make way. */
+function hasRoom(line) {
+  return pickedCount(line) < line.allocatable || swappable(line) !== null
+}
+
+function onSuggestion(line) {
+  const set = picked.value[line.request_item_id]
+  const suggested = suggestedIds(line)
+
+  return set?.size === suggested.length && suggested.every((id) => set.has(id))
+}
+
+/** Put the suggestion back: the first-expiring units, ticked for staff to check. */
+function useSuggested(line) {
+  picked.value = { ...picked.value, [line.request_item_id]: new Set(suggestedIds(line)) }
+  handPicked.value = { ...handPicked.value, [line.request_item_id]: new Set() }
+}
+
+/**
+ * Picked bags that expire later than ones left on the shelf: those dated past
+ * the last of the same number of first-expiring units. Ties on a date count
+ * as in order. Warned about, never refused.
+ */
+function newerPicks(line) {
+  const set = picked.value[line.request_item_id]
+  const count = set?.size ?? 0
+  if (!count) return 0
+
+  const bar = line.units[count - 1]?.expiry_date
+  if (!bar) return 0
+
+  return line.units.filter((unit) => set.has(unit.id) && unit.expiry_date > bar).length
 }
 
 function confirm() {
@@ -525,6 +625,8 @@ onMounted(() => {
 .line__title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; font-size: 13.5px; font-weight: 700; }
 .line__meta { margin: 3px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
 .line__meta strong { color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.line__warn { display: flex; align-items: center; gap: 6px; margin: 3px 0 0; font-size: 12px; color: var(--rb-warning-text); }
+.line__warn :deep(.asset-icon) { flex-shrink: 0; }
 
 /* Find a bag by number: typed, or scanned with a barcode scanner. */
 .scan { display: flex; flex-direction: column; gap: 5px; }
@@ -603,6 +705,7 @@ onMounted(() => {
 .unit--on { background: rgba(var(--rb-primary-rgb), 0.06); }
 .unit--error td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
 .unit__id { font-weight: 600; cursor: pointer; }
+.unit__tag { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); }
 .unit__error { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-accent-text); }
 
 .expiry { display: inline-flex; align-items: center; gap: 6px; }

@@ -128,7 +128,8 @@ describe('Fulfillment\'s payment notice', () => {
     expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
-  it('leaves a blocked statement to Billing rather than letting Issuance apply subsidy', () => {
+  // Issuance subsidises only from Issue on Incoming Requests (2026-11-27).
+  it('leaves a blocked statement to Billing rather than applying the subsidy here', () => {
     expect(page).not.toContain('applySubsidy(')
     expect(page).not.toContain("can('billing.subsidise')")
     expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)

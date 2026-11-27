@@ -21,6 +21,20 @@
         </p>
       </div>
 
+      <div v-if="soonerBag" class="banner banner--warning" role="status">
+        <AssetIcon name="clock" :size="15" />
+        <div class="banner__text">
+          <span>
+            {{ soonerBags.length }} {{ unit.blood_type?.code }} {{ unit.component?.name }}
+            bag{{ soonerBags.length === 1 ? ' expires' : 's expire' }} sooner than this one. Suggested:
+            <strong class="mono">{{ bagLabel(soonerBag) }}</strong>, expiring {{ formatDate(soonerBag.expiry_date) }}.
+          </span>
+          <button type="button" class="link-btn" :disabled="busy" @click="$emit('switch', soonerBag)">
+            Tag {{ bagLabel(soonerBag) }} instead
+          </button>
+        </div>
+      </div>
+
       <label class="field">
         <span class="field__label">Blood Request (optional)</span>
         <SelectField
@@ -110,6 +124,12 @@
  * the hospital's open requests fills the form from it; the bag a request was
  * received for preselects that request. What staff type wins over what the
  * request says, exactly as the API merges them.
+ *
+ * First-expiring is a suggestion, not a rule (project owner, 2026-11-27): when
+ * a bag of the same blood type and component on the shelf expires sooner, the
+ * soonest is named with a switch to tag it instead, and the bag staff opened
+ * can still be tagged as it is. A bag received for another patient's request
+ * is never suggested.
  */
 
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -125,7 +145,7 @@ const props = defineProps({
   fieldErrors: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['confirm', 'close'])
+const emit = defineEmits(['confirm', 'close', 'switch'])
 
 const requirements = ref([])
 const requirementsLoading = ref(false)
@@ -165,7 +185,57 @@ watch(selectedRequirement, (request) => {
   form.patient_sex = request.patient.sex ?? ''
 })
 
-onMounted(loadRequirements)
+// This bag's blood type and component on the shelf, first-expiring first.
+const shelf = ref([])
+let shelfTicket = 0
+
+/**
+ * Bags free for this patient that expire before this one, soonest first:
+ * stocked, in date, untagged, and not received for another patient's request.
+ * Ties on a date are not sooner.
+ */
+const soonerBags = computed(() => {
+  const expiry = props.unit.expiry_date
+  if (!expiry) return []
+
+  return shelf.value.filter((bag) => bag.unit_id !== props.unit.unit_id
+    && !bag.bag_expired
+    && bag.expiry_date
+    && bag.expiry_date < expiry
+    && (!bag.source?.transfusion_request_id || bag.source.transfusion_request_id === requirementId.value))
+})
+
+const soonerBag = computed(() => soonerBags.value[0] ?? null)
+
+async function loadShelf() {
+  const ticket = ++shelfTicket
+  const bloodTypeId = props.unit.blood_type?.id
+  const componentId = props.unit.component?.id
+  shelf.value = []
+
+  if (!bloodTypeId || !componentId) return
+
+  try {
+    const response = await hospitalService.inventory({
+      status: 'available',
+      blood_type_id: bloodTypeId,
+      component_id: componentId,
+      sort: 'fefo',
+      per_page: 100,
+    })
+    if (ticket === shelfTicket) shelf.value = response?.data ?? []
+  } catch {
+    // Only a suggestion: without it the bag is tagged as chosen.
+  }
+}
+
+// Switched to the suggested bag: look again from there.
+watch(() => props.unit.unit_id, loadShelf)
+
+onMounted(() => {
+  loadRequirements()
+  loadShelf()
+})
 
 async function loadRequirements() {
   requirementsLoading.value = true
@@ -203,6 +273,10 @@ function submit() {
   }
 
   emit('confirm', payload)
+}
+
+function bagLabel(bag) {
+  return bag.bag_number || bag.unit_id
 }
 
 function formatDate(value) {
@@ -261,6 +335,16 @@ function formatDate(value) {
   color: var(--rb-warning-text);
   border: 1px solid rgba(var(--rb-warning-rgb), 0.3);
 }
+.banner :deep(.asset-icon) { flex-shrink: 0; margin-top: 1px; }
+.banner__text { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+
+.link-btn {
+  padding: 0; border: 0; background: none;
+  color: var(--rb-primary-text); font: inherit; font-weight: 600; cursor: pointer;
+}
+.link-btn:hover:not(:disabled) { text-decoration: underline; }
+.link-btn:disabled { opacity: .55; cursor: not-allowed; }
+.link-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
