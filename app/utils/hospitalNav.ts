@@ -53,6 +53,9 @@ export const HOSPITAL_NAV_GROUPS: HospitalNavGroup[] = [
       // Stock-in's own page, apart from the inventory (project owner, 2026-10-28).
       { label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', requires: 'hospital.inventory.stock_in' },
       { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', requires: 'hospital.inventory.view' },
+      // Other hospitals' open Blood Requests, supplied from this shelf's
+      // near-expiry bags (project owner, 2026-11-28).
+      { label: "Other Hospitals' Requests", path: '/hospital/supply-requests', icon: 'send', requires: 'hospital.inventory.view' },
     ],
   },
   {

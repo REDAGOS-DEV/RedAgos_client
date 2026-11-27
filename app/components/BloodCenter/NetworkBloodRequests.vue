@@ -319,15 +319,16 @@ function viewRow(row) {
         { label: 'Released', value: line.fulfilled },
         { label: 'Unallocated', value: line.unallocated },
       ] })),
-      { title: 'Blood centers', rows: shares.length
+      // A hospital may supply one from its own near-expiry stock (2026-11-28).
+      { title: 'Suppliers', rows: shares.length
         // Keyed by the share's reference: one center can hold two shares.
         ? shares.map((share) => ({
             label: share.reference_number,
-            value: `${share.centre || 'Blood center'}${share.is_mine ? ' (this center)' : ''} · ${share.quantity} unit${share.quantity === 1 ? '' : 's'} · ${share.status_label}`,
+            value: `${share.centre || 'Supplier'}${share.is_mine ? ' (this center)' : ''} · ${share.quantity} unit${share.quantity === 1 ? '' : 's'} · ${share.status_label}`,
             to: share.is_mine && share.id ? { path: '/blood-center/bloodrequests', query: { request: share.id } } : undefined,
             wide: true,
           }))
-        : [{ label: 'Blood centers', value: 'No blood center yet', wide: true }] },
+        : [{ label: 'Suppliers', value: 'None yet', wide: true }] },
       { title: 'This center', rows: [
         { label: 'Adding a share', value: row.add_share_blocked, wide: true },
       ] },

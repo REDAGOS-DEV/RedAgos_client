@@ -35,6 +35,8 @@ export type HospitalUnitStatus =
   | 'transfused'
   | 'expired'
   | 'discarded'
+  // Sent to another hospital's Blood Request from this shelf (2026-11-28).
+  | 'transferred'
 
 /** unit_tags.status — one patient's hold on one bag, and how it ended. */
 export type UnitTagStatus =
@@ -270,6 +272,7 @@ export type HospitalActivityKind =
   | 'returned'
   | 'discarded'
   | 'expired'
+  | 'transferred'
 
 export interface HospitalInventoryActivity {
   id: number

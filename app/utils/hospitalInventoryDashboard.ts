@@ -24,6 +24,8 @@ const STATUS_TAGS: Record<HospitalUnitStatus, HospitalInventoryTag> = {
   transfused: { label: 'Transfused', tone: 'muted' },
   expired: { label: 'Expired', tone: 'danger' },
   discarded: { label: 'Discarded', tone: 'muted' },
+  // Sent to another hospital's Blood Request (2026-11-28): gone from this shelf.
+  transferred: { label: 'Sent to Another Hospital', tone: 'muted' },
 }
 
 /**
@@ -57,7 +59,7 @@ export function hospitalUnitStatusTag(status: HospitalUnitStatus, daysRemaining:
  * the blood bank, so it shows no days rather than a stale number.
  */
 export function hospitalRemainingDaysTag(status: HospitalUnitStatus, daysRemaining: number | null): InventoryTag {
-  if (status === 'transfused' || status === 'discarded') return { label: '—', tone: 'muted' }
+  if (status === 'transfused' || status === 'discarded' || status === 'transferred') return { label: '—', tone: 'muted' }
 
   return remainingDaysTag(status, daysRemaining)
 }
@@ -75,6 +77,7 @@ const ACTIVITY_KINDS: Record<HospitalActivityKind, ActivityKindMeta> = {
   returned: { label: 'Back in Storage', icon: 'refresh-cw', tone: 'neutral' },
   discarded: { label: 'Discarded', icon: 'trash-2', tone: 'danger' },
   expired: { label: 'Expired', icon: 'clock', tone: 'danger' },
+  transferred: { label: 'Sent to Another Hospital', icon: 'send', tone: 'neutral' },
 }
 
 /** How one activity entry is titled and marked. */

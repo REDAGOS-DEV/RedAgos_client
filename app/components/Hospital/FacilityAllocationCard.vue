@@ -5,6 +5,8 @@
         <span class="allocation__facility">{{ allocation.target_facility?.name || 'Blood center' }}</span>
         <NuxtLink :to="`/hospital/bloodrequests/${allocation.id}`" class="allocation__ref">{{ allocation.reference_number }}</NuxtLink>
         <span v-if="allocation.is_walk_in" class="allocation__tag">Walk-in at this center</span>
+        <!-- Another hospital sent bags from its own near-expiry stock (2026-11-28). -->
+        <span v-else-if="allocation.supplied_by_hospital" class="allocation__tag">Sent from hospital stock</span>
         <!-- A share the center added itself from every hospital's Blood Requests (2026-11-19): nobody here asked. -->
         <span v-else-if="!allocation.requester_name && allocation.recorder_name" class="allocation__tag">Added by the center</span>
       </div>

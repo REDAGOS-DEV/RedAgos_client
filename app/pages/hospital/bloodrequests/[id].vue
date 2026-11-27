@@ -101,7 +101,7 @@
                 <span class="info-label">Submitted By</span>
                 <span class="info-value">
                   {{ request.requester_name
-                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : (request.recorder_name ? `Added by ${request.target_facility?.name || 'the blood center'}` : '—')) }}
+                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : (request.recorder_name ? `${request.supplied_by_hospital ? 'Sent' : 'Added'} by ${request.target_facility?.name || 'the blood center'}` : '—')) }}
                 </span>
               </div>
               <div class="info-item">

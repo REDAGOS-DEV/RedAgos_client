@@ -76,6 +76,60 @@ export interface Paginated<T> {
   last_page: number
   per_page: number
   total: number
+  from?: number | null
+  to?: number | null
+}
+
+/** Another hospital's open Blood Request, as this blood bank sees it: no patient (2026-11-28). */
+export interface SupplyRequestRow {
+  id: number
+  reference_number: string
+  hospital: { id: number; name: string | null }
+  blood_type: { id: number | null; code: string | null }
+  urgency_level: string
+  urgency_label: string
+  is_emergency: boolean
+  status: string
+  status_label: string
+  is_open: boolean
+  request_date: string | null
+  needed_by: string | null
+  lines: Array<{
+    transfusion_request_item_id: number
+    component: { id: number; name: string | null; code: string | null }
+    required: number
+    fulfilled: number
+    unallocated: number
+    near_expiry_here: number
+    sendable: number
+  }>
+  suppliers: Array<{ reference_number: string; name: string | null; is_mine: boolean; quantity: number; status_label: string }>
+  unallocated_quantity: number
+  sendable_quantity: number
+  can_supply: boolean
+  supply_blocked: string | null
+}
+
+/** The near-expiry bags this blood bank may send for one request, by line. */
+export interface SupplyCandidates {
+  request_id: number
+  reference_number: string
+  hospital: string | null
+  blood_type: string | null
+  window_days: number
+  lines: Array<{
+    transfusion_request_item_id: number
+    component: { id: number; name: string | null; code: string | null }
+    unallocated: number
+    units: Array<{
+      unit_id: string
+      bag_number: string
+      expiry_date: string | null
+      days_remaining: number | null
+      storage_location: string | null
+      volume_ml: number | null
+    }>
+  }>
 }
 
 class HospitalService extends BaseService {
@@ -136,6 +190,28 @@ class HospitalService extends BaseService {
   eligibleFacilities() {
     return this.request<{ facilities: Array<{ id: number; name: string; address: string | null }> }>(
       '/hospital/facilities',
+    )
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Other hospitals' Blood Requests, which this blood bank may supply
+   * from its own near-expiry stock (project owner, 2026-11-28). No
+   * patient names; nothing is billed.
+   * ---------------------------------------------------------------- */
+
+  listSupplyRequests(params: { search?: string; page?: number; per_page?: number } = {}) {
+    return this.request<Paginated<SupplyRequestRow>>('/hospital/supply-requests', 'GET', params)
+  }
+
+  supplyCandidates(id: number) {
+    return this.request<SupplyCandidates>(`/hospital/supply-requests/${id}/units`)
+  }
+
+  supplyRequest(id: number, unitIds: string[]) {
+    return this.request<{ message: string; share: { id: number; reference_number: string }; request: SupplyRequestRow }>(
+      `/hospital/supply-requests/${id}/supply`,
+      'POST',
+      { unit_ids: unitIds },
     )
   }
 

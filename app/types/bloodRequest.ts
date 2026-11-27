@@ -297,6 +297,8 @@ export interface BloodRequest {
   requesting_facility: FacilityStub | null
   /** Absent on the fulfilling side's projection, which always means itself. */
   target_facility?: FacilityStub | null
+  /** Sent by another hospital from its own near-expiry stock (2026-11-28), not a centre. */
+  supplied_by_hospital?: boolean
   request_purpose: RequestPurpose
   purpose_label: string
   request_source: RequestSource

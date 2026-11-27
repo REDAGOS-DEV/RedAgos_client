@@ -1187,6 +1187,7 @@ const statusTabs = computed(() => {
       { value: 'partner_reserved', label: 'Reserved for partner', tone: 'neutral' },
       { value: 'transfused', label: 'Transfused', tone: 'neutral' },
       { value: 'discarded', label: 'Discarded', tone: 'neutral' },
+      { value: 'transferred', label: 'Sent to another hospital', tone: 'neutral' },
     ]
       .map((tab) => ({ ...tab, count: n(tab.value) }))
       .filter((tab) => tab.count > 0 || filters.status === tab.value),
@@ -1318,7 +1319,7 @@ const drawerTag = computed(() => (drawerUnit.value
 const drawerRemaining = computed(() => {
   const unit = drawerUnit.value
   if (!unit || unit.days_remaining === null || unit.days_remaining === undefined) return ''
-  if (['transfused', 'discarded'].includes(unit.status)) return ''
+  if (['transfused', 'discarded', 'transferred'].includes(unit.status)) return ''
   const d = unit.days_remaining
   if (d < 0) return `Expired ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} ago`
   if (d === 0) return 'Expires today'
