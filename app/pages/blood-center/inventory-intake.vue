@@ -276,12 +276,16 @@
                 </span>
               </div>
 
-              <DatePicker v-model="row.expiry_date" :aria-label="`Bag ${index + 1} expiry date`" />
+              <!-- Read-only: the date on Processing's final label (project owner, 2026-11-27). -->
+              <span class="bag-expiry" :aria-label="`Bag ${index + 1} expiry date`">{{ formatDay(row.expiry_date) }}</span>
 
-              <!-- Every bag goes onto a shelf (project owner, 2026-10-13): no "not recorded". -->
+              <!--
+                Every bag goes onto a shelf (project owner, 2026-10-13): no "not recorded".
+                Only the shelves of its component's storage area (2026-11-27).
+              -->
               <SelectField
                 v-model="row.storage_location"
-                :options="storageLocations.map((loc) => ({ value: loc, label: loc }))"
+                :options="locationsFor(row.component_id).map((loc) => ({ value: loc, label: loc }))"
                 placeholder="Select a location"
                 :aria-label="`Bag ${index + 1} storage location`"
               />
@@ -382,7 +386,6 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 import { normalizeBarcode } from '~/utils/phlebotomy'
 import SelectField from '~/components/common/SelectField.vue'
-import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import RecentlyBookedIn from '~/components/BloodCenter/RecentlyBookedIn.vue'
@@ -439,6 +442,8 @@ const service = bloodCenterService
 const queue = ref([])
 const selected = ref(null)
 const storageLocations = ref([])
+// Component id → the shelves of its storage area; null means any shelf.
+const componentLocations = ref({})
 
 const loadingQueue = ref(true)
 const busy = ref(false)
@@ -486,14 +491,24 @@ const blockers = computed(() => {
   const list = []
 
   if (!unitRows.value.length) list.push('Add at least one bag.')
-  if (unitRows.value.some((row) => !row.expiry_date)) list.push('Every bag needs an expiry date.')
+  if (unitRows.value.some((row) => !row.expiry_date)) list.push('A bag has no expiry date because the donation has no date recorded.')
 
   // Every bag goes onto a shelf (project owner, 2026-10-13).
+  const shelfless = [...new Set(unitRows.value
+    .filter((row) => !locationsFor(row.component_id).length)
+    .map((row) => componentName(row.component_id)))]
+
   if (!storageLocations.value.length) list.push('The storage locations could not be loaded. Reload the page to book bags in.')
+  else if (shelfless.length) list.push(`No storage location is set up for ${shelfless.join(', ')}.`)
   else if (unitRows.value.some((row) => !row.storage_location)) list.push('Every bag needs a storage location.')
 
   return list
 })
+
+/** The shelves a bag may go on: its component's storage area, or every location when none is set. */
+function locationsFor(componentId) {
+  return componentLocations.value[componentId] ?? storageLocations.value
+}
 
 const canBook = computed(() => Boolean(selected.value?.into_stock) && barcoded.value && shelvable.value.length > 0
   && !busy.value && !blockers.value.length)
@@ -558,6 +573,15 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? 'date not recorded' : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
+/** A calendar date (Y-m-d) on the local day, so it never shifts by a timezone. */
+function formatDay(value) {
+  if (!value) return '—'
+
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
+}
+
 /* VIEW: a waiting donation's eye opens everything the queue leaves out (project owner, 2026-11-27) */
 const viewing = ref(null)
 const NUMBERS_MISSING = {
@@ -603,7 +627,7 @@ function openViewed() {
 
 /**
  * Expiry is derived, not typed: donation date plus the component's shelf life.
- * Left editable because a bag's own printed date wins over a computed one.
+ * Read-only (project owner, 2026-11-27): it is the date already printed on the bag.
  */
 function applyExpiry(row) {
   const component = shelvable.value.find((c) => c.component_id === row.component_id)
@@ -756,10 +780,14 @@ async function loadReference() {
     const res = await service.referenceData()
 
     storageLocations.value = res?.storage_locations ?? []
+    componentLocations.value = Object.fromEntries((res?.components ?? [])
+      .filter((c) => Array.isArray(c.storage_locations))
+      .map((c) => [c.id, c.storage_locations]))
   } catch {
     // Every bag needs a location, so without the list nothing can be booked
     // in; the blockers say so.
     storageLocations.value = []
+    componentLocations.value = {}
   }
 }
 
@@ -1362,6 +1390,7 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs:
 }
 .bags__row--ready .bag-mark { border-color: var(--rb-success); background: var(--rb-success); color: #fff; }
 .bag-fixed { gap: 1px; }
+.bag-expiry { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bag-fixed__expiry { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 11.5px; font-weight: 600; }
 .bag-fixed__expiry--ok { color: var(--rb-text-secondary); font-weight: 500; }
 .bag-fixed__expiry--warn { color: var(--rb-warning-text); }

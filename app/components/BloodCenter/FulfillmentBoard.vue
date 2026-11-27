@@ -152,248 +152,287 @@
         </EmptyState>
       </div>
 
-      <div v-else class="request-groups">
-        <section v-for="group in groups" :key="group.key" class="fx-group" :aria-label="group.label || 'Requests'">
-          <!-- A group's head: what it holds and how many; it folds away. -->
-          <button
-            v-if="group.label"
-            type="button"
-            class="fx-group__head"
-            :aria-expanded="!folded.has(group.key)"
-            @click="toggleGroup(group.key)"
-          >
-            <AssetIcon :name="folded.has(group.key) ? 'chevron-right' : 'chevron-down'" :size="15" class="fx-group__chev" />
-            <span class="fx-group__dot" :class="`fx-group__dot--${group.tone}`" aria-hidden="true" />
-            <span class="fx-group__title">{{ group.label }}</span>
-            <span class="fx-group__count">{{ group.items.length }}</span>
-            <span v-if="group.hint" class="fx-group__hint">{{ group.hint }}</span>
-          </button>
+      <!--
+        One row a request, one plain value a column, like the other lists
+        (project owner, 2026-11-27). The eye shows the request; the row or Open
+        opens it, where its units are picked, returned and dispatched.
+      -->
+      <div v-else class="card fx-table-card fade-in" style="--delay:80ms">
+        <div class="fx-table-wrap">
+          <table class="fx-table">
+            <caption class="sr-only">{{ forDispatch ? (awaitingRelease ? 'Requests cleared to dispatch' : 'Requests waiting on the hospital to confirm receipt') : 'Requests whose invoice still has a balance' }}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Request</th>
+                <th scope="col">Received</th>
+                <th scope="col">Hospital</th>
+                <th scope="col">Blood Type</th>
+                <th scope="col" class="num">Requested</th>
+                <template v-if="awaitingRelease">
+                  <th scope="col" class="num">Tagged</th>
+                  <th scope="col">First Expiry</th>
+                  <th scope="col">Needed By</th>
+                  <th scope="col">Payment</th>
+                </template>
+                <template v-else>
+                  <th scope="col" class="num">Dispatched</th>
+                  <th scope="col" class="num">Confirmed</th>
+                </template>
+                <th scope="col">Status</th>
+                <th scope="col" class="end"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
 
-      <div v-show="!folded.has(group.key)" class="request-list">
-        <article
-          v-for="request in group.items"
-          :id="`request-${request.id}`"
-          :key="request.id"
-          class="card request-card fade-in"
-          :class="{ 'request-card--stat': request.is_emergency, 'request-card--focus': request.id === focusId }"
-        >
-          <header class="request-head">
-            <div>
-              <div class="request-title">
-                <span class="mono">{{ request.reference_number }}</span>
-                <span v-if="request.id === nextUpId" class="tag tag--next">
-                  <AssetIcon name="flag" :size="11" />
-                  Next up
-                </span>
-                <span v-if="request.is_emergency" class="tag tag--stat">STAT</span>
-                <span v-if="request.is_walk_in" class="tag tag--walk-in">Walk-in</span>
-                <span
-                  v-if="request.weekly_request"
-                  class="tag tag--weekly"
-                  title="The hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
-                >Weekly · {{ request.weekly_request.reference_number }}</span>
-                <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
-              </div>
-              <p class="request-sub">
-                <span class="request-facility">{{ request.requesting_facility?.name || 'Hospital not recorded' }}</span>
-                <span v-for="code in (bloodTypeCodes(request).length ? bloodTypeCodes(request) : ['?'])" :key="code" class="blood-pill">{{ code }}</span>
-                <span>
-                  {{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested<template v-if="request.committed_quantity != null">, {{ request.committed_quantity }} committed</template>
-                </span>
-              </p>
-              <!-- When it came in, and when it is needed: the reasons for its place in the list. -->
-              <p class="request-when">
-                <span v-if="request.request_date" class="when">
-                  <AssetIcon name="clock" :size="13" />
-                  Received {{ formatWhen(request.request_date) }}<template v-if="waitingFor(request)"> · waiting {{ waitingFor(request) }}</template>
-                </span>
-                <span v-if="neededBy(request)" class="when" :class="{ 'when--soon': isSoon(neededBy(request)) }">
-                  <AssetIcon name="calendar" :size="13" />
-                  Needed by {{ formatWhen(neededBy(request)) }}
-                </span>
-                <span v-if="expiringCount(request)" class="when when--soon">
-                  <AssetIcon name="triangle-alert" :size="13" />
-                  {{ expiringCount(request) }} unit{{ expiringCount(request) === 1 ? '' : 's' }} expiring within 7 days
-                </span>
-              </p>
-              <!-- A replenishment order's hand-over, as the center confirmed it (project owner, 2026-10-29). -->
-              <p v-if="request.supply_plan" class="handover">
-                <AssetIcon :name="request.supply_plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="14" />
-                <strong>{{ request.supply_plan.handover_method === 'delivery' ? 'Deliver' : 'Pick-up' }} · {{ handoverWhen(request.supply_plan.scheduled_at) }}</strong>
-                <span v-if="request.supply_plan.handover_address">{{ request.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ request.supply_plan.handover_address }}</span>
-              </p>
-            </div>
+            <tbody v-for="group in groups" :key="group.key">
+              <!-- A group's head: what it holds and how many; it folds away. -->
+              <tr v-if="group.label" class="fx-group-row">
+                <th :colspan="columnCount" scope="colgroup">
+                  <button
+                    type="button"
+                    class="fx-group__head"
+                    :aria-expanded="!folded.has(group.key)"
+                    @click="toggleGroup(group.key)"
+                  >
+                    <AssetIcon :name="folded.has(group.key) ? 'chevron-right' : 'chevron-down'" :size="15" class="fx-group__chev" />
+                    <span class="fx-group__dot" :class="`fx-group__dot--${group.tone}`" aria-hidden="true" />
+                    <span class="fx-group__title">{{ group.label }}</span>
+                    <span class="fx-group__count">{{ group.items.length }}</span>
+                    <span v-if="group.hint" class="fx-group__hint">{{ group.hint }}</span>
+                  </button>
+                </th>
+              </tr>
 
-            <!--
-              The three state counts are gone (project owner, 2026-11-11): the
-              fulfilment and units tables below say the same. Waiting on the
-              hospital, the one figure that matters stays: how much arrived.
-            -->
-            <span
-              v-if="activeTab === 'awaiting_receipt'"
-              class="receipt-state"
-              :class="{ 'receipt-state--part': (request.received_count ?? 0) > 0 }"
-              title="Receipt is confirmed by the hospital, not here."
-            >
-              <AssetIcon :name="(request.received_count ?? 0) > 0 ? 'package-check' : 'clock'" :size="14" />
-              <template v-if="(request.received_count ?? 0) > 0">
-                Hospital confirmed {{ request.received_count }} of {{ request.fulfilled_quantity ?? 0 }}
-              </template>
-              <template v-else>
-                0 of {{ request.fulfilled_quantity ?? 0 }} confirmed
-              </template>
-            </span>
-          </header>
-
-          <!-- What was asked for beside what has been provided, per component. -->
-          <RequestFulfilmentTable v-if="request.detail" :request="request.detail" class="request-fulfilment" />
-          <div v-else-if="request.items?.length" class="lines">
-            <span v-for="item in request.items" :key="item.id" class="line-chip">
-              {{ requestLineLabel(request, item) }} &times;{{ item.quantity }}
-            </span>
-          </div>
-
-          <!-- BILLING GATE -->
-          <div
-            v-if="activeTab === 'awaiting_release'"
-            class="gate"
-            :class="gateFor(request).ok ? 'gate--ok' : 'gate--blocked'"
-          >
-            <AssetIcon :name="gateFor(request).ok ? 'check' : 'octagon-alert'" :size="15" />
-            <span>{{ gateFor(request).message }}</span>
-            <!-- Issuance only sees the release gate. Billing now owns every
-                 subsidy decision and checks its centrally scheduled dates. -->
-            <NuxtLink v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing" class="gate-link">
-              Go to Billing
-            </NuxtLink>
-            <button
-              v-if="gateFor(request).canDefer"
-              type="button"
-              class="ui-btn ui-btn--sm gate-action"
-              :disabled="busyId === request.id"
-              @click="openDefer(request)"
-            >
-              Issue with Deferred Payment
-            </button>
-          </div>
-
-          <!-- UNITS -->
-          <div class="units">
-            <div v-if="request.loadingUnits" class="skeleton skeleton--row" />
-
-            <table v-else-if="request.allocations?.length" class="units-table">
-              <thead>
-                <tr>
-                  <th v-if="activeTab === 'awaiting_release' && !isOrder(request)" scope="col" class="pick">
-                    <input
-                      type="checkbox"
-                      :checked="allSelected(request)"
-                      :aria-label="`Select every tagged unit on ${request.reference_number}`"
-                      @change="toggleAll(request)"
-                    >
-                  </th>
-                  <th scope="col">Unit</th>
-                  <th scope="col">Component</th>
-                  <th scope="col">Expires</th>
-                  <th scope="col">Storage</th>
-                  <th scope="col">State</th>
-                  <th v-if="hasReleased(request)" scope="col">Dispatched</th>
-                  <th v-if="hasReleased(request) && canCorrectDispatch" scope="col"><span class="sr-only">Correct</span></th>
-                  <th scope="col" class="view-col"><span class="sr-only">View</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="allocation in request.allocations" :key="allocation.id">
-                  <td v-if="activeTab === 'awaiting_release' && !isOrder(request)" class="pick">
-                    <input
-                      v-if="allocation.status === 'allocated'"
-                      type="checkbox"
-                      :checked="isSelected(request, allocation.id)"
-                      :aria-label="`Select unit ${allocation.unit_id}`"
-                      @change="toggleUnit(request, allocation.id)"
-                    >
-                  </td>
-                  <td class="mono">{{ allocation.unit_id }}</td>
-                  <td>{{ componentFor(request, allocation) }}</td>
-                  <td :class="{ expiring: isExpiringSoon(allocation.expiry_date) }">
-                    {{ allocation.expiry_date || 'Not set' }}
-                  </td>
-                  <td :class="{ muted: !allocation.storage_location }">{{ allocation.storage_location || 'Not set' }}</td>
-                  <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
-                  <td>{{ allocation.received_at ? 'Received' : allocation.status_label }}</td>
-                  <td v-if="hasReleased(request)">{{ allocation.status === 'released' ? formatWhen(allocation.released_at) : '—' }}</td>
-                  <td v-if="hasReleased(request) && canCorrectDispatch">
-                    <button
-                      v-if="allocation.status === 'released'"
-                      type="button"
-                      class="ui-btn ui-btn--sm"
-                      :aria-label="`Request a correction to the dispatch record of unit ${allocation.unit_id}`"
-                      @click="openCorrect(request, allocation)"
-                    >
-                      Correct
+              <template v-if="!folded.has(group.key)">
+                <tr
+                  v-for="request in group.items"
+                  :id="`request-${request.id}`"
+                  :key="request.id"
+                  class="fx-row"
+                  :class="{ 'fx-row--stat': request.is_emergency, 'fx-row--focus': request.id === focusId }"
+                  tabindex="0"
+                  :aria-label="`Open ${request.reference_number}`"
+                  @click="openRequest(request)"
+                  @keydown.enter.self="openRequest(request)"
+                >
+                  <td class="mono nowrap">{{ request.reference_number }}</td>
+                  <td class="nowrap">{{ formatWhen(request.request_date) }}</td>
+                  <td>{{ request.requesting_facility?.name || 'Not recorded' }}</td>
+                  <td class="nowrap">{{ bloodTypeCodes(request).join(', ') || '—' }}</td>
+                  <td class="num">{{ request.quantity }}</td>
+                  <template v-if="awaitingRelease">
+                    <td class="num">{{ isOrder(request) ? '—' : taggedCount(request) }}</td>
+                    <td class="nowrap">{{ firstExpiry(request) || '—' }}</td>
+                    <td class="nowrap">{{ neededBy(request) ? formatWhen(neededBy(request)) : '—' }}</td>
+                    <td class="nowrap">{{ paymentLabel(request) }}</td>
+                  </template>
+                  <template v-else>
+                    <td class="num">{{ request.fulfilled_quantity ?? 0 }}</td>
+                    <td class="num">{{ request.received_count ?? 0 }}</td>
+                  </template>
+                  <td class="nowrap">{{ requestStatusLabel(request) }}</td>
+                  <td class="end nowrap">
+                    <RowViewButton :label="`View ${request.reference_number}`" @view="viewRequest(request)" />
+                    <button type="button" class="fx-open" :aria-label="`Open ${request.reference_number}`" @click.stop="openRequest(request)">
+                      Open
+                      <AssetIcon name="arrow-right" :size="14" />
                     </button>
                   </td>
-                  <td class="view-col">
-                    <RowViewButton :label="`View unit ${allocation.unit_id}`" @view="viewUnit(request, allocation)" />
-                  </td>
                 </tr>
-              </tbody>
-            </table>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </template>
+    </div>
 
-            <p v-else class="units-empty">{{ isOrder(request) ? 'Nothing is held for this order. Pick its units as you dispatch it.' : 'No units are tagged for this request.' }}</p>
-          </div>
+    <!--
+      A request opened from its row: what its card used to hold (project owner,
+      2026-11-27). It steps aside while one of its own dialogs is open, and is
+      back when that one is cancelled.
+    -->
+    <CenterModal
+      :open="Boolean(opened) && !stepping"
+      :title="opened?.reference_number || 'Request'"
+      :eyebrow="opened ? requestKind(opened) : ''"
+      size="lg"
+      @close="closeRequest"
+    >
+      <template v-if="opened" #meta>
+        <span>{{ opened.requesting_facility?.name || 'Hospital not recorded' }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ bloodTypeCodes(opened).join(', ') || 'Blood type not recorded' }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ opened.quantity }} unit{{ opened.quantity === 1 ? '' : 's' }} requested<template v-if="opened.committed_quantity != null">, {{ opened.committed_quantity }} committed</template></span>
+        <span aria-hidden="true">·</span>
+        <span>{{ requestStatusLabel(opened) }}</span>
+      </template>
 
-          <!-- ACTIONS -->
+      <div v-if="opened" class="rq">
+        <!-- A replenishment order's hand-over, as the center confirmed it (project owner, 2026-10-29). -->
+        <p v-if="opened.supply_plan" class="handover">
+          <AssetIcon :name="opened.supply_plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="14" />
+          <strong>{{ opened.supply_plan.handover_method === 'delivery' ? 'Deliver' : 'Pick-up' }} · {{ handoverWhen(opened.supply_plan.scheduled_at) }}</strong>
+          <span v-if="opened.supply_plan.handover_address">{{ opened.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ opened.supply_plan.handover_address }}</span>
+        </p>
+
+        <!-- What was asked for beside what has been provided, per component. -->
+        <RequestFulfilmentTable v-if="opened.detail" :request="opened.detail" />
+        <div v-else-if="opened.items?.length" class="lines">
+          <span v-for="item in opened.items" :key="item.id" class="line-chip">
+            {{ requestLineLabel(opened, item) }} &times;{{ item.quantity }}
+          </span>
+        </div>
+
+        <!-- BILLING GATE -->
+        <div
+          v-if="awaitingRelease"
+          class="gate"
+          :class="gateFor(opened).ok ? 'gate--ok' : 'gate--blocked'"
+        >
+          <AssetIcon :name="gateFor(opened).ok ? 'check' : 'octagon-alert'" :size="15" />
+          <span>{{ gateFor(opened).message }}</span>
+          <!-- Issuance only sees the release gate. Billing now owns every
+               subsidy decision and checks its centrally scheduled dates. -->
+          <NuxtLink v-if="!gateFor(opened).ok && can('billing.record_payment')" to="/blood-center/billing" class="gate-link">
+            Go to Billing
+          </NuxtLink>
+          <button
+            v-if="gateFor(opened).canDefer"
+            type="button"
+            class="ui-btn ui-btn--sm gate-action"
+            :disabled="busyId === opened.id"
+            @click="openDefer(opened)"
+          >
+            Issue with Deferred Payment
+          </button>
+        </div>
+
+        <!-- UNITS -->
+        <div class="units">
+          <div v-if="opened.loadingUnits" class="skeleton skeleton--row" />
+
+          <table v-else-if="opened.allocations?.length" class="units-table">
+            <thead>
+              <tr>
+                <th v-if="awaitingRelease && !isOrder(opened)" scope="col" class="pick">
+                  <input
+                    type="checkbox"
+                    :checked="allSelected(opened)"
+                    :aria-label="`Select every tagged unit on ${opened.reference_number}`"
+                    @change="toggleAll(opened)"
+                  >
+                </th>
+                <th scope="col">Unit</th>
+                <th scope="col">Component</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Storage</th>
+                <th scope="col">State</th>
+                <th v-if="hasReleased(opened)" scope="col">Dispatched</th>
+                <th v-if="hasReleased(opened) && canCorrectDispatch" scope="col"><span class="sr-only">Correct</span></th>
+                <th scope="col" class="view-col"><span class="sr-only">View</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="allocation in opened.allocations" :key="allocation.id">
+                <td v-if="awaitingRelease && !isOrder(opened)" class="pick">
+                  <input
+                    v-if="allocation.status === 'allocated'"
+                    type="checkbox"
+                    :checked="isSelected(opened, allocation.id)"
+                    :aria-label="`Select unit ${allocation.unit_id}`"
+                    @change="toggleUnit(opened, allocation.id)"
+                  >
+                </td>
+                <td class="mono">{{ allocation.unit_id }}</td>
+                <td>{{ componentFor(opened, allocation) }}</td>
+                <td :class="{ expiring: isExpiringSoon(allocation.expiry_date) }">
+                  {{ allocation.expiry_date || 'Not set' }}
+                </td>
+                <td :class="{ muted: !allocation.storage_location }">{{ allocation.storage_location || 'Not set' }}</td>
+                <!-- One plain value a column (project owner, 2026-11-27); the eye shows the rest. -->
+                <td>{{ allocation.received_at ? 'Received' : allocation.status_label }}</td>
+                <td v-if="hasReleased(opened)">{{ allocation.status === 'released' ? formatWhen(allocation.released_at) : '—' }}</td>
+                <td v-if="hasReleased(opened) && canCorrectDispatch">
+                  <button
+                    v-if="allocation.status === 'released'"
+                    type="button"
+                    class="ui-btn ui-btn--sm"
+                    :aria-label="`Request a correction to the dispatch record of unit ${allocation.unit_id}`"
+                    @click="openCorrect(opened, allocation)"
+                  >
+                    Correct
+                  </button>
+                </td>
+                <td class="view-col">
+                  <RowViewButton :label="`View unit ${allocation.unit_id}`" @view="viewUnit(opened, allocation)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p v-else class="units-empty">{{ isOrder(opened) ? 'Nothing is held for this order. Pick its units as you dispatch it.' : 'No units are tagged for this request.' }}</p>
+        </div>
+      </div>
+
+      <template #actions>
+        <template v-if="opened">
           <!-- A confirmed replenishment order: nothing to return, the bags are picked as it goes. -->
-          <footer v-if="activeTab === 'awaiting_release' && isOrder(request)" class="request-actions">
+          <template v-if="awaitingRelease && isOrder(opened)">
             <span class="selection-note">
-              {{ request.outstanding_quantity }} unit{{ request.outstanding_quantity === 1 ? '' : 's' }} to send
+              {{ opened.outstanding_quantity }} unit{{ opened.outstanding_quantity === 1 ? '' : 's' }} to send
             </span>
             <button
-              class="ui-btn ui-btn--primary ui-btn--sm"
-              :disabled="busyId === request.id || !request.outstanding_quantity"
-              @click="openOrderDispatch(request)"
+              class="ui-btn ui-btn--primary"
+              :disabled="busyId === opened.id || !opened.outstanding_quantity"
+              @click="openOrderDispatch(opened)"
             >
-              <AssetIcon v-if="busyId !== request.id" name="truck" :size="14" />
-              {{ busyId === request.id ? 'Working…' : 'Pick Units & Dispatch' }}
+              <AssetIcon v-if="busyId !== opened.id" name="truck" :size="15" />
+              {{ busyId === opened.id ? 'Working…' : 'Pick Units & Dispatch' }}
             </button>
-          </footer>
+          </template>
 
-          <footer v-else-if="activeTab === 'awaiting_release'" class="request-actions">
+          <template v-else-if="awaitingRelease">
             <span class="selection-note">
-              {{ selectedCount(request) > 0
-                ? `${selectedCount(request)} unit(s) selected`
+              {{ selectedCount(opened) > 0
+                ? `${selectedCount(opened)} unit(s) selected`
                 : 'Nothing selected — Dispatch sends every tagged unit.' }}
             </span>
             <button
-              class="ui-btn ui-btn--sm"
-              :disabled="busyId === request.id || taggedCount(request) === 0"
-              @click="openReturn(request)"
+              class="ui-btn"
+              :disabled="busyId === opened.id || taggedCount(opened) === 0"
+              @click="openReturn(opened)"
             >
               Return to Stock
             </button>
             <button
-              class="ui-btn ui-btn--primary ui-btn--sm"
-              :disabled="busyId === request.id || taggedCount(request) === 0 || !gateFor(request).ok"
-              @click="openDispatch(request)"
+              class="ui-btn ui-btn--primary"
+              :disabled="busyId === opened.id || taggedCount(opened) === 0 || !gateFor(opened).ok"
+              @click="openDispatch(opened)"
             >
-              <AssetIcon v-if="busyId !== request.id" name="truck" :size="14" />
-              {{ busyId === request.id ? 'Working…' : 'Dispatch' }}
+              <AssetIcon v-if="busyId !== opened.id" name="truck" :size="15" />
+              {{ busyId === opened.id ? 'Working…' : 'Dispatch' }}
             </button>
-          </footer>
+          </template>
 
-          <footer v-else class="request-actions">
+          <template v-else>
+            <!-- Receipt is confirmed by the hospital, not here. -->
             <span class="selection-note">
               <AssetIcon name="clock" :size="13" />
-              Waiting on {{ request.requesting_facility?.name || 'the hospital' }} to confirm receipt.
+              {{ opened.requesting_facility?.name || 'The hospital' }} confirmed {{ opened.received_count ?? 0 }} of {{ opened.fulfilled_quantity ?? 0 }}.
             </span>
-          </footer>
-        </article>
-      </div>
-        </section>
-      </div>
+            <button type="button" class="ui-btn" @click="closeRequest">Close</button>
+          </template>
+        </template>
       </template>
-    </div>
+    </CenterModal>
+
+    <!-- Everything about a request, read only, from its row's eye. -->
+    <RecordDialog :open="Boolean(viewingRequest)" :title="viewingRequest?.title || 'Request'" eyebrow="Request" :sections="viewingRequest?.sections || []" @close="viewingRequest = null">
+      <template #actions>
+        <button type="button" class="ui-btn ui-btn--primary" @click="openViewed">Open</button>
+      </template>
+    </RecordDialog>
 
     <!-- DISPATCH CONFIRM -->
     <Teleport to="body" :disabled="pageHidden">
@@ -604,6 +643,7 @@ import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import RecordDialog from '~/components/ui/RecordDialog.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
 import RowViewButton from '~/components/ui/RowViewButton.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
@@ -646,6 +686,10 @@ const tabs = [
   { value: 'awaiting_release', label: 'Awaiting Dispatch' },
   { value: 'awaiting_receipt', label: 'Awaiting Confirmation' },
 ]
+
+// Request Fulfillment and For Dispatch's first tab: units still to go out.
+const awaitingRelease = computed(() => activeTab.value === 'awaiting_release')
+const columnCount = computed(() => (awaitingRelease.value ? 11 : 9))
 
 /* TOASTS */
 const { notify: toast } = useToast()
@@ -702,12 +746,20 @@ function queueFilters() {
  * The request Issue sent here: marked on this list or, when its invoice is
  * already cleared, opened on For Dispatch instead.
  */
+// Opened once for each time a link names it, not again on every reload.
+let autoOpened = null
+watch(focusId, () => { autoOpened = null })
+
 async function showFocused() {
   const id = focusId.value
   if (!id) return
   if (requests.value.some(r => r.id === id)) {
     await nextTick()
-    document.getElementById(`request-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document.getElementById(`request-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (autoOpened !== id) {
+      autoOpened = id
+      openedId.value = id
+    }
     return
   }
   if (!forDispatch.value) {
@@ -917,12 +969,6 @@ function neededBy(request) {
   return request.transfusion_request?.needed_by ?? request.supply_plan?.scheduled_at ?? null
 }
 
-/** Within the next 24 hours, or already past. */
-function isSoon(iso) {
-  const at = time(iso)
-  return !Number.isNaN(at) && at - Date.now() <= 86_400_000
-}
-
 function isToday(iso) {
   const at = iso ? new Date(iso) : null
   return Boolean(at) && at.toDateString() === new Date().toDateString()
@@ -1064,12 +1110,6 @@ const groups = computed(() => {
     .filter((g) => g.items.length)
 })
 
-// The one to start on: the most urgent of what is shown, whatever the grouping.
-const nextUpId = computed(() => {
-  if (shown.value.length < 2) return null
-  return [...shown.value].sort(ORDERS.urgent)[0]?.id ?? null
-})
-
 function clearFilters() {
   search.value = ''
   show.value = 'all'
@@ -1184,6 +1224,7 @@ async function confirmDispatch() {
 
     toastDispatched(request, response, dispatchCount.value)
     dispatchFor.value = null
+    openedId.value = null
     await load()
   } catch (err) {
     actionError.value = err?.message || 'Those units could not be dispatched.'
@@ -1235,6 +1276,7 @@ async function confirmOrderDispatch(unitIds) {
 
     toastDispatched(request, response, unitIds.length)
     orderFor.value = null
+    openedId.value = null
     await load()
   } catch (err) {
     const byUnit = {}
@@ -1279,6 +1321,7 @@ async function confirmDefer() {
     const response = await bloodCenterService.deferPayment(request.id)
     toast('Payment Deferred', 'success', response?.message ?? 'The units can be dispatched.')
     deferFor.value = null
+    openedId.value = null
     await navigateTo({ path: '/blood-center/dispatch', query: { request: request.id } })
   } catch (err) {
     actionError.value = err?.message || 'The payment could not be deferred.'
@@ -1297,6 +1340,110 @@ function hasReleased(request) {
 
 function formatWhen(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+}
+
+/*
+ * THE OPENED REQUEST (project owner, 2026-11-27): the list is one row a
+ * request, and the row opens it in a dialog where its units are picked,
+ * returned and dispatched. Held by id, so a reload shows the request as it now
+ * reads, and closes the dialog once it has left this list.
+ */
+const openedId = ref(null)
+const opened = computed(() => (openedId.value === null ? null : requests.value.find((r) => r.id === openedId.value) ?? null))
+
+// One of the request's own dialogs is open over it: the request steps aside.
+const stepping = computed(() => dispatchFor.value !== null
+  || orderFor.value !== null
+  || deferFor.value !== null
+  || correctFor.value !== null
+  || dispatchCorrection.value !== null
+  || returnFor.value !== null)
+
+function openRequest(request) {
+  if (busyId.value) return
+  actionError.value = ''
+  openedId.value = request.id
+}
+
+function closeRequest() {
+  if (busyId.value) return
+  openedId.value = null
+}
+
+/** What sort of request it is, over its reference in the dialogs. */
+function requestKind(request) {
+  if (request.weekly_request) return `Weekly request ${request.weekly_request.reference_number}`
+  if (isOrder(request)) return 'Replenishment order'
+  const kind = request.is_walk_in ? 'Walk-in request' : 'Patient request'
+  return request.is_emergency ? `STAT · ${kind}` : kind
+}
+
+/** The invoice in one plain value, for the Payment column. */
+function paymentLabel(request) {
+  const billing = request.billing
+  if (!billing) return isOrder(request) ? 'Billed at dispatch' : 'No invoice'
+  if (billing.is_payment_deferred) return 'Deferred'
+  if (billing.clears_release) {
+    if (billing.is_statement_only) return 'Invoice only'
+    if (billing.is_subsidised) return 'Subsidised'
+    return 'Settled'
+  }
+  return `${owedOn(request)} owing`
+}
+
+/** The soonest expiry among the bags still held for it, as the units table shows dates. */
+function firstExpiry(request) {
+  const dates = taggedUnits(request).map((a) => a.expiry_date).filter(Boolean).sort()
+  return dates[0] ?? ''
+}
+
+/* VIEW: a request's eye, read only, with Open to work it */
+const viewingRequest = ref(null)
+
+function viewRequest(request) {
+  const plan = request.supply_plan
+  const delivery = plan?.handover_method === 'delivery'
+
+  viewingRequest.value = {
+    id: request.id,
+    title: request.reference_number || 'Request',
+    sections: [
+      { title: 'Request', rows: [
+        { label: 'Reference', value: request.reference_number, mono: true },
+        { label: 'Type', value: requestKind(request) },
+        { label: 'Hospital', value: request.requesting_facility?.name },
+        { label: 'Blood type', value: bloodTypeCodes(request).join(', ') },
+        { label: 'Urgency', value: request.urgency_label },
+        { label: 'Status', value: requestStatusLabel(request) },
+      ] },
+      { title: 'Timing', rows: [
+        { label: 'Received', value: request.request_date ? formatWhen(request.request_date) : '' },
+        { label: 'Waiting', value: waitingFor(request) },
+        { label: 'Needed by', value: neededBy(request) ? formatWhen(neededBy(request)) : '' },
+        { label: 'Hand-over', value: plan ? `${delivery ? 'Deliver' : 'Pick-up'} · ${handoverWhen(plan.scheduled_at)}` : '' },
+        { label: delivery ? 'Deliver to' : 'Pick-up at', value: plan?.handover_address },
+      ] },
+      { title: 'Units', rows: [
+        { label: 'Requested', value: request.quantity },
+        { label: 'Committed', value: request.committed_quantity },
+        { label: 'Tagged', value: isOrder(request) ? '' : taggedCount(request) },
+        { label: 'First expiry', value: firstExpiry(request) },
+        { label: 'Expiring within 7 days', value: expiringCount(request) || '' },
+        { label: 'Dispatched', value: request.fulfilled_quantity },
+        { label: 'Confirmed by the hospital', value: request.received_count },
+      ] },
+      { title: 'Payment', rows: [
+        { label: 'Payment', value: paymentLabel(request) },
+        { label: 'Release', value: gateFor(request).message, wide: true },
+      ] },
+    ],
+  }
+}
+
+function openViewed() {
+  const id = viewingRequest.value?.id
+  viewingRequest.value = null
+  if (id != null) openedId.value = id
 }
 
 /* VIEW: a unit's eye opens everything the units table leaves out (project owner, 2026-11-27) */
@@ -1443,11 +1590,22 @@ onMounted(load)
 // quietly, and an Issue button's ?request= is marked again. A link naming a
 // tab (?tab=all) opens that one; the Blood Requests list reloads itself.
 onPageReturn(() => {
+  // A link back naming a request opens it again.
+  autoOpened = null
   if (!forDispatch.value) fulfilmentTab.value = route.query.tab === 'all' ? 'all' : 'owing'
   if (showingNetwork.value) return
   return load({ quiet: true })
 })
 const pageHidden = usePageHidden()
+
+/*
+ * A unit's view opens over its request, and closing it unlocks the page's
+ * scroll (each dialog keeps its own lock). Locked again after it, while the
+ * request is still open.
+ */
+watch(() => viewing.value, (now) => {
+  if (!now && opened.value && !stepping.value && !pageHidden.value) document.body.style.overflow = 'hidden'
+}, { flush: 'post' })
 
 /*
  * Kept current while it is open: every 30 seconds while this page and the tab
@@ -1466,6 +1624,8 @@ useLiveRefresh(refreshQuietly, {
     || correctFor.value !== null
     || dispatchCorrection.value !== null
     || returnFor.value !== null
+    || openedId.value !== null
+    || viewingRequest.value !== null
     || requests.value.some((row) => row.selected?.length > 0),
 })
 </script>
@@ -1519,9 +1679,7 @@ useLiveRefresh(refreshQuietly, {
 .fx-sort__sel--group { width: 160px; }
 .fx-sort__label + .fx-sort__sel + .fx-sort__label { margin-left: 6px; }
 
-/* Groups: a quiet head over its cards, folding away. */
-.request-groups { display: flex; flex-direction: column; gap: 18px; }
-.fx-group { display: flex; flex-direction: column; gap: 10px; }
+/* Groups: a quiet head row over its requests, folding away. */
 .fx-group__head {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 2px; border: 0; background: none;
   color: var(--rb-text-primary); font: inherit; text-align: left; cursor: pointer;
@@ -1539,15 +1697,6 @@ useLiveRefresh(refreshQuietly, {
   font-size: 11.5px; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
 }
 .fx-group__hint { font-size: 12px; color: var(--rb-text-secondary); }
-
-/* Why a request sits where it does. */
-.request-when { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
-.when { display: inline-flex; align-items: center; gap: 5px; }
-.when--soon { color: var(--rb-warning-text); font-weight: 600; }
-.tag--next {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
-}
 
 .tabbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .tabs { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; border: 1px solid var(--rb-border); background: var(--rb-surface); }
@@ -1573,39 +1722,18 @@ useLiveRefresh(refreshQuietly, {
 .pill--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .07); color: var(--rb-primary-text); }
 
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; }
-.request-list { display: flex; flex-direction: column; gap: 14px; }
-.request-card { padding: 16px 18px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); }
-.request-card--stat { border-color: rgba(var(--rb-accent-rgb), 0.35); }
-
-.request-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.request-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.request-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--rb-text-secondary); margin: 5px 0 0; }
-.request-facility { font-weight: 600; color: var(--rb-text-primary); }
 
 .mono { font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 600; }
-.tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
-.tag--stat { background: var(--rb-accent); color: #fff; }
-.tag--walk-in { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
-.tag--weekly { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
 /* A replenishment order's confirmed hand-over. */
-.handover { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.handover { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .handover strong { color: var(--rb-primary-text); font-weight: 700; }
 .handover :deep(.asset-icon) { color: var(--rb-primary-text); }
 .modal-warning {
   font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; padding: 10px 12px; border-radius: 9px;
   background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3);
 }
-.request-fulfilment { margin-top: 12px; }
-.blood-pill {
-  display: inline-block; padding: 1px 7px; border-radius: 6px; font-weight: 700; font-size: 11.5px;
-  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text);
-}
-.status { padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-.status--processing { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
-.status--partial { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
-.status--fulfilled { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
 
-.lines { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.lines { display: flex; gap: 6px; flex-wrap: wrap; }
 .line-chip {
   font-size: 11.5px; padding: 3px 9px; border-radius: 6px;
   background: var(--rb-surface-alt); color: var(--rb-text-secondary);
@@ -1614,7 +1742,7 @@ useLiveRefresh(refreshQuietly, {
 
 .gate {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 12px; padding: 9px 12px; border-radius: 9px; font-size: 12.5px;
+  padding: 9px 12px; border-radius: 9px; font-size: 12.5px;
 }
 .gate--ok { background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), .2); }
 .gate--blocked { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .22); }
@@ -1622,7 +1750,6 @@ useLiveRefresh(refreshQuietly, {
 .gate-action { margin-left: auto; }
 .gate-link + .gate-action { margin-left: 4px; }
 
-.units { margin-top: 12px; }
 .units-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .units-table th {
   text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
@@ -1638,8 +1765,8 @@ useLiveRefresh(refreshQuietly, {
 .expiring { color: var(--rb-warning-text); font-weight: 600; }
 
 
-.request-actions { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rb-border); flex-wrap: wrap; }
-.selection-note { flex: 1; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); min-width: 180px; }
+/* The request dialog's footer: what will happen, left of its buttons. */
+.selection-note { flex: 1; display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 12.5px; color: var(--rb-text-secondary); min-width: 180px; }
 
 .empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 40px 20px; color: var(--rb-text-secondary); }
 .empty__icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
@@ -1724,14 +1851,11 @@ useLiveRefresh(refreshQuietly, {
   .fx-page { padding: 16px 16px 32px; }
   .units-table { font-size: 11.5px; }
   .units-table th, .units-table td { padding: 6px 6px; }
-  .request-actions { flex-direction: column; align-items: stretch; }
 }
 
 /* Cards in the shared SectionCard's shape (2026-10-15). */
 .card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 
-/* The request its Issue button sent here. */
-.request-card--focus { border-color: rgba(var(--rb-primary-rgb), 0.55); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.14), var(--rb-shadow-sm); scroll-margin-top: 88px; }
 
 /* ---------- The toolbar in two rows (2026-11-11) ---------- */
 .fx-tools { display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 0; padding: 0; overflow: hidden; }
@@ -1744,11 +1868,53 @@ useLiveRefresh(refreshQuietly, {
 .fx-tools .fx-chip { height: 30px; background: var(--rb-surface); }
 .fx-tools .fx-chip--on { background: rgba(var(--rb-primary-rgb), 0.08); }
 
-/* Waiting on the hospital: what has been confirmed of what went out. */
-.receipt-state {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 5px 11px; border-radius: 999px;
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.4); background: rgba(var(--rb-warning-rgb), 0.08);
-  color: var(--rb-warning-text); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+/*
+ * The list (project owner, 2026-11-27): one row a request, one plain value a
+ * column, like Incoming Requests and Stock Intake. Groups are head rows.
+ */
+.fx-table-card { overflow: hidden; }
+.fx-table-wrap { overflow-x: auto; }
+.fx-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 13px; }
+.fx-table thead th {
+  padding: 10px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); white-space: nowrap;
 }
-.receipt-state--part { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); }
+.fx-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.fx-table th:first-child, .fx-table td:first-child { padding-left: 20px; }
+.fx-table th:last-child, .fx-table td:last-child { padding-right: 20px; }
+.fx-table tbody:last-child tr:last-child td { border-bottom: 0; }
+.fx-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.fx-table .end { text-align: right; }
+.fx-table .nowrap { white-space: nowrap; }
+.fx-table td.end > * { vertical-align: middle; }
+.fx-table td.end > * + * { margin-left: 6px; }
+
+.fx-group-row th { padding: 8px 14px 8px 18px; background: var(--rb-surface); border-bottom: 1px solid var(--rb-border); text-align: left; }
+.fx-table tbody + tbody .fx-group-row th { border-top: 1px solid var(--rb-border); }
+
+.fx-row { cursor: pointer; transition: background 0.12s ease; }
+.fx-row:hover { background: var(--rb-surface-hover); }
+.fx-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+/* STAT, as Incoming Requests marks it: a tint, not a chip. */
+.fx-row--stat td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.fx-row--stat:hover td { background: rgba(var(--rb-accent-rgb), 0.07); }
+/* The request its Issue button sent here. */
+.fx-row--focus td { background: rgba(var(--rb-primary-rgb), 0.07); }
+.fx-row { scroll-margin-top: 88px; }
+
+.fx-open {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer;
+  transition: background 0.12s ease;
+}
+.fx-open:hover, .fx-row:hover .fx-open { background: rgba(var(--rb-primary-rgb), 0.12); }
+.fx-open:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* The opened request: what its card held, top to bottom. */
+.rq { display: flex; flex-direction: column; gap: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-row, .fx-open { transition: none; }
+}
 </style>
